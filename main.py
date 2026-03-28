@@ -23,8 +23,11 @@ def main(page: ft.Page):
         page.bgcolor = "#0a0a0a"
         page.padding = 10
 
-        # REGLA ESTRICTA 2: Ruta segura DB Sandbox
-        home_dir = os.environ.get("HOME", os.getcwd())
+        # RUTA DB ULTRA-BLINDADA PARA ANDROID
+        home_dir = os.environ.get("HOME")
+        if not home_dir or home_dir == "/":
+            home_dir = os.environ.get("TMPDIR", os.getcwd())
+            
         db_path = os.path.join(home_dir, "nexus_cad.db")
         
         conn = sqlite3.connect(db_path, check_same_thread=False)
@@ -48,10 +51,12 @@ def main(page: ft.Page):
         status_text = ft.Text("Sistema listo Offline.", color="grey600", size=12)
         projects_list = ft.ListView(expand=True, spacing=10, padding=10)
 
-        # MOTOR WASM + WEBVIEW
-        wasm_html_content = ""
-        assets_path = os.path.join(os.getcwd(), "assets", WASM_ENGINE_FILE)
+        # LECTURA DE ASSETS BLINDADA PARA APK
+        # En Android, os.getcwd() puede fallar. Usamos el directorio del archivo actual.
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        assets_path = os.path.join(base_dir, "assets", WASM_ENGINE_FILE)
         
+        wasm_html_content = ""
         if os.path.exists(assets_path):
             with open(assets_path, "r", encoding="utf-8") as f:
                 wasm_html_content = f.read()
@@ -60,15 +65,14 @@ def main(page: ft.Page):
 
         b64_html = base64.b64encode(wasm_html_content.encode('utf-8')).decode('utf-8')
         
-        # BLINDAJE: Si falla el import, muestra el texto en vez de crashear
-        if HAS_WEBVIEW:
+        if HAS_WEBVIEW and not page.web:
             wasm_webview = fwv.WebView(
                 url=f"data:text/html;base64,{b64_html}",
                 expand=True, javascript_enabled=True, 
             )
         else:
             wasm_webview = ft.Container(
-                content=ft.Text("Visor 3D: WebView no empaquetado", color="red400"),
+                content=ft.Text("Visor 3D: Activo solo en APK", color="yellow"),
                 alignment=ft.Alignment(0, 0), expand=True, bgcolor="#111111"
             )
 
@@ -125,7 +129,7 @@ def main(page: ft.Page):
             status_text.color = "orange400"
             switch_tab(1)
             try:
-                if HAS_WEBVIEW:
+                if HAS_WEBVIEW and not page.web:
                     wasm_webview.run_javascript(f"processOpenScad('{code}');")
             except Exception as ex:
                 status_text.value = f"WASM Error: {ex}"
@@ -177,7 +181,6 @@ def main(page: ft.Page):
         )
         load_history()
 
-    # REGLA ESTRICTA 2: Diagnóstico. Uso hex puro para asegurar que Flet lo pinte.
     except Exception:
         page.clean()
         page.bgcolor = "#990000" 
@@ -188,5 +191,13 @@ def main(page: ft.Page):
         page.update()
 
 if __name__ == "__main__":
-    # BLINDAJE VITAL: Eliminado el os.makedirs("assets") que crasheaba el APK.
-    ft.app(target=main, assets_dir="assets", view="web_browser", port=8555)
+    # AUTO-DETECCIÓN DE ENTORNO (LA CURA PARA EL PANTALLAZO GRIS)
+    is_termux = "com.termux" in os.environ.get("PREFIX", "")
+    
+    if is_termux:
+        # Modo Desarrollo (Termux): Abre servidor web
+        ft.app(target=main, assets_dir="assets", view="web_browser", port=8555)
+    else:
+        # Modo Producción (APK Android): Arranque 100% nativo. 
+        # NUNCA le pasamos "view" ni "port" aquí.
+        ft.app(target=main, assets_dir="assets")

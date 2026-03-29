@@ -43,13 +43,14 @@
             function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
 
             // ==================================================
-            // COMPILADOR MINI-SCAD: Interpreta tus variables reales
+            // COMPILADOR MINI-SCAD: Interpreta tu código real
             // ==================================================
             function parseAndDrawSCAD(code) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                // Extraer parámetros de tu código: branch(length, thickness, angle, depth)
+                // 1. Extraer tus parámetros reales de branch(...)
                 let length = 20, thickness = 3, baseAngle = 25, maxDepth = 7;
+                // Buscar branch(20, 3, 25, 7) en el código
                 const match = code.match(/branch\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
                 
                 if (match) {
@@ -57,63 +58,84 @@
                     thickness = parseFloat(match[2]);
                     baseAngle = parseFloat(match[3]);
                     maxDepth = parseInt(match[4]);
-                    logToScreen(`✓ Parámetros extraídos: L=${length}, Grosor=${thickness}, Angulo=${baseAngle}°, Profundidad=${maxDepth}`);
+                    logToScreen(`✓ Matemáticas extraídas: L=${length}, Grosor=${thickness}, Angulo=${baseAngle}°, Nivel=${maxDepth}`);
                 } else {
-                    logToScreen('Aviso: No se detectaron parámetros. Usando valores por defecto.');
+                    logToScreen('Aviso: Variables no detectadas. Usando modelo por defecto.');
                 }
 
-                // Ajustar escala visual
-                const scale = canvas.height / (length * 10); 
+                // Ajustar escala visual a la pantalla del móvil
+                const scale = (canvas.height * 0.6) / (length * 4); 
                 const angleRad = baseAngle * (Math.PI / 180);
 
-                // Función recursiva que emula tu código OpenSCAD
+                // 2. Función recursiva que emula tus cilindros y rotaciones
                 function drawBranch(x, y, l, t, ang, depth) {
                     if (depth <= 0) {
-                        // Interpretar el follaje (spheres)
-                        if (code.includes('sphere')) {
-                            ctx.beginPath();
-                            // rand(i) simulado para dar aspecto orgánico
-                            const leafSize = (4 + Math.random() * 2) * scale * 0.5;
-                            ctx.arc(x, y, leafSize, 0, Math.PI * 2);
-                            ctx.fillStyle = `rgba(0, ${150 + Math.random()*105}, ${50 + Math.random()*50}, 0.8)`;
-                            ctx.fill();
-                        }
-                        return;
+                        return; // Fin de la rama
                     }
 
-                    const x2 = x + Math.cos(ang) * (l * scale * 4);
-                    const y2 = y + Math.sin(ang) * (l * scale * 4);
+                    // Calcular siguiente punto (translación)
+                    const x2 = x + Math.cos(ang) * (l * scale);
+                    const y2 = y + Math.sin(ang) * (l * scale);
 
+                    // Dibujar el cilindro (como línea gruesa)
                     ctx.beginPath();
                     ctx.moveTo(x, y);
                     ctx.lineTo(x2, y2);
-                    ctx.strokeStyle = '#6d4c41'; // Tronco madera
+                    ctx.strokeStyle = '#8d6e63'; // Color madera
                     ctx.lineCap = 'round';
-                    ctx.lineWidth = t * scale * 1.5;
+                    ctx.lineWidth = t * scale * 0.5;
                     ctx.stroke();
 
-                    // Simular las 3 rotaciones de tu código:
-                    // 1. rotate([angle, 0, 0]) -> ángulo * 1.1
+                    // Simular tus 3 ramas de OpenSCAD:
+                    // rotate([angle, 0, 0]) branch(length * 0.7, thickness * 0.7, angle * 1.1, depth - 1);
                     drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 1.1), depth - 1);
-                    // 2. rotate([-angle * 0.8, 0, 120]) -> ángulo a la izquierda
+                    
+                    // rotate([-angle * 0.8, 0, 120]) branch(...)
                     drawBranch(x2, y2, l * 0.7, t * 0.7, ang + (angleRad * 0.8), depth - 1);
-                    // 3. rotate([angle * 0.5, 0, 240]) -> ángulo * 1.2 central
-                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 0.3), depth - 1);
+                    
+                    // rotate([angle * 0.5, 0, 240]) branch(...)
+                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 0.5), depth - 1);
                 }
 
-                logToScreen('Paso 8: Renderizando malla nativa avanzada...');
-                // Empezar a dibujar desde abajo al centro
-                drawBranch(canvas.width / 2, canvas.height - 20, length, thickness, -Math.PI / 2, maxDepth);
-                logToScreen('✓ Paso 9: Modelo de follaje 3D-Proyectado dibujado con éxito.');
+                // 3. Función para dibujar tu follaje (esferas)
+                function drawFoliage(x, y) {
+                    if (code.includes('sphere')) {
+                        // Bucle for(i=[0:5:360]) emulado
+                        for (let i = 0; i < 360; i += 15) {
+                            const radius = (4 + Math.random() * 2) * scale * 0.4;
+                            const offsetX = (Math.random() - 0.5) * 40 * scale;
+                            const offsetY = (Math.random() - 0.5) * 40 * scale;
+                            
+                            ctx.beginPath();
+                            ctx.arc(x + offsetX, y - (15 * scale) + offsetY, radius, 0, Math.PI * 2);
+                            ctx.fillStyle = `rgba(0, ${150 + Math.random()*100}, ${50 + Math.random()*50}, 0.6)`;
+                            ctx.fill();
+                        }
+                        logToScreen('✓ Follaje de esferas renderizado.');
+                    }
+                }
+
+                logToScreen('Paso 8: Procesando geometría dinámica...');
+                
+                // Iniciar el tronco desde la parte inferior central
+                const startX = canvas.width / 2;
+                const startY = canvas.height - 30;
+                drawBranch(startX, startY, length, thickness, -Math.PI / 2, maxDepth);
+                
+                // Añadir el follaje en la copa del árbol (aproximado a tu translate)
+                drawFoliage(startX, startY - (length * scale * 3.5));
+                
+                logToScreen('✓ Paso 9: Árbol complejo proyectado en pantalla con éxito.');
             }
 
             // ==================================================
-            // CONEXIÓN API
+            // CONEXIÓN API AL SERVIDOR PYTHON DE LA V1.0 RC01
             // ==================================================
             fetch('/api/get_code_b64.json')
                 .then(r => r.json())
                 .then(data => {
                     if (data.code_b64 && data.code_b64.trim() !== "") {
+                        logToScreen('✓ Paso 6: Código recibido. Compilando...');
                         const code = decodeB64(data.code_b64);
                         parseAndDrawSCAD(code);
                     } else { logToScreen('Esperando código...'); }

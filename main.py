@@ -47,7 +47,7 @@ def main(page: ft.Page):
             page.update()
 
         def run_render():
-            status_text.value = "Inyectando con JS Activado..."
+            status_text.value = "Inyectando en RAM..."
             status_text.color = "orange400"
             switch(1) 
 
@@ -55,22 +55,28 @@ def main(page: ft.Page):
                 with open("assets/openscad_engine.html", "r", encoding="utf-8") as f:
                     template = f.read()
                 
+                # 1. CODIFICAR Y LIMPIAR
                 raw_b64 = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
                 clean_b64 = raw_b64.replace('\n', '').replace('\r', '')
+                
+                # 2. INYECTAR
                 final_html = template.replace("__NEXUS_PAYLOAD__", clean_b64)
+                
+                # 3. EMPAQUETAR PÁGINA COMPLETA
                 final_b64 = base64.b64encode(final_html.encode('utf-8')).decode('utf-8')
                 
                 if HAS_WEBVIEW and not page.web:
                     # ==========================================================
-                    # FIX CRÍTICO: DEVOLVERLE LA VIDA AL MOTOR JAVASCRIPT
+                    # FIX CRÍTICO: SIN 'javascript_enabled' Y CON 'charset=utf-8'
                     # ==========================================================
                     viewer_container.content = fwv.WebView(
-                        url=f"data:text/html;base64,{final_b64}", 
-                        javascript_enabled=True, # <--- LA CLAVE DE TODO
+                        url=f"data:text/html;charset=utf-8;base64,{final_b64}", 
                         expand=True
                     )
-                    status_text.value = "✓ Renderizado en RAM (JS ON)"
+                    status_text.value = "✓ Renderizado en RAM"
                     status_text.color = "blue400"
+                else:
+                    status_text.value = "Error: Faltan librerías nativas"
             except Exception as e:
                 status_text.value = f"Error Python: {e}"
                 status_text.color = "red900"

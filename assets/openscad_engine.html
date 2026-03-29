@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { margin: 0; background: #000; font-family: monospace; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-        /* Mitad superior: El Visor */
         #visor-container { flex: 1; position: relative; border-bottom: 2px solid #00ff00; }
         canvas { display: block; width: 100%; height: 100%; }
-        
-        /* Mitad inferior: La Consola de Diagnóstico */
         #log-container { flex: 1; background: #0a0a0a; color: #00ff00; padding: 10px; overflow-y: auto; font-size: 11px; }
         .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #333; padding-bottom: 4px; word-wrap: break-word; }
         .error { color: #ff3333; font-weight: bold; }
@@ -23,7 +20,6 @@
     <script>
         const logBox = document.getElementById('log-container');
         
-        // Función para imprimir en la pantalla del móvil
         function logToScreen(msg, isError=false) {
             const p = document.createElement('div');
             p.className = 'log-msg ' + (isError ? 'error' : (msg.includes('✓') ? 'success' : ''));
@@ -32,7 +28,6 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        // INTERCEPTOR DE CUALQUIER FALLO FATAL DE ANDROID
         window.onerror = function(msg, url, line) {
             logToScreen('CRASH FATAL: ' + msg + ' (Línea ' + line + ')', true);
             return false;
@@ -69,29 +64,27 @@
                 drawFractalTree(x2, y2, len * 0.7, angle + 0.4, depth - 1);
             }
 
-            // EL PUENTE (Python inyectará aquí)
             const payload = "__NEXUS_PAYLOAD__";
             logToScreen('Paso 4: Leyendo inyección. Longitud: ' + payload.length + ' chars');
 
             if (payload !== "__NEXUS_PAYLOAD__" && payload.trim() !== "") {
                 logToScreen('Paso 5: Intentando decodificar Base64...');
                 const code = decodeB64(payload);
-                logToScreen('✓ Paso 6: Decodificación exitosa. Código recibido.');
+                logToScreen('✓ Paso 6: Decodificación exitosa.');
                 
-                logToScreen('Paso 7: Iniciando motor de renderizado...');
+                logToScreen('Paso 7: Iniciando motor...');
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 if (code.toLowerCase().includes("branch") || code.toLowerCase().includes("tree")) {
                     drawFractalTree(canvas.width / 2, canvas.height - 20, canvas.height / 3.5, -Math.PI / 2, 8);
-                    logToScreen('✓ Paso 8: Árbol fractal dibujado en pantalla.');
+                    logToScreen('✓ Paso 8: Árbol fractal dibujado.');
                 } else {
                     ctx.fillStyle = "#00e676"; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
-                    logToScreen('✓ Paso 8: Cubo dibujado en pantalla.');
+                    logToScreen('✓ Paso 8: Cubo dibujado.');
                 }
             } else {
-                logToScreen('Esperando que Python inyecte el código OpenSCAD...');
+                logToScreen('Esperando que Python inyecte el código...');
             }
-
         } catch(error) {
             logToScreen('EXCEPCIÓN ATRAPADA: ' + error.message, true);
         }

@@ -50,7 +50,7 @@
             drawFractalTree(x2, y2, len * 0.7, angle + 0.4, depth - 1);
         }
 
-        // PYTHON INYECTARÁ EL CÓDIGO AQUÍ:
+        // PYTHON INYECTARÁ EL CÓDIGO AQUÍ AL GUARDAR EL ARCHIVO FÍSICO:
         const b64_payload = "__NEXUS_PAYLOAD__";
 
         try {
@@ -58,7 +58,7 @@
                 const code = decodeB64(b64_payload);
                 stateIndicator.style.background = '#00ff00';
                 stateIndicator.style.boxShadow = '0 0 10px #00ff00';
-                stateText.innerHTML = "● VISOR: Objeto generado.";
+                stateText.innerHTML = "● VISOR: JS Ejecutado. Dibujando...";
                 stateText.style.color = '#00ff00';
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -72,7 +72,7 @@
             } else {
                 stateIndicator.style.background = 'orange';
                 stateIndicator.style.boxShadow = '0 0 5px orange';
-                stateText.innerHTML = "● VISOR: Esperando código...";
+                stateText.innerHTML = "● VISOR: JS Ejecutado (Sin código)";
                 stateText.style.color = 'orange';
             }
         } catch(e) {

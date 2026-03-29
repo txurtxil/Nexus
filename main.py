@@ -16,10 +16,13 @@ def main(page: ft.Page):
         page.bgcolor = "#0a0a0a"
         page.padding = 0
         
+        # 1. RUTAS SEGURAS EN ANDROID (Para DB y para el HTML renderizado)
         home_dir = os.environ.get("HOME", os.getcwd())
         if home_dir == "/": home_dir = os.environ.get("TMPDIR", os.getcwd())
             
         db_path = os.path.join(home_dir, "nexus_cad.db")
+        render_path = os.path.join(home_dir, "render.html") # AQUÍ GUARDAREMOS EL HTML
+        
         conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.execute("CREATE TABLE IF NOT EXISTS projects (name TEXT UNIQUE, code TEXT, created_at TEXT)")
         conn.commit()
@@ -33,12 +36,6 @@ def main(page: ft.Page):
         
         status_text = ft.Text("Listo", color="grey600")
 
-        # Iniciar WebView con about:blank. ¡OJO! Sin on_message ni javascript_enabled.
-        if HAS_WEBVIEW and not page.web:
-            wv = fwv.WebView(url="about:blank", expand=True)
-        else:
-            wv = ft.Container(content=ft.Text("Visor 3D: Activo en APK"), expand=True, bgcolor="#111")
-
         editor_container = ft.Container(
             content=ft.Column([
                 txt_name, txt_code, 
@@ -47,34 +44,48 @@ def main(page: ft.Page):
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
 
-        viewer_container = ft.Container(content=wv, expand=True, visible=False)
+        # Visor inactivo al arrancar
+        viewer_container = ft.Container(
+            content=ft.Text("Visor inactivo. Pulsa compilar.", color="grey500"), 
+            alignment=ft.alignment.center, expand=True, visible=False
+        )
 
         def switch(idx):
             editor_container.visible = (idx == 0)
             viewer_container.visible = (idx == 1)
             page.update()
 
+        # LA MAGIA: ESCRIBIR A DISCO PARA ENGAÑAR A ANDROID
         def run_render():
-            status_text.value = "Generando..."
+            status_text.value = "Horneando archivo local..."
             status_text.color = "orange400"
             switch(1) 
 
-            # LEEMOS EL HTML
-            with open("assets/openscad_engine.html", "r", encoding="utf-8") as f:
-                template = f.read()
-            
-            # CIFRAMOS EL CÓDIGO A BASE64
-            b64_code = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
-            
-            # INYECTAMOS EN EL HTML Y CODIFICAMOS LA PÁGINA COMPLETA
-            final_html = template.replace("__NEXUS_PAYLOAD__", b64_code)
-            final_b64 = base64.b64encode(final_html.encode('utf-8')).decode('utf-8')
-            
-            # RECARGAMOS LA URL DEL WEBVIEW
-            if HAS_WEBVIEW and not page.web:
-                wv.url = f"data:text/html;base64,{final_b64}"
-                status_text.value = "✓ Objeto generado."
-                status_text.color = "blue400"
+            try:
+                # 1. Leemos la plantilla
+                with open("assets/openscad_engine.html", "r", encoding="utf-8") as f:
+                    template = f.read()
+                
+                # 2. Incrustamos tu código
+                b64_code = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
+                final_html = template.replace("__NEXUS_PAYLOAD__", b64_code)
+                
+                # 3. GUARDAMOS EL ARCHIVO FÍSICO EN EL MÓVIL
+                with open(render_path, "w", encoding="utf-8") as f:
+                    f.write(final_html)
+                
+                # 4. CARGAMOS EL ARCHIVO MEDIANTE file://
+                if HAS_WEBVIEW and not page.web:
+                    # Sobrescribimos el contenedor con un WebView totalmente nuevo apuntando al archivo
+                    viewer_container.content = fwv.WebView(url=f"file://{render_path}", expand=True)
+                    status_text.value = "✓ Renderizado (Motor Nativo Local)"
+                    status_text.color = "blue400"
+                else:
+                    viewer_container.content = ft.Text("WebView no disponible", color="red")
+            except Exception as e:
+                status_text.value = f"Error al hornear: {e}"
+                status_text.color = "red900"
+                
             page.update()
 
         page.add(

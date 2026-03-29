@@ -4,17 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; padding: 0; background: #0a0a0a; color: #00ff00; overflow: hidden; font-family: monospace; display: flex; flex-direction: column; height: 100vh; }
-        #visor-container { flex: 1; position: relative; border-bottom: 2px solid #1a1a1a; z-index: 10; }
+        body { margin: 0; padding: 0; background: #0a0a0a; color: #00ff00; overflow: hidden; font-family: monospace; display: flex; flex-direction: column; height: 100vh; touch-action: none; }
+        #visor-container { flex: 1; position: relative; border-bottom: 2px solid #1a1a1a; z-index: 10; cursor: grab; }
+        #visor-container:active { cursor: grabbing; }
         canvas { display: block; width: 100%; height: 100%; z-index: 20; position: absolute; top: 0; left: 0; }
-        #log-container { flex: 1; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 5; }
+        #overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 30; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 5px; pointer-events: none; }
+        #log-container { height: 120px; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 5; }
         .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #222; padding-bottom: 4px; }
         .error { color: #ff3333; font-weight: bold; }
         .success { color: #00e676; }
     </style>
 </head>
 <body>
-    <div id="visor-container"><canvas id="cvs"></canvas></div>
+    <div id="visor-container">
+        <div id="overlay-ui">👆 Arrastra para rotar en 3D</div>
+        <canvas id="cvs"></canvas>
+    </div>
     <div id="log-container"></div>
     <script>
         const logBox = document.getElementById('log-container');
@@ -25,124 +30,187 @@
             logBox.appendChild(p);
             logBox.scrollTop = logBox.scrollHeight;
         }
-        window.onerror = function(msg, url, line) { logToScreen('CRASH FATAL: ' + msg + ' (Línea ' + line + ')', true); return false; };
+        window.onerror = function(msg, url, line) { logToScreen('CRASH FATAL: ' + msg, true); return false; };
 
-        logToScreen('Paso 1: Motor Mini-SCAD Parser 2.0 arrancado.');
+        logToScreen('Paso 1: Motor WebGL-Bypass 3.0 (v1.2.0) arrancado.');
         
-        try {
-            const canvas = document.getElementById('cvs');
-            const ctx = canvas.getContext('2d');
+        const canvas = document.getElementById('cvs');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        
+        function resize() {
+            width = canvas.width = canvas.parentElement.clientWidth;
+            height = canvas.height = canvas.parentElement.clientHeight;
+            if(geometry.length > 0) renderScene();
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
+
+        // ==================================================
+        // MOTOR DE MATRICES 3D Y CÁMARA
+        // ==================================================
+        let camRotZ = 0; // Rotación Yaw (izquierda/derecha)
+        let camRotX = 0.2; // Rotación Pitch (arriba/abajo)
+        let zoom = 4;
+        let geometry = []; // Almacena la malla 3D
+
+        // Multiplicador de matrices 4x4 simplificado
+        const identity = () => [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+        const multiply = (a, b) => {
+            let c = new Array(16).fill(0);
+            for(let i=0; i<4; i++) for(let j=0; j<4; j++) for(let k=0; k<4; k++) c[i + j*4] += a[i + k*4] * b[k + j*4];
+            return c;
+        };
+        const translateMat = (x,y,z) => [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
+        const rotateXMat = (d) => { let c=Math.cos(d), s=Math.sin(d); return [1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]; };
+        const rotateYMat = (d) => { let c=Math.cos(d), s=Math.sin(d); return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]; };
+        const rotateZMat = (d) => { let c=Math.cos(d), s=Math.sin(d); return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]; };
+        
+        const transformPoint = (p, m) => ({
+            x: p.x*m[0] + p.y*m[4] + p.z*m[8] + m[12],
+            y: p.x*m[1] + p.y*m[5] + p.z*m[9] + m[13],
+            z: p.x*m[2] + p.y*m[6] + p.z*m[10] + m[14]
+        });
+
+        // ==================================================
+        // CONTROLES TÁCTILES Y RATÓN
+        // ==================================================
+        let isDragging = false, lastX=0, lastY=0;
+        const startDrag = (x,y) => { isDragging = true; lastX = x; lastY = y; };
+        const onDrag = (x,y) => {
+            if(!isDragging) return;
+            camRotZ += (x - lastX) * 0.01;
+            camRotX += (y - lastY) * 0.01;
+            lastX = x; lastY = y;
+            renderScene();
+        };
+        const endDrag = () => isDragging = false;
+
+        canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+        window.addEventListener('mousemove', e => onDrag(e.clientX, e.clientY));
+        window.addEventListener('mouseup', endDrag);
+        canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY));
+        window.addEventListener('touchmove', e => onDrag(e.touches[0].clientX, e.touches[0].clientY));
+        window.addEventListener('touchend', endDrag);
+
+        // ==================================================
+        // COMPILADOR OpenSCAD a MATRICES
+        // ==================================================
+        function buildGeometry(code) {
+            geometry = [];
+            let matStack = [];
+            let currentMat = identity();
+            const pushMat = () => matStack.push([...currentMat]);
+            const popMat = () => currentMat = matStack.pop();
+            const apply = (m) => currentMat = multiply(currentMat, m);
+
+            let length = 20, thickness = 3, baseAngle = 25, maxDepth = 7;
+            const match = code.match(/branch\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
+            if (match) {
+                length = parseFloat(match[1]); thickness = parseFloat(match[2]);
+                baseAngle = parseFloat(match[3]); maxDepth = parseInt(match[4]);
+                logToScreen(`✓ Geometría: L=${length}, Grosor=${thickness}, Ang=${baseAngle}°, Nivel=${maxDepth}`);
+            }
+
+            zoom = (height * 0.5) / (length * 3);
+
+            function addLine(l, t) {
+                let p1 = transformPoint({x:0, y:0, z:0}, currentMat);
+                let p2 = transformPoint({x:0, y:0, z:l}, currentMat);
+                geometry.push({type: 'line', p1, p2, t, rawZ: Math.max(p1.z, p2.z)});
+            }
+
+            function branch(l, t, a, d) {
+                if(d <= 0) return;
+                
+                addLine(l, t);
+                
+                pushMat();
+                apply(translateMat(0, 0, l));
+
+                // Equivalente matemático de tu código OpenSCAD real:
+                pushMat(); apply(rotateXMat(a * Math.PI/180)); branch(l*0.7, t*0.7, a*1.1, d-1); popMat();
+                pushMat(); apply(rotateZMat(120 * Math.PI/180)); apply(rotateXMat(-a*0.8 * Math.PI/180)); branch(l*0.7, t*0.7, a, d-1); popMat();
+                pushMat(); apply(rotateZMat(240 * Math.PI/180)); apply(rotateXMat(a*0.5 * Math.PI/180)); branch(l*0.7, t*0.7, a*1.2, d-1); popMat();
+
+                popMat();
+            }
+
+            logToScreen('Paso 8: Procesando recursividad 3D...');
+            branch(length, thickness, baseAngle, maxDepth);
             
-            function resize() {
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight;
+            // Renderizado de follaje (spheres)
+            if(code.includes('sphere')) {
+                let foliageHeight = length * 2.5;
+                for (let i = 0; i < 360; i += 15) {
+                    let r = 4 + Math.random()*2;
+                    let p = transformPoint({
+                        x: Math.cos(i) * (Math.random()*20), 
+                        y: Math.sin(i) * (Math.random()*20), 
+                        z: foliageHeight + Math.random()*15
+                    }, identity());
+                    geometry.push({type: 'sphere', p, r, rawZ: p.z});
+                }
+                logToScreen('✓ Follaje de esferas procesado.');
             }
-            window.addEventListener('resize', resize);
-            resize();
+        }
 
-            function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
+        function renderScene() {
+            ctx.clearRect(0, 0, width, height);
+            let cx = width/2, cy = height - (height*0.2); // Anclar a la parte inferior
 
-            // ==================================================
-            // COMPILADOR MINI-SCAD: Interpreta tu código real
-            // ==================================================
-            function parseAndDrawSCAD(code) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // 1. Extraer tus parámetros reales de branch(...)
-                let length = 20, thickness = 3, baseAngle = 25, maxDepth = 7;
-                // Buscar branch(20, 3, 25, 7) en el código
-                const match = code.match(/branch\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
-                
-                if (match) {
-                    length = parseFloat(match[1]);
-                    thickness = parseFloat(match[2]);
-                    baseAngle = parseFloat(match[3]);
-                    maxDepth = parseInt(match[4]);
-                    logToScreen(`✓ Matemáticas extraídas: L=${length}, Grosor=${thickness}, Angulo=${baseAngle}°, Nivel=${maxDepth}`);
+            // Proyección de cámara para ordenar por profundidad (Z-Sort)
+            let projected = geometry.map(item => {
+                let projectPoint = (p) => {
+                    // Yaw (Z en SCAD)
+                    let x1 = p.x*Math.cos(camRotZ) - p.y*Math.sin(camRotZ);
+                    let y1 = p.x*Math.sin(camRotZ) + p.y*Math.cos(camRotZ);
+                    let z1 = p.z;
+                    // Pitch (X en SCAD)
+                    let y2 = y1*Math.cos(camRotX) - z1*Math.sin(camRotX);
+                    let z2 = y1*Math.sin(camRotX) + z1*Math.cos(camRotX);
+                    return { x: cx + x1*zoom, y: cy - z2*zoom, depth: y2 }; 
+                };
+
+                if(item.type === 'line') {
+                    let p1 = projectPoint(item.p1), p2 = projectPoint(item.p2);
+                    return { ...item, p1, p2, depth: (p1.depth + p2.depth)/2 };
                 } else {
-                    logToScreen('Aviso: Variables no detectadas. Usando modelo por defecto.');
+                    return { ...item, p: projectPoint(item.p), depth: projectPoint(item.p).depth };
                 }
+            });
 
-                // Ajustar escala visual a la pantalla del móvil
-                const scale = (canvas.height * 0.6) / (length * 4); 
-                const angleRad = baseAngle * (Math.PI / 180);
+            // Z-Buffer: Pintar lo de atrás primero
+            projected.sort((a,b) => b.depth - a.depth);
 
-                // 2. Función recursiva que emula tus cilindros y rotaciones
-                function drawBranch(x, y, l, t, ang, depth) {
-                    if (depth <= 0) {
-                        return; // Fin de la rama
-                    }
-
-                    // Calcular siguiente punto (translación)
-                    const x2 = x + Math.cos(ang) * (l * scale);
-                    const y2 = y + Math.sin(ang) * (l * scale);
-
-                    // Dibujar el cilindro (como línea gruesa)
+            projected.forEach(item => {
+                if(item.type === 'line') {
                     ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x2, y2);
-                    ctx.strokeStyle = '#8d6e63'; // Color madera
+                    ctx.moveTo(item.p1.x, item.p1.y);
+                    ctx.lineTo(item.p2.x, item.p2.y);
+                    ctx.strokeStyle = '#8d6e63';
+                    ctx.lineWidth = Math.max(0.5, item.t * zoom * 0.1);
                     ctx.lineCap = 'round';
-                    ctx.lineWidth = t * scale * 0.5;
                     ctx.stroke();
-
-                    // Simular tus 3 ramas de OpenSCAD:
-                    // rotate([angle, 0, 0]) branch(length * 0.7, thickness * 0.7, angle * 1.1, depth - 1);
-                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 1.1), depth - 1);
-                    
-                    // rotate([-angle * 0.8, 0, 120]) branch(...)
-                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang + (angleRad * 0.8), depth - 1);
-                    
-                    // rotate([angle * 0.5, 0, 240]) branch(...)
-                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 0.5), depth - 1);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(item.p.x, item.p.y, item.r * zoom * 0.2, 0, Math.PI*2);
+                    ctx.fillStyle = `rgba(0, 200, 100, 0.7)`;
+                    ctx.fill();
                 }
+            });
+        }
 
-                // 3. Función para dibujar tu follaje (esferas)
-                function drawFoliage(x, y) {
-                    if (code.includes('sphere')) {
-                        // Bucle for(i=[0:5:360]) emulado
-                        for (let i = 0; i < 360; i += 15) {
-                            const radius = (4 + Math.random() * 2) * scale * 0.4;
-                            const offsetX = (Math.random() - 0.5) * 40 * scale;
-                            const offsetY = (Math.random() - 0.5) * 40 * scale;
-                            
-                            ctx.beginPath();
-                            ctx.arc(x + offsetX, y - (15 * scale) + offsetY, radius, 0, Math.PI * 2);
-                            ctx.fillStyle = `rgba(0, ${150 + Math.random()*100}, ${50 + Math.random()*50}, 0.6)`;
-                            ctx.fill();
-                        }
-                        logToScreen('✓ Follaje de esferas renderizado.');
-                    }
-                }
-
-                logToScreen('Paso 8: Procesando geometría dinámica...');
-                
-                // Iniciar el tronco desde la parte inferior central
-                const startX = canvas.width / 2;
-                const startY = canvas.height - 30;
-                drawBranch(startX, startY, length, thickness, -Math.PI / 2, maxDepth);
-                
-                // Añadir el follaje en la copa del árbol (aproximado a tu translate)
-                drawFoliage(startX, startY - (length * scale * 3.5));
-                
-                logToScreen('✓ Paso 9: Árbol complejo proyectado en pantalla con éxito.');
+        fetch('/api/get_code_b64.json').then(r => r.json()).then(data => {
+            if (data.code_b64) {
+                logToScreen('✓ Paso 6: Código recibido. Generando mallas...');
+                buildGeometry(decodeB64(data.code_b64));
+                renderScene();
+                logToScreen('✓ Paso 9: LISTO. Mueve el dedo por la pantalla.');
             }
-
-            // ==================================================
-            // CONEXIÓN API AL SERVIDOR PYTHON DE LA V1.0 RC01
-            // ==================================================
-            fetch('/api/get_code_b64.json')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.code_b64 && data.code_b64.trim() !== "") {
-                        logToScreen('✓ Paso 6: Código recibido. Compilando...');
-                        const code = decodeB64(data.code_b64);
-                        parseAndDrawSCAD(code);
-                    } else { logToScreen('Esperando código...'); }
-                })
-                .catch(e => logToScreen('ERROR API: ' + e.message, true));
-                
-        } catch(error) { logToScreen('EXCEPCIÓN ATRAPADA: ' + error.message, true); }
+        }).catch(e => logToScreen('ERROR API: ' + e.message, true));
     </script>
 </body>
 </html>

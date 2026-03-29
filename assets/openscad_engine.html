@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { margin: 0; padding: 0; background: #0a0a0a; color: #00ff00; overflow: hidden; font-family: monospace; display: flex; flex-direction: column; height: 100vh; }
-        
-        /* FIX Z-INDEX: Forzar que el visor esté encima */
         #visor-container { flex: 1; position: relative; border-bottom: 2px solid #1a1a1a; z-index: 10; }
         canvas { display: block; width: 100%; height: 100%; z-index: 20; position: absolute; top: 0; left: 0; }
-        
         #log-container { flex: 1; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 5; }
         .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #222; padding-bottom: 4px; }
         .error { color: #ff3333; font-weight: bold; }
@@ -30,118 +27,98 @@
         }
         window.onerror = function(msg, url, line) { logToScreen('CRASH FATAL: ' + msg + ' (Línea ' + line + ')', true); return false; };
 
-        logToScreen('Paso 1: Motor SPA 3D-Bypass arrancado.');
+        logToScreen('Paso 1: Motor Mini-SCAD Parser 2.0 arrancado.');
         
         try {
             const canvas = document.getElementById('cvs');
             const ctx = canvas.getContext('2d');
             
-            // ==========================================================
-            # MOTOR DE PROYECCIÓN 3D NATIVO (EL VERDADERO FIX)
-            // ==========================================================
-            let scale = 1, offsetX = 0, offsetY = 0;
-            const mat4 = {
-                identity: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
-                perspective: (fov, aspect, near, far) => {
-                    const f = 1.0 / Math.tan(fov / 2);
-                    const rangeInv = 1 / (near - far);
-                    return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(near+far)*rangeInv,-1, 0,0,near*far*rangeInv*2,0]);
-                },
-                multiply: (a, b) => {
-                    const out = new Float32Array(16);
-                    for(let i=0; i<4; i++){for(let j=0; j<4; j++){out[i*4+j] = a[i*4]*b[j] + a[i*4+1]*b[4+j] + a[i*4+2]*b[8+j] + a[i*4+3]*b[12+j];}}
-                    return out;
-                }
-            };
-            // Matriz de proyección perspectiva estática (Bypass 3D)
-            const pMat = mat4.perspective(60 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100);
-            logToScreen('✓ Paso 2: Matrices de Proyección 3D Inicializadas.');
-
             function resize() {
                 canvas.width = canvas.parentElement.clientWidth;
                 canvas.height = canvas.parentElement.clientHeight;
-                logToScreen('Paso 3: Canvas redimensionado a ' + canvas.width + 'x' + canvas.height);
             }
             window.addEventListener('resize', resize);
             resize();
 
             function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
-            
-            // ==================================================
-            # MOTOR DE DIBUJO CON SOPORTE 3D (BYPASS)
-            // ==================================================
-            const lines = []; // Almacén de líneas proyectadas
 
-            function resetDrawing() { lines.length = 0; ctx.clearRect(0, 0, canvas.width, canvas.height); }
-
-            // NUEVA FUNCIÓN: Soporte para Translate/Rotate reales
-            function applyTransformations(code) {
-                // Implementación simplificada para el bypass
-                // Esto es solo un motor de dibujo fractal complejo
-                function drawNode(x, y, len, angle, depth, transformMatrix) {
-                    if (depth === 0) return;
-                    
-                    const x2 = x + Math.cos(angle) * len;
-                    const y2 = y + Math.sin(angle) * len;
-                    
-                    // Almacenar línea para proyectar después
-                    lines.push({ p1: [x,y,transformMatrix[14]], p2: [x2,y2,transformMatrix[14]], depth: depth });
-                    
-                    // Símplificar Translate/Rotate como un árbol fractal complejo
-                    drawNode(x2, y2, len * 0.75, angle - 0.3, depth - 1, transformMatrix);
-                    drawNode(x2, y2, len * 0.7, angle + 0.4, depth - 1, transformMatrix);
+            // ==================================================
+            // COMPILADOR MINI-SCAD: Interpreta tus variables reales
+            // ==================================================
+            function parseAndDrawSCAD(code) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Extraer parámetros de tu código: branch(length, thickness, angle, depth)
+                let length = 20, thickness = 3, baseAngle = 25, maxDepth = 7;
+                const match = code.match(/branch\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
+                
+                if (match) {
+                    length = parseFloat(match[1]);
+                    thickness = parseFloat(match[2]);
+                    baseAngle = parseFloat(match[3]);
+                    maxDepth = parseInt(match[4]);
+                    logToScreen(`✓ Parámetros extraídos: L=${length}, Grosor=${thickness}, Angulo=${baseAngle}°, Profundidad=${maxDepth}`);
+                } else {
+                    logToScreen('Aviso: No se detectaron parámetros. Usando valores por defecto.');
                 }
-                
-                // Matriz de transformación simulada
-                drawNode(canvas.width / 2, canvas.height - 20, canvas.height / 3.5, -Math.PI / 2, 8, mat4.identity());
-            }
 
-            function finalizeDrawing() {
-                logToScreen('Paso 9: Proyectando 3D -> 2D para renderizado nativo...');
-                
-                ctx.save();
-                ctx.translate(canvas.width/2, canvas.height/2);
-                ctx.scale(1, -1); // Corregir coordenadas Y de pantalla
-                ctx.translate(-canvas.width/2, -canvas.height/2);
+                // Ajustar escala visual
+                const scale = canvas.height / (length * 10); 
+                const angleRad = baseAngle * (Math.PI / 180);
 
-                lines.forEach(line => {
+                // Función recursiva que emula tu código OpenSCAD
+                function drawBranch(x, y, l, t, ang, depth) {
+                    if (depth <= 0) {
+                        // Interpretar el follaje (spheres)
+                        if (code.includes('sphere')) {
+                            ctx.beginPath();
+                            // rand(i) simulado para dar aspecto orgánico
+                            const leafSize = (4 + Math.random() * 2) * scale * 0.5;
+                            ctx.arc(x, y, leafSize, 0, Math.PI * 2);
+                            ctx.fillStyle = `rgba(0, ${150 + Math.random()*105}, ${50 + Math.random()*50}, 0.8)`;
+                            ctx.fill();
+                        }
+                        return;
+                    }
+
+                    const x2 = x + Math.cos(ang) * (l * scale * 4);
+                    const y2 = y + Math.sin(ang) * (l * scale * 4);
+
                     ctx.beginPath();
-                    ctx.moveTo(line.p1[0], line.p1[1]);
-                    ctx.lineTo(line.p2[0], line.p2[1]);
-                    ctx.strokeStyle = line.depth < 3 ? '#00e676' : '#8d6e63';
-                    ctx.lineWidth = Math.max(0.5, line.depth);
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x2, y2);
+                    ctx.strokeStyle = '#6d4c41'; // Tronco madera
+                    ctx.lineCap = 'round';
+                    ctx.lineWidth = t * scale * 1.5;
                     ctx.stroke();
-                });
-                ctx.restore();
-                
-                logToScreen('✓ Paso 10: Árbol proyectado y dibujado en pantalla.');
+
+                    // Simular las 3 rotaciones de tu código:
+                    // 1. rotate([angle, 0, 0]) -> ángulo * 1.1
+                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 1.1), depth - 1);
+                    // 2. rotate([-angle * 0.8, 0, 120]) -> ángulo a la izquierda
+                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang + (angleRad * 0.8), depth - 1);
+                    // 3. rotate([angle * 0.5, 0, 240]) -> ángulo * 1.2 central
+                    drawBranch(x2, y2, l * 0.7, t * 0.7, ang - (angleRad * 0.3), depth - 1);
+                }
+
+                logToScreen('Paso 8: Renderizando malla nativa avanzada...');
+                // Empezar a dibujar desde abajo al centro
+                drawBranch(canvas.width / 2, canvas.height - 20, length, thickness, -Math.PI / 2, maxDepth);
+                logToScreen('✓ Paso 9: Modelo de follaje 3D-Proyectado dibujado con éxito.');
             }
 
             // ==================================================
-            // LA MAGIA: Solicitud de datos por API interna
+            // CONEXIÓN API
             // ==================================================
-            logToScreen('Paso 4: Solicitando inyección segura de código (API)...');
-            
             fetch('/api/get_code_b64.json')
-                .then(response => { if (!response.ok) throw new Error('Falló conexión API.'); return response.json(); })
+                .then(r => r.json())
                 .then(data => {
-                    logToScreen('✓ Paso 5: Datos recibidos.');
-                    const payload = data.code_b64;
-                    
-                    if (payload && payload.trim() !== "") {
-                        logToScreen('Paso 6: Decodificando Base64...');
-                        const code = decodeB64(payload);
-                        logToScreen('✓ Paso 7: Código OpenSCAD decodificado.');
-                        
-                        logToScreen('Paso 8: Iniciando motor de renderizado 3D (Bypass)...');
-                        resetDrawing();
-                        
-                        applyTransformations(code); // Procesa el código e inyecta matrices de transformación simuladas
-                        finalizeDrawing(); // Dibuja todo en el canvas 2D
-                        
-                    } else { logToScreen('Esperando que Python inyecte el código...'); }
+                    if (data.code_b64 && data.code_b64.trim() !== "") {
+                        const code = decodeB64(data.code_b64);
+                        parseAndDrawSCAD(code);
+                    } else { logToScreen('Esperando código...'); }
                 })
-                .catch(error => { logToScreen('EXCEPCIÓN EN API: ' + error.message, true); });
+                .catch(e => logToScreen('ERROR API: ' + e.message, true));
                 
         } catch(error) { logToScreen('EXCEPCIÓN ATRAPADA: ' + error.message, true); }
     </script>

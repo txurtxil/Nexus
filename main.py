@@ -13,18 +13,16 @@ except:
     HAS_WEBVIEW = False
 
 # ==========================================================
-# LA MAGIA: MICRO-SERVIDOR LOCAL (BYPASS ANDROID SANDBOX)
+# MOTOR INTERNO: MICRO-SERVIDOR LOCAL
 # ==========================================================
 try:
-    # Busca un puerto libre automáticamente
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('127.0.0.1', 0))
         LOCAL_PORT = s.getsockname()[1]
 except:
     LOCAL_PORT = 8556
 
-# Variable global que almacena la página web horneada
-LATEST_HTML = "<html><body style='background:#0a0a0a;color:#0f0;font-family:monospace;'>Iniciando motor interno...</body></html>"
+LATEST_HTML = "<html><body style='background:#0a0a0a;color:#00ff00;font-family:monospace;padding:20px;'>NEXUS CAD: Servidor local iniciado. Esperando renderizado...</body></html>"
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -32,20 +30,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(LATEST_HTML.encode('utf-8'))
         
     def log_message(self, format, *args):
-        pass # Silenciamos los logs del servidor para no molestar
+        pass 
 
-# Arrancamos el servidor en un hilo secundario
-def start_local_server():
-    server = http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler)
-    server.serve_forever()
-
-threading.Thread(target=start_local_server, daemon=True).start()
+threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 # ==========================================================
-
 
 def main(page: ft.Page):
     try:
@@ -68,7 +61,7 @@ def main(page: ft.Page):
             value="module tree() {\n  // Tronco\n  cylinder(h=20, r=3);\n}\ntree();", 
             color="#00ff00", bgcolor="#050505", border_color="#333333"
         )
-        status_text = ft.Text("Listo", color="grey600")
+        status_text = ft.Text("Servidor interno activo", color="grey600")
 
         editor_container = ft.Container(
             content=ft.Column([
@@ -78,7 +71,12 @@ def main(page: ft.Page):
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
 
-        viewer_container = ft.Container(content=ft.Text("Visor inactivo."), alignment=ft.Alignment(0,0), expand=True, visible=False)
+        if HAS_WEBVIEW and not page.web:
+            wv = fwv.WebView(url=f"http://127.0.0.1:{LOCAL_PORT}/?init=1", expand=True)
+        else:
+            wv = ft.Container(content=ft.Text("Visor 3D: Solo disponible en APK", color="yellow"), expand=True, alignment=ft.Alignment(0,0))
+
+        viewer_container = ft.Container(content=wv, expand=True, visible=False)
 
         def switch(idx):
             editor_container.visible = (idx == 0)
@@ -87,30 +85,22 @@ def main(page: ft.Page):
 
         def run_render():
             global LATEST_HTML
-            status_text.value = "Conectando al servidor interno..."
+            status_text.value = "Enviando al servidor local..."
             status_text.color = "orange400"
             switch(1) 
 
             try:
-                with open("assets/openscad_engine.html", "r", encoding="utf-8") as f:
+                with open(os.path.join("assets", "openscad_engine.html"), "r", encoding="utf-8") as f:
                     template = f.read()
                 
                 raw_b64 = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
                 clean_b64 = raw_b64.replace('\n', '').replace('\r', '')
                 
-                # Actualizamos la página global que sirve nuestro servidor
                 LATEST_HTML = template.replace("__NEXUS_PAYLOAD__", clean_b64)
                 
                 if HAS_WEBVIEW and not page.web:
-                    # ==========================================================
-                    # CARGAMOS MEDIANTE HTTP (Bypass total de seguridad Android)
-                    # El parámetro ?t= fuerza a que no use la memoria caché
-                    # ==========================================================
-                    viewer_container.content = fwv.WebView(
-                        url=f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}", 
-                        expand=True
-                    )
-                    status_text.value = f"✓ Renderizado HTTP (Puerto {LOCAL_PORT})"
+                    wv.url = f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}"
+                    status_text.value = f"✓ Objeto Renderizado"
                     status_text.color = "blue400"
             except Exception as e:
                 status_text.value = f"Error Python: {e}"

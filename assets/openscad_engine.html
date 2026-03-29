@@ -32,16 +32,24 @@
         }
         window.onerror = function(msg, url, line) { logToScreen('CRASH FATAL: ' + msg, true); return false; };
 
-        logToScreen('Paso 1: Motor WebGL-Bypass 3.0 (v1.2.0) arrancado.');
+        logToScreen('Paso 1: Motor WebGL-Bypass 3.0 (v1.2.1) arrancado.');
         
         const canvas = document.getElementById('cvs');
         const ctx = canvas.getContext('2d');
         let width, height;
         
+        // ==================================================
+        // FIX CRÍTICO: Variables declaradas ARRIBA (Evita ReferenceError)
+        // ==================================================
+        let camRotZ = 0; 
+        let camRotX = 0.2; 
+        let zoom = 4;
+        let geometry = []; 
+        
         function resize() {
             width = canvas.width = canvas.parentElement.clientWidth;
             height = canvas.height = canvas.parentElement.clientHeight;
-            if(geometry.length > 0) renderScene();
+            if(geometry && geometry.length > 0) renderScene();
         }
         window.addEventListener('resize', resize);
         resize();
@@ -51,12 +59,6 @@
         // ==================================================
         // MOTOR DE MATRICES 3D Y CÁMARA
         // ==================================================
-        let camRotZ = 0; // Rotación Yaw (izquierda/derecha)
-        let camRotX = 0.2; // Rotación Pitch (arriba/abajo)
-        let zoom = 4;
-        let geometry = []; // Almacena la malla 3D
-
-        // Multiplicador de matrices 4x4 simplificado
         const identity = () => [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
         const multiply = (a, b) => {
             let c = new Array(16).fill(0);
@@ -81,8 +83,8 @@
         const startDrag = (x,y) => { isDragging = true; lastX = x; lastY = y; };
         const onDrag = (x,y) => {
             if(!isDragging) return;
-            camRotZ += (x - lastX) * 0.01;
-            camRotX += (y - lastY) * 0.01;
+            camRotZ -= (x - lastX) * 0.01; // Giro fluido horizontal
+            camRotX += (y - lastY) * 0.01; // Giro fluido vertical
             lastX = x; lastY = y;
             renderScene();
         };
@@ -130,7 +132,7 @@
                 pushMat();
                 apply(translateMat(0, 0, l));
 
-                // Equivalente matemático de tu código OpenSCAD real:
+                // Translaciones matemáticas equivalentes a tu OpenSCAD
                 pushMat(); apply(rotateXMat(a * Math.PI/180)); branch(l*0.7, t*0.7, a*1.1, d-1); popMat();
                 pushMat(); apply(rotateZMat(120 * Math.PI/180)); apply(rotateXMat(-a*0.8 * Math.PI/180)); branch(l*0.7, t*0.7, a, d-1); popMat();
                 pushMat(); apply(rotateZMat(240 * Math.PI/180)); apply(rotateXMat(a*0.5 * Math.PI/180)); branch(l*0.7, t*0.7, a*1.2, d-1); popMat();
@@ -141,7 +143,7 @@
             logToScreen('Paso 8: Procesando recursividad 3D...');
             branch(length, thickness, baseAngle, maxDepth);
             
-            // Renderizado de follaje (spheres)
+            // Follaje
             if(code.includes('sphere')) {
                 let foliageHeight = length * 2.5;
                 for (let i = 0; i < 360; i += 15) {
@@ -157,18 +159,21 @@
             }
         }
 
+        // ==================================================
+        // RENDERIZADOR 3D INTERACTIVO
+        // ==================================================
         function renderScene() {
             ctx.clearRect(0, 0, width, height);
-            let cx = width/2, cy = height - (height*0.2); // Anclar a la parte inferior
+            let cx = width/2, cy = height - (height*0.2); // Anclaje inferior
 
-            // Proyección de cámara para ordenar por profundidad (Z-Sort)
+            // 1. Aplicar transformaciones de cámara (Rotación de usuario)
             let projected = geometry.map(item => {
                 let projectPoint = (p) => {
-                    // Yaw (Z en SCAD)
+                    // Yaw
                     let x1 = p.x*Math.cos(camRotZ) - p.y*Math.sin(camRotZ);
                     let y1 = p.x*Math.sin(camRotZ) + p.y*Math.cos(camRotZ);
                     let z1 = p.z;
-                    // Pitch (X en SCAD)
+                    // Pitch
                     let y2 = y1*Math.cos(camRotX) - z1*Math.sin(camRotX);
                     let z2 = y1*Math.sin(camRotX) + z1*Math.cos(camRotX);
                     return { x: cx + x1*zoom, y: cy - z2*zoom, depth: y2 }; 
@@ -182,9 +187,10 @@
                 }
             });
 
-            // Z-Buffer: Pintar lo de atrás primero
+            // 2. Z-Buffer: Ordenar dibujando lo lejano primero (Fake 3D)
             projected.sort((a,b) => b.depth - a.depth);
 
+            // 3. Pintar en lienzo 2D
             projected.forEach(item => {
                 if(item.type === 'line') {
                     ctx.beginPath();
@@ -203,12 +209,15 @@
             });
         }
 
+        // ==================================================
+        // ARRANQUE API
+        // ==================================================
         fetch('/api/get_code_b64.json').then(r => r.json()).then(data => {
             if (data.code_b64) {
                 logToScreen('✓ Paso 6: Código recibido. Generando mallas...');
                 buildGeometry(decodeB64(data.code_b64));
                 renderScene();
-                logToScreen('✓ Paso 9: LISTO. Mueve el dedo por la pantalla.');
+                logToScreen('✓ Paso 9: LISTO. Arrastra el dedo por la pantalla para rotar.');
             }
         }).catch(e => logToScreen('ERROR API: ' + e.message, true));
     </script>

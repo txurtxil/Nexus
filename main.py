@@ -66,14 +66,42 @@ def main(page: ft.Page):
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
 
-        # FIX CRÍTICO ESTÉTICO: Eliminado ft.Icon por completo. Usamos texto y Emoji.
+        # ==========================================================
+        # UX DEFENSIVO: Mostrar URL y botón de copia de seguridad
+        # ==========================================================
+        link_text = ft.Text("http://127.0.0.1", color="blue400", selectable=True, italic=True)
+
+        def copy_link():
+            page.set_clipboard(link_text.value)
+            status_text.value = "✓ Enlace copiado. Pégalo en Chrome."
+            status_text.color = "green400"
+            page.update()
+
+        def force_open_browser():
+            url = link_text.value
+            # Ataque 1: Flet Oficial
+            page.launch_url(url)
+            # Ataque 2: Python Nativo
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except:
+                pass
+            # Ataque 3: Android OS Terminal (Fuerza Bruta)
+            try:
+                os.system(f'am start -a android.intent.action.VIEW -d "{url}"')
+            except:
+                pass
+
         viewer_container = ft.Container(
             content=ft.Column([
                 ft.Text("🌐", size=80),
                 ft.Text("Malla 3D Generada", color="white", size=20, weight="bold"),
-                ft.Text("El visor 3D se ejecutará en pantalla completa\ncon aceleración por hardware.", text_align="center", color="grey500"),
-                ft.Container(height=20),
-                ft.ElevatedButton("ABRIR VISOR AHORA", on_click=lambda e: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}"), bgcolor="blue900", color="white")
+                ft.Text("El sistema intentará abrir tu navegador.\nSi Android lo bloquea, copia este enlace y pégalo:", text_align="center", color="grey500"),
+                link_text,
+                ft.Container(height=10),
+                ft.ElevatedButton("INTENTAR ABRIR NAVEGADOR", on_click=lambda e: force_open_browser(), bgcolor="blue900", color="white"),
+                ft.ElevatedButton("📋 COPIAR ENLACE (Seguro)", on_click=lambda e: copy_link(), bgcolor="#333333", color="white")
             ], alignment="center", horizontal_alignment="center"), 
             expand=True, visible=False
         )
@@ -98,15 +126,22 @@ def main(page: ft.Page):
                 
                 LATEST_HTML = template.replace("__NEXUS_PAYLOAD__", clean_b64)
                 
-                page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}")
+                # Actualizar la URL visual para burlar la caché
+                current_url = f"http://127.0.0.1:{LOCAL_PORT}/?t={int(time.time())}"
+                link_text.value = current_url
                 
                 switch(1)
-                status_text.value = f"✓ Abierto en Visor Nativo"
+                status_text.value = f"✓ Listo. Abre el navegador."
                 status_text.color = "blue400"
+                page.update()
+                
+                # Lanzar ataques de apertura automática
+                force_open_browser()
+                
             except Exception as e:
                 status_text.value = f"Error Python: {e}"
                 status_text.color = "red900"
-            page.update()
+                page.update()
 
         page.add(
             ft.Container(

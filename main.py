@@ -1,5 +1,9 @@
 import flet as ft
 import os, base64, traceback, sqlite3, warnings
+import http.server
+import threading
+import socket
+import time
 
 warnings.simplefilter("ignore", DeprecationWarning)
 try:
@@ -7,6 +11,41 @@ try:
     HAS_WEBVIEW = True
 except:
     HAS_WEBVIEW = False
+
+# ==========================================================
+# LA MAGIA: MICRO-SERVIDOR LOCAL (BYPASS ANDROID SANDBOX)
+# ==========================================================
+try:
+    # Busca un puerto libre automáticamente
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('127.0.0.1', 0))
+        LOCAL_PORT = s.getsockname()[1]
+except:
+    LOCAL_PORT = 8556
+
+# Variable global que almacena la página web horneada
+LATEST_HTML = "<html><body style='background:#0a0a0a;color:#0f0;font-family:monospace;'>Iniciando motor interno...</body></html>"
+
+class NexusHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        global LATEST_HTML
+        self.send_response(200)
+        self.send_header("Content-type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.end_headers()
+        self.wfile.write(LATEST_HTML.encode('utf-8'))
+        
+    def log_message(self, format, *args):
+        pass # Silenciamos los logs del servidor para no molestar
+
+# Arrancamos el servidor en un hilo secundario
+def start_local_server():
+    server = http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler)
+    server.serve_forever()
+
+threading.Thread(target=start_local_server, daemon=True).start()
+# ==========================================================
+
 
 def main(page: ft.Page):
     try:
@@ -47,7 +86,8 @@ def main(page: ft.Page):
             page.update()
 
         def run_render():
-            status_text.value = "Inyectando en RAM..."
+            global LATEST_HTML
+            status_text.value = "Conectando al servidor interno..."
             status_text.color = "orange400"
             switch(1) 
 
@@ -55,28 +95,23 @@ def main(page: ft.Page):
                 with open("assets/openscad_engine.html", "r", encoding="utf-8") as f:
                     template = f.read()
                 
-                # 1. CODIFICAR Y LIMPIAR
                 raw_b64 = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
                 clean_b64 = raw_b64.replace('\n', '').replace('\r', '')
                 
-                # 2. INYECTAR
-                final_html = template.replace("__NEXUS_PAYLOAD__", clean_b64)
-                
-                # 3. EMPAQUETAR PÁGINA COMPLETA
-                final_b64 = base64.b64encode(final_html.encode('utf-8')).decode('utf-8')
+                # Actualizamos la página global que sirve nuestro servidor
+                LATEST_HTML = template.replace("__NEXUS_PAYLOAD__", clean_b64)
                 
                 if HAS_WEBVIEW and not page.web:
                     # ==========================================================
-                    # FIX CRÍTICO: SIN 'javascript_enabled' Y CON 'charset=utf-8'
+                    # CARGAMOS MEDIANTE HTTP (Bypass total de seguridad Android)
+                    # El parámetro ?t= fuerza a que no use la memoria caché
                     # ==========================================================
                     viewer_container.content = fwv.WebView(
-                        url=f"data:text/html;charset=utf-8;base64,{final_b64}", 
+                        url=f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}", 
                         expand=True
                     )
-                    status_text.value = "✓ Renderizado en RAM"
+                    status_text.value = f"✓ Renderizado HTTP (Puerto {LOCAL_PORT})"
                     status_text.color = "blue400"
-                else:
-                    status_text.value = "Error: Faltan librerías nativas"
             except Exception as e:
                 status_text.value = f"Error Python: {e}"
                 status_text.color = "red900"

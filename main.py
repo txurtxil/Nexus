@@ -1,14 +1,15 @@
 import flet as ft
-import os, base64, traceback, sqlite3, warnings
+import os, base64, traceback, sqlite3, warnings, json
 import http.server
 import threading
 import socket
 import time
+from urllib.parse import urlparse, parse_qs
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # ==========================================================
-# MOTOR INTERNO: MICRO-SERVIDOR LOCAL
+# MOTOR INTERNO: MICRO-SERVIDOR API (Bypass Sandbox Android)
 # ==========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -17,18 +18,45 @@ try:
 except:
     LOCAL_PORT = 8556
 
-LATEST_HTML = "<html><body style='background:#0a0a0a;color:#00ff00;font-family:monospace;padding:20px;'>NEXUS CAD: Esperando renderizado...</body></html>"
+# Variable global que almacena ÚNICAMENTE los datos Base64
+LATEST_CODE_B64 = ""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        global LATEST_HTML
-        self.send_response(200)
-        self.send_header("Content-type", "text/html; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(LATEST_HTML.encode('utf-8'))
+        global LATEST_CODE_B64
+        parsed_url = urlparse(self.path)
         
+        # ==================================================
+        # RUTA API: Sirve los datos Base64 puros
+        # ==================================================
+        if parsed_url.path == '/api/get_code_b64.json':
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            # Empaquetamos en JSON limpio
+            response = json.dumps({"code_b64": LATEST_CODE_B64})
+            self.wfile.write(response.encode('utf-8'))
+            
+        # ==================================================
+        # RUTA WEB: Sirve el HTML Estático
+        # ==================================================
+        else:
+            try:
+                with open(os.path.join("assets", "openscad_engine.html"), "r", encoding="utf-8") as f:
+                    template_html = f.read()
+                
+                self.send_response(200)
+                self.send_header("Content-type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.end_headers()
+                self.wfile.write(template_html.encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(f"Error cargando motor: {e}".encode('utf-8'))
+                
     def log_message(self, format, *args):
         pass 
 
@@ -56,47 +84,14 @@ def main(page: ft.Page):
             value="module tree() {\n  // Tronco\n  cylinder(h=20, r=3);\n}\ntree();", 
             color="#00ff00", bgcolor="#050505", border_color="#333333"
         )
-        status_text = ft.Text("Motor nativo listo", color="grey600")
+        status_text = ft.Text("Listo", color="grey600")
 
         editor_container = ft.Container(
-            content=ft.Column([
-                txt_name, txt_code, 
-                ft.ElevatedButton("▶ COMPILAR Y VER 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white")
-            ], expand=True),
+            content=ft.Column([txt_name, txt_code, ft.ElevatedButton("▶ COMPILAR Y VER", on_click=lambda e: run_render(), bgcolor="green900", color="white")], expand=True),
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
 
-        # ==========================================================
-        # UX DEFENSIVO: Botones con delegación nativa al Frontend
-        # ==========================================================
-        link_text = ft.Text("http://127.0.0.1", color="blue400", selectable=True, italic=True)
-        
-        # Este es el botón mágico. Usaremos su propiedad 'url' nativa más adelante.
-        btn_open_browser = ft.ElevatedButton(
-            "🚀 ABRIR EN NAVEGADOR NATIVO", 
-            bgcolor="blue900", 
-            color="white"
-        )
-
-        def copy_link():
-            page.set_clipboard(link_text.value)
-            status_text.value = "✓ Enlace copiado al portapapeles."
-            status_text.color = "green400"
-            page.update()
-
-        viewer_container = ft.Container(
-            content=ft.Column([
-                ft.Text("🌐", size=80),
-                ft.Text("Malla 3D Generada", color="white", size=20, weight="bold"),
-                ft.Text("Servidor interno transmitiendo en:", text_align="center", color="grey500"),
-                link_text,
-                ft.Container(height=15),
-                btn_open_browser,
-                ft.Container(height=5),
-                ft.ElevatedButton("📋 COPIAR ENLACE MANUALMENTE", on_click=lambda e: copy_link(), bgcolor="#333333", color="white")
-            ], alignment="center", horizontal_alignment="center"), 
-            expand=True, visible=False
-        )
+        viewer_container = ft.Container(content=ft.Text("Visor inactivo."), alignment=ft.Alignment(0,0), expand=True, visible=False)
 
         def switch(idx):
             editor_container.visible = (idx == 0)
@@ -104,27 +99,29 @@ def main(page: ft.Page):
             page.update()
 
         def run_render():
-            global LATEST_HTML
-            status_text.value = "Generando malla..."
+            global LATEST_CODE_B64
+            status_text.value = "Enviando datos a API interna..."
             status_text.color = "orange400"
-            page.update()
+            switch(1) 
 
             try:
-                with open(os.path.join("assets", "openscad_engine.html"), "r", encoding="utf-8") as f:
-                    template = f.read()
-                
+                # 1. CODIFICAR Y LIMPIAR EL CÓDIGO OpenSCAD
+                # No inyectamos nada, solo lo guardamos en memoria limpia
                 raw_b64 = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
-                clean_b64 = raw_b64.replace('\n', '').replace('\r', '')
+                LATEST_CODE_B64 = raw_b64.replace('\n', '').replace('\r', '') # <-- Base64 puro y limpio
                 
-                LATEST_HTML = template.replace("__NEXUS_PAYLOAD__", clean_b64)
+                # 2. CARGAMOS EL HTML ESTÁTICO MEDIANTE HTTP
+                final_url = f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}"
+                # Intentamos abrir el visor con la URL nativa delegada al Frontend (Flutter)
+                viewer_container.content = ft.ElevatedButton(
+                    "🚀 VER MODELO GENERADO (Navegador Nativo)", 
+                    url=final_url,
+                    bgcolor="blue900", 
+                    color="white",
+                    expand=True
+                )
                 
-                # LA CLAVE: Actualizamos la URL nativa del botón
-                current_url = f"http://127.0.0.1:{LOCAL_PORT}/?t={int(time.time())}"
-                link_text.value = current_url
-                btn_open_browser.url = current_url  # <-- Delegación a Flutter OS
-                
-                switch(1)
-                status_text.value = f"✓ Listo. Pulsa el botón azul."
+                status_text.value = f"✓ Listo. Renderizado por API HTTP"
                 status_text.color = "blue400"
                 page.update()
                 
@@ -134,26 +131,12 @@ def main(page: ft.Page):
                 page.update()
 
         page.add(
-            ft.Container(
-                content=ft.Row([
-                    ft.TextButton("💻 EDITOR", on_click=lambda _: switch(0)),
-                    ft.TextButton("👁️ VISOR", on_click=lambda _: switch(1)),
-                ], alignment="center"),
-                bgcolor="#111111", padding=5
-            ),
-            editor_container,
-            viewer_container,
-            status_text
+            ft.Container(content=ft.Row([ft.TextButton("💻 EDITOR", on_click=lambda _: switch(0)), ft.TextButton("👁️ VISOR", on_click=lambda _: switch(1))], alignment="center"), bgcolor="#111111", padding=5),
+            editor_container, viewer_container, status_text
         )
 
     except Exception:
-        page.clean()
-        page.bgcolor = "#990000" 
-        page.add(
-            ft.Text("FALLO CRÍTICO", size=20, weight="bold", color="white"),
-            ft.Text(traceback.format_exc(), color="white", selectable=True, size=12)
-        )
-        page.update()
+        page.clean(); page.bgcolor = "#990000"; page.add(ft.Text("FALLO CRÍTICO", size=20, weight="bold", color="white"), ft.Text(traceback.format_exc(), color="white", selectable=True, size=12)); page.update()
 
 if __name__ == "__main__":
     is_termux = "com.termux" in os.environ.get("PREFIX", "")

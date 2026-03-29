@@ -25,12 +25,10 @@
             logBox.appendChild(p);
             logBox.scrollTop = logBox.scrollHeight;
         }
-        window.onerror = function(msg, url, line) {
-            logToScreen('CRASH FATAL: ' + msg + ' (Línea ' + line + ')', true);
-            return false;
-        };
+        window.onerror = function(msg, url, line) { logToScreen('CRASH FATAL: ' + msg + ' (Línea ' + line + ')', true); return false; };
 
-        logToScreen('Paso 1: Motor de diagnóstico JS arrancado.');
+        logToScreen('Paso 1: Motor de diagnóstico SPA arrancado.');
+        
         try {
             const canvas = document.getElementById('cvs');
             const ctx = canvas.getContext('2d');
@@ -41,10 +39,8 @@
             window.addEventListener('resize', resize);
             resize();
 
-            function decodeB64(str) {
-                return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-            }
-
+            function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
+            
             function drawFractalTree(x, y, len, angle, depth) {
                 if (depth === 0) return;
                 ctx.beginPath(); ctx.moveTo(x, y);
@@ -57,21 +53,42 @@
                 drawFractalTree(x2, y2, len * 0.7, angle + 0.4, depth - 1);
             }
 
-            const payload = "__NEXUS_PAYLOAD__";
-            if (payload !== "__NEXUS_PAYLOAD__" && payload.trim() !== "") {
-                const code = decodeB64(payload);
-                logToScreen('✓ Decodificación exitosa. Iniciando motor...');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (code.toLowerCase().includes("branch") || code.toLowerCase().includes("tree")) {
-                    drawFractalTree(canvas.width / 2, canvas.height - 20, canvas.height / 3.5, -Math.PI / 2, 8);
-                    logToScreen('✓ Árbol fractal dibujado.');
-                } else {
-                    ctx.fillStyle = "#00e676"; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
-                    logToScreen('✓ Cubo dibujado.');
-                }
-            } else {
-                logToScreen('Esperando que Python inyecte el código...');
-            }
+            // ==================================================
+            // LA MAGIA: Solicitud de datos por API interna
+            // ==================================================
+            logToScreen('Paso 4: Solicitando inyección segura de código a Python (API Call)...');
+            
+            fetch('/api/get_code_b64.json')
+                .then(response => {
+                    if (!response.ok) throw new Error('Falló la conexión con el motor de Python.');
+                    return response.json();
+                })
+                .then(data => {
+                    logToScreen('✓ Paso 5: Código Base64 recibido de la API (Puro).');
+                    const payload = data.code_b64;
+                    
+                    if (payload && payload.trim() !== "") {
+                        logToScreen('Paso 6: Intentando decodificar...');
+                        const code = decodeB64(payload);
+                        logToScreen('✓ Paso 7: Decodificación exitosa.');
+                        logToScreen('Paso 8: Renderizando malla nativa...');
+                        
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        if (code.toLowerCase().includes("branch") || code.toLowerCase().includes("tree")) {
+                            drawFractalTree(canvas.width / 2, canvas.height - 20, canvas.height / 3.5, -Math.PI / 2, 8);
+                            logToScreen('✓ Paso 9: Árbol fractal dibujado en pantalla.');
+                        } else {
+                            ctx.fillStyle = "#00e676"; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
+                            logToScreen('✓ Paso 9: Cubo dibujado en pantalla.');
+                        }
+                    } else {
+                        logToScreen('Esperando que Python inyecte el código...');
+                    }
+                })
+                .catch(error => {
+                    logToScreen('EXCEPCIÓN ATRAPADA EN API: ' + error.message, true);
+                });
+                
         } catch(error) {
             logToScreen('EXCEPCIÓN ATRAPADA: ' + error.message, true);
         }

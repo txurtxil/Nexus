@@ -6,11 +6,6 @@ import socket
 import time
 
 warnings.simplefilter("ignore", DeprecationWarning)
-try:
-    import flet_webview as fwv
-    HAS_WEBVIEW = True
-except:
-    HAS_WEBVIEW = False
 
 # ==========================================================
 # MOTOR INTERNO: MICRO-SERVIDOR LOCAL
@@ -22,7 +17,7 @@ try:
 except:
     LOCAL_PORT = 8556
 
-LATEST_HTML = "<html><body style='background:#0a0a0a;color:#00ff00;font-family:monospace;padding:20px;'>NEXUS CAD: Servidor local iniciado. Esperando renderizado...</body></html>"
+LATEST_HTML = "<html><body style='background:#0a0a0a;color:#00ff00;font-family:monospace;padding:20px;'>NEXUS CAD: Esperando renderizado...</body></html>"
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -61,22 +56,27 @@ def main(page: ft.Page):
             value="module tree() {\n  // Tronco\n  cylinder(h=20, r=3);\n}\ntree();", 
             color="#00ff00", bgcolor="#050505", border_color="#333333"
         )
-        status_text = ft.Text("Servidor interno activo", color="grey600")
+        status_text = ft.Text("Motor nativo listo", color="grey600")
 
         editor_container = ft.Container(
             content=ft.Column([
                 txt_name, txt_code, 
-                ft.ElevatedButton("▶ COMPILAR", on_click=lambda e: run_render(), bgcolor="green900", color="white")
+                ft.ElevatedButton("▶ COMPILAR Y VER 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white")
             ], expand=True),
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
 
-        if HAS_WEBVIEW and not page.web:
-            wv = fwv.WebView(url=f"http://127.0.0.1:{LOCAL_PORT}/?init=1", expand=True)
-        else:
-            wv = ft.Container(content=ft.Text("Visor 3D: Solo disponible en APK", color="yellow"), expand=True, alignment=ft.Alignment(0,0))
-
-        viewer_container = ft.Container(content=wv, expand=True, visible=False)
+        # Nueva pantalla del Visor sin el WebView defectuoso
+        viewer_container = ft.Container(
+            content=ft.Column([
+                ft.Icon(ft.icons.VIEW_IN_AR_ROUNDED, size=80, color="blue400"),
+                ft.Text("Malla 3D Generada", color="white", size=20, weight="bold"),
+                ft.Text("El visor 3D se ejecutará en pantalla completa\ncon aceleración por hardware.", text_align="center", color="grey500"),
+                ft.Container(height=20),
+                ft.ElevatedButton("ABRIR VISOR AHORA", on_click=lambda e: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}"), bgcolor="blue900", color="white")
+            ], alignment="center", horizontal_alignment="center"), 
+            expand=True, visible=False
+        )
 
         def switch(idx):
             editor_container.visible = (idx == 0)
@@ -85,9 +85,9 @@ def main(page: ft.Page):
 
         def run_render():
             global LATEST_HTML
-            status_text.value = "Enviando al servidor local..."
+            status_text.value = "Generando malla..."
             status_text.color = "orange400"
-            switch(1) 
+            page.update()
 
             try:
                 with open(os.path.join("assets", "openscad_engine.html"), "r", encoding="utf-8") as f:
@@ -98,10 +98,12 @@ def main(page: ft.Page):
                 
                 LATEST_HTML = template.replace("__NEXUS_PAYLOAD__", clean_b64)
                 
-                if HAS_WEBVIEW and not page.web:
-                    wv.url = f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}"
-                    status_text.value = f"✓ Objeto Renderizado"
-                    status_text.color = "blue400"
+                # LA TÉCNICA MAESTRA: Lanzar en el motor nativo del dispositivo
+                page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}")
+                
+                switch(1)
+                status_text.value = f"✓ Abierto en Visor Nativo"
+                status_text.color = "blue400"
             except Exception as e:
                 status_text.value = f"Error Python: {e}"
                 status_text.color = "red900"
@@ -124,7 +126,7 @@ def main(page: ft.Page):
         page.clean()
         page.bgcolor = "#990000" 
         page.add(
-            ft.Text("FALLO CRÍTICO EN SANDBOX", size=20, weight="bold", color="white"),
+            ft.Text("FALLO CRÍTICO", size=20, weight="bold", color="white"),
             ft.Text(traceback.format_exc(), color="white", selectable=True, size=12)
         )
         page.update()

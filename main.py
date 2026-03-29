@@ -16,12 +16,10 @@ def main(page: ft.Page):
         page.bgcolor = "#0a0a0a"
         page.padding = 0
         
-        # 1. RUTAS SEGURAS EN ANDROID (Para DB y para el HTML renderizado)
         home_dir = os.environ.get("HOME", os.getcwd())
         if home_dir == "/": home_dir = os.environ.get("TMPDIR", os.getcwd())
             
         db_path = os.path.join(home_dir, "nexus_cad.db")
-        render_path = os.path.join(home_dir, "render.html") # AQUÍ GUARDAREMOS EL HTML
         
         conn = sqlite3.connect(db_path, check_same_thread=False)
         conn.execute("CREATE TABLE IF NOT EXISTS projects (name TEXT UNIQUE, code TEXT, created_at TEXT)")
@@ -44,7 +42,6 @@ def main(page: ft.Page):
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
 
-        # FIX CRÍTICO: Reemplazado ft.alignment.center por ft.Alignment(0, 0)
         viewer_container = ft.Container(
             content=ft.Text("Visor inactivo. Pulsa compilar.", color="grey500"), 
             alignment=ft.Alignment(0, 0), expand=True, visible=False
@@ -55,9 +52,8 @@ def main(page: ft.Page):
             viewer_container.visible = (idx == 1)
             page.update()
 
-        # LA MAGIA: ESCRIBIR A DISCO PARA ENGAÑAR A ANDROID
         def run_render():
-            status_text.value = "Horneando archivo local..."
+            status_text.value = "Inyectando en memoria RAM..."
             status_text.color = "orange400"
             switch(1) 
 
@@ -70,20 +66,18 @@ def main(page: ft.Page):
                 b64_code = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8')
                 final_html = template.replace("__NEXUS_PAYLOAD__", b64_code)
                 
-                # 3. GUARDAMOS EL ARCHIVO FÍSICO EN EL MÓVIL
-                with open(render_path, "w", encoding="utf-8") as f:
-                    f.write(final_html)
+                # 3. CONVERTIMOS LA PÁGINA A BASE 64 (Evita ERR_ACCESS_DENIED)
+                final_b64 = base64.b64encode(final_html.encode('utf-8')).decode('utf-8')
                 
-                # 4. CARGAMOS EL ARCHIVO MEDIANTE file://
+                # 4. CARGAMOS DIRECTAMENTE EN LA MEMORIA DEL NAVEGADOR
                 if HAS_WEBVIEW and not page.web:
-                    # Sobrescribimos el contenedor con un WebView totalmente nuevo apuntando al archivo
-                    viewer_container.content = fwv.WebView(url=f"file://{render_path}", expand=True)
-                    status_text.value = "✓ Renderizado (Motor Nativo Local)"
+                    viewer_container.content = fwv.WebView(url=f"data:text/html;base64,{final_b64}", expand=True)
+                    status_text.value = "✓ Renderizado en Memoria"
                     status_text.color = "blue400"
                 else:
                     viewer_container.content = ft.Text("WebView no disponible", color="red")
             except Exception as e:
-                status_text.value = f"Error al hornear: {e}"
+                status_text.value = f"Error de inyección: {e}"
                 status_text.color = "red900"
                 
             page.update()
@@ -105,7 +99,7 @@ def main(page: ft.Page):
         page.clean()
         page.bgcolor = "#990000" 
         page.add(
-            ft.Text("FALLO CRÍTICO EN SANDBOX ANDROID", size=20, weight="bold", color="white"),
+            ft.Text("FALLO CRÍTICO EN SANDBOX", size=20, weight="bold", color="white"),
             ft.Text(traceback.format_exc(), color="white", selectable=True, size=12)
         )
         page.update()

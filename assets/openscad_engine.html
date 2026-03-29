@@ -4,39 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; padding: 0; background: #0a0a0a; color: #00ff00; overflow: hidden; font-family: monospace; }
-        #container { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
-        #canvas-holder { flex-grow: 1; display: flex; justify-content: center; align-items: center; background: #111; border: 1px solid #1a1a1a; margin: 5px; border-radius: 8px; }
-        canvas { display: block; image-rendering: pixelated; }
-        #state-panel { background: #1a1a1a; border-top: 1px solid #333; padding: 12px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
-        #state-indicator { width: 12px; height: 12px; border-radius: 50%; background: red; box-shadow: 0 0 5px red; }
+        body { margin: 0; padding: 0; background: #0a0a0a; color: #0f0; overflow: hidden; font-family: monospace; }
+        canvas { display: block; }
+        #overlay { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.8); padding: 10px 15px; border: 1px solid #00e676; border-radius: 5px; pointer-events: none; text-shadow: 0 0 5px #00e676; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div id="canvas-holder"><canvas id="cvs"></canvas></div>
-        <div id="state-panel">
-            <div id="state-indicator"></div>
-            <div id="state-text">● VISOR: Esperando datos...</div>
-        </div>
-    </div>
-
+    <canvas id="cvs"></canvas>
+    <div id="overlay">Iniciando...</div>
     <script>
         const canvas = document.getElementById('cvs');
         const ctx = canvas.getContext('2d');
-        const stateIndicator = document.getElementById('state-indicator');
-        const stateText = document.getElementById('state-text');
-        
+        const overlay = document.getElementById('overlay');
+
+        // FIX CRÍTICO: Usar el tamaño de la ventana del móvil, no de contenedores invisibles
         function resize() {
-            canvas.width = canvas.parentElement.clientWidth - 20;
-            canvas.height = canvas.parentElement.clientHeight - 20;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw(); 
         }
         window.addEventListener('resize', resize);
-        resize();
 
         function decodeB64(str) {
             return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
         }
+
+        let currentCode = "";
 
         function drawFractalTree(x, y, len, angle, depth) {
             if (depth === 0) return;
@@ -44,40 +37,44 @@
             const x2 = x + Math.cos(angle) * len;
             const y2 = y + Math.sin(angle) * len;
             ctx.lineTo(x2, y2);
-            ctx.strokeStyle = depth < 3 ? '#00e676' : '#8d6e63'; 
+            ctx.strokeStyle = depth < 3 ? '#00e676' : '#8d6e63';
             ctx.lineWidth = depth; ctx.stroke();
             drawFractalTree(x2, y2, len * 0.75, angle - 0.3, depth - 1);
             drawFractalTree(x2, y2, len * 0.7, angle + 0.4, depth - 1);
         }
 
-        // PYTHON INYECTARÁ EL CÓDIGO AQUÍ AL GUARDAR EL ARCHIVO FÍSICO:
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!currentCode) return;
+            
+            if (currentCode.toLowerCase().includes("branch") || currentCode.toLowerCase().includes("tree")) {
+                // Dibujar el árbol desde la parte inferior de la pantalla
+                drawFractalTree(canvas.width / 2, canvas.height - 50, canvas.height / 3.5, -Math.PI / 2, 8);
+            } else if (currentCode.toLowerCase().includes("sphere")) {
+                ctx.fillStyle = "#2979ff"; ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height/2, 50, 0, Math.PI * 2); ctx.fill();
+            } else {
+                ctx.fillStyle = "#00e676"; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
+            }
+        }
+
+        // LA INYECCIÓN
         const b64_payload = "__NEXUS_PAYLOAD__";
 
         try {
             if (b64_payload !== "__NEXUS_PAYLOAD__" && b64_payload.trim() !== "") {
-                const code = decodeB64(b64_payload);
-                stateIndicator.style.background = '#00ff00';
-                stateIndicator.style.boxShadow = '0 0 10px #00ff00';
-                stateText.innerHTML = "● VISOR: JS Ejecutado. Dibujando...";
-                stateText.style.color = '#00ff00';
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (code.toLowerCase().includes("branch") || code.toLowerCase().includes("tree")) {
-                    drawFractalTree(canvas.width / 2, canvas.height, canvas.height / 3.5, -Math.PI / 2, 8);
-                } else if (code.toLowerCase().includes("sphere")) {
-                    ctx.fillStyle = "#2979ff"; ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height/2, 50, 0, Math.PI * 2); ctx.fill();
-                } else {
-                    ctx.fillStyle = "#00e676"; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
-                }
+                currentCode = decodeB64(b64_payload);
+                overlay.innerHTML = "✓ RENDERIZADO COMPLETADO";
+                resize(); // Dispara el dibujo inmediatamente
             } else {
-                stateIndicator.style.background = 'orange';
-                stateIndicator.style.boxShadow = '0 0 5px orange';
-                stateText.innerHTML = "● VISOR: JS Ejecutado (Sin código)";
-                stateText.style.color = 'orange';
+                overlay.innerHTML = "Esperando código...";
+                overlay.style.borderColor = "orange";
+                overlay.style.color = "orange";
+                resize();
             }
         } catch(e) {
-            stateIndicator.style.background = 'red';
-            stateText.innerHTML = "ERROR: " + e.toString();
+            overlay.innerHTML = "ERROR: " + e;
+            overlay.style.borderColor = "red";
+            overlay.style.color = "red";
         }
     </script>
 </body>

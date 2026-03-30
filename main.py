@@ -105,14 +105,14 @@ def main(page: ft.Page):
             txt_code.value = t
             page.update()
 
-        # === BOTÓN DE PLANTILLAS CORREGIDO (icono compatible con versiones antiguas de Flet) ===
+        # === BOTÓN DE PLANTILLAS (SIN ICONOS DE FLET - usa emoji) ===
         btn_templates = ft.PopupMenuButton(
             items=[
                 ft.PopupMenuItem(content=ft.Text("📦 Carcasa"), on_click=lambda _: load_template(T_CARCASA)),
                 ft.PopupMenuItem(content=ft.Text("⚙️ Engranaje"), on_click=lambda _: load_template(T_ENGRARE)),
                 ft.PopupMenuItem(content=ft.Text("📱 Peana"), on_click=lambda _: load_template(T_PEANA)),
             ],
-            content=ft.Row([ft.Icon(ft.icons.MENU), ft.Text("Plantillas")])   # ← Icono 100% compatible
+            content=ft.Row([ft.Text("📖", size=20), ft.Text("Plantillas")])   # ← SOLUCIÓN DEFINITIVA
         )
 
         # --- GESTOR DE ARCHIVOS ---

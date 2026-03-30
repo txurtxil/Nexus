@@ -81,7 +81,6 @@ def main(page: ft.Page):
                 if hasattr(page, 'set_clipboard'):
                     page.set_clipboard(text)
                 else:
-                    # Fallback nativo Termux
                     subprocess.run(['termux-clipboard-set'], input=text.encode('utf-8'))
                 status.value = "✓ Copiado correctamente."
             except:
@@ -106,14 +105,14 @@ def main(page: ft.Page):
             txt_code.value = t
             page.update()
 
-        # === BOTÓN DE PLANTILLAS CORREGIDO ===
+        # === BOTÓN DE PLANTILLAS CORREGIDO (icono compatible con versiones antiguas de Flet) ===
         btn_templates = ft.PopupMenuButton(
             items=[
                 ft.PopupMenuItem(content=ft.Text("📦 Carcasa"), on_click=lambda _: load_template(T_CARCASA)),
                 ft.PopupMenuItem(content=ft.Text("⚙️ Engranaje"), on_click=lambda _: load_template(T_ENGRARE)),
                 ft.PopupMenuItem(content=ft.Text("📱 Peana"), on_click=lambda _: load_template(T_PEANA)),
             ],
-            content=ft.Row([ft.Icon(ft.icons.BOOK), ft.Text("Plantillas")])   # ← AQUÍ ESTABA EL ERROR
+            content=ft.Row([ft.Icon(ft.icons.MENU), ft.Text("Plantillas")])   # ← Icono 100% compatible
         )
 
         # --- GESTOR DE ARCHIVOS ---
@@ -190,7 +189,6 @@ def main(page: ft.Page):
         page.update()
 
 if __name__ == "__main__":
-    # Detección de entorno para evitar bloqueos de red
     if "TERMUX_VERSION" in os.environ:
         ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
     else:

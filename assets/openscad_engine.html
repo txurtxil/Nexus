@@ -8,8 +8,9 @@
         #visor-container { flex: 1; position: relative; border-bottom: 2px solid #1a1a1a; z-index: 10; cursor: grab; }
         #visor-container:active { cursor: grabbing; }
         canvas { display: block; width: 100%; height: 100%; z-index: 20; position: absolute; top: 0; left: 0; }
-        #overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 30; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 8px; border: 1px solid #333; display: flex; flex-wrap: wrap; gap: 5px; max-width: 90%; }
+        #overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 30; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 8px; border: 1px solid #333; display: flex; flex-wrap: wrap; gap: 5px; max-width: 95%; }
         button { background: #0044cc; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .btn-export { background: #d81b60; }
         #log-container { height: 120px; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 5; }
         .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #222; padding-bottom: 4px; }
         .error { color: #ff3333; font-weight: bold; }
@@ -21,9 +22,9 @@
         <div id="overlay-ui">
             <button onclick="autoRotate = !autoRotate;">🔄 Rotar</button>
             <button onclick="showGrid = !showGrid; renderScene();">▦ Grid</button>
-            <button onclick="isWireframe = !isWireframe; renderScene();">🕸️ Malla</button>
             <button onclick="zoom *= 1.2; renderScene();">➕</button>
             <button onclick="zoom *= 0.8; renderScene();">➖</button>
+            <button class="btn-export" onclick="exportSTL();">⬇️ Guardar STL</button>
             <div style="color:#aaa; font-size:10px; width: 100%;">👆 Arrastra para orbitar cámara</div>
         </div>
         <canvas id="cvs"></canvas>
@@ -38,13 +39,11 @@
         }
         window.onerror = function(msg) { logToScreen('CRASH: ' + msg, true); return false; };
 
-        logToScreen('Paso 1: Motor WebGL-Bypass 5.0 (v1.4.0) arrancado a 60FPS.');
+        logToScreen('Paso 1: Motor WebGL 6.0 (v1.5.0) arrancado.');
         
         const canvas = document.getElementById('cvs'); const ctx = canvas.getContext('2d');
-        let width, height;
-        let camRotZ = 0.5, camRotX = 0.3, zoom = 4;
-        let geometry = []; 
-        let autoRotate = true, showGrid = true, isWireframe = false;
+        let width, height; let camRotZ = 0.5, camRotX = 0.3, zoom = 4;
+        let geometry = []; let autoRotate = true, showGrid = true;
         
         function resize() { width = canvas.width = canvas.parentElement.clientWidth; height = canvas.height = canvas.parentElement.clientHeight; }
         window.addEventListener('resize', resize); resize();
@@ -58,7 +57,6 @@
         const rotateZMat = (d) => { let c=Math.cos(d), s=Math.sin(d); return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]; };
         const transformPoint = (p, m) => ({ x: p.x*m[0] + p.y*m[4] + p.z*m[8] + m[12], y: p.x*m[1] + p.y*m[5] + p.z*m[9] + m[13], z: p.x*m[2] + p.y*m[6] + p.z*m[10] + m[14] });
 
-        // Controles táctiles
         let isDragging = false, lastX=0, lastY=0;
         const startDrag = (x,y) => { isDragging = true; autoRotate = false; lastX = x; lastY = y; };
         const onDrag = (x,y) => { if(!isDragging) return; camRotZ -= (x - lastX) * 0.01; camRotX += (y - lastY) * 0.01; lastX = x; lastY = y; renderScene();};
@@ -67,27 +65,74 @@
         canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY)); window.addEventListener('touchmove', e => onDrag(e.touches[0].clientX, e.touches[0].clientY)); window.addEventListener('touchend', endDrag);
 
         // ==================================================
-        // MOTOR MULTI-PARSER (ÁRBOL / BICI / SISTEMA SOLAR)
+        // EXPORTADOR STL (NUEVO)
+        // ==================================================
+        function exportSTL() {
+            logToScreen('Generando archivo STL...');
+            let stl = "solid nexus_cad_model\n";
+            // Función auxiliar para escribir triángulos (facetas)
+            const addTri = (v1, v2, v3) => {
+                stl += `facet normal 0 0 1\nouter loop\nvertex ${v1.x.toFixed(4)} ${v1.y.toFixed(4)} ${v1.z.toFixed(4)}\nvertex ${v2.x.toFixed(4)} ${v2.y.toFixed(4)} ${v2.z.toFixed(4)}\nvertex ${v3.x.toFixed(4)} ${v3.y.toFixed(4)} ${v3.z.toFixed(4)}\nendloop\nendfacet\n`;
+            };
+
+            geometry.forEach(item => {
+                if(item.c === '#113311') return; // Ignorar el suelo/grid
+                if(item.type === 'line') {
+                    // Convertir línea en un prisma triangular para el STL
+                    let t = item.t || 1;
+                    let p1 = item.p1, p2 = item.p2;
+                    addTri({x:p1.x-t, y:p1.y, z:p1.z}, {x:p1.x+t, y:p1.y, z:p1.z}, {x:p2.x, y:p2.y, z:p2.z});
+                    addTri({x:p1.x, y:p1.y-t, z:p1.z}, {x:p1.x, y:p1.y+t, z:p1.z}, {x:p2.x, y:p2.y, z:p2.z});
+                }
+            });
+            stl += "endsolid nexus_cad_model\n";
+            
+            // Descargar el archivo
+            const blob = new Blob([stl], {type: 'text/plain'});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'nexus_modelo.stl';
+            link.click();
+            logToScreen('✓ Archivo STL descargado.');
+        }
+
+        // ==================================================
+        // MOTOR MULTI-PARSER (Añadida Torre Eiffel)
         // ==================================================
         function buildGeometry(code) {
             geometry = [];
-            const addGrid = () => {
-                for(let i=-500; i<=500; i+=100) {
-                    geometry.push({type: 'line', p1: {x:i, y:-500, z:0}, p2: {x:i, y:500, z:0}, c: '#113311', t: 1, rawZ:0});
-                    geometry.push({type: 'line', p1: {x:-500, y:i, z:0}, p2: {x:500, y:i, z:0}, c: '#113311', t: 1, rawZ:0});
-                }
-            };
-            addGrid();
+            for(let i=-500; i<=500; i+=100) {
+                geometry.push({type: 'line', p1: {x:i, y:-500, z:0}, p2: {x:i, y:500, z:0}, c: '#113311', t: 1, rawZ:0});
+                geometry.push({type: 'line', p1: {x:-500, y:i, z:0}, p2: {x:500, y:i, z:0}, c: '#113311', t: 1, rawZ:0});
+            }
 
-            // RUTA 1: SISTEMA SOLAR
-            if(code.includes('sun_radius') || code.includes('Sistema Solar')) {
-                logToScreen('Paso 8: Iniciando motor de simulador orbital...');
-                let sun_r = 15; let m;
-                if(m = code.match(/sun_radius\s*=\s*([\d.]+)/)) sun_r = parseFloat(m[1]);
-                
-                zoom = (height * 0.5) / 180; // Ajuste automático de cámara
-                
-                // Sol
+            // RUTA 1: TORRE EIFFEL
+            if(code.includes('eiffel_tower')) {
+                logToScreen('Paso 8: Iniciando motor procedural de Torre Eiffel...');
+                zoom = (height * 0.5) / 350;
+                let h = 300;
+                for(let z=0; z<h; z+=10) {
+                    // Curvatura exponencial
+                    let w1 = 62.5 * Math.exp(-z/120);
+                    let w2 = 62.5 * Math.exp(-(z+10)/120);
+                    let c1 = [{x:w1,y:w1},{x:-w1,y:w1},{x:-w1,y:-w1},{x:w1,y:-w1}];
+                    let c2 = [{x:w2,y:w2},{x:-w2,y:w2},{x:-w2,y:-w2},{x:w2,y:-w2}];
+                    for(let i=0; i<4; i++) {
+                        // Pilares verticales
+                        geometry.push({type:'line', p1:{x:c1[i].x, y:c1[i].y, z:z}, p2:{x:c2[i].x, y:c2[i].y, z:z+10}, c:'#cc7722', t:3, rawZ:z});
+                        // Barras horizontales
+                        geometry.push({type:'line', p1:{x:c1[i].x, y:c1[i].y, z:z}, p2:{x:c1[(i+1)%4].x, y:c1[(i+1)%4].y, z:z}, c:'#aa5511', t:1.5, rawZ:z});
+                        // Cruces diagonales
+                        geometry.push({type:'line', p1:{x:c1[i].x, y:c1[i].y, z:z}, p2:{x:c2[(i+1)%4].x, y:c2[(i+1)%4].y, z:z+10}, c:'#884411', t:0.5, rawZ:z});
+                    }
+                }
+                logToScreen('✓ Torre Eiffel construida.');
+            }
+            // RUTA 2: SISTEMA SOLAR
+            else if(code.includes('sun_radius') || code.includes('Sistema Solar')) {
+                logToScreen('Paso 8: Iniciando motor orbital...');
+                let sun_r = 15; let m; if(m = code.match(/sun_radius\s*=\s*([\d.]+)/)) sun_r = parseFloat(m[1]);
+                zoom = (height * 0.5) / 180; 
                 geometry.push({type: 'sphere', p: {x:0,y:0,z:0}, r: sun_r, c: '#ffcc00', rawZ: 0});
                 
                 const planets = [
@@ -102,25 +147,17 @@
                     if(m = code.match(new RegExp(pl.name + "_radius\\s*=\\s*([\\d.]+)"))) r = parseFloat(m[1]);
                     if(m = code.match(new RegExp(pl.name + "_orbit\\s*=\\s*([\\d.]+)"))) orb = parseFloat(m[1]);
 
-                    // Anillo orbital
                     let prev = null, first = null;
                     for(let i=0; i<=360; i+=10) {
                         let a = i * Math.PI/180; let p = {x: orb*Math.cos(a), y: orb*Math.sin(a), z: 0};
                         if(prev) geometry.push({type: 'line', p1: prev, p2: p, c: '#333333', t: 1, rawZ: 0});
                         if(!first) first = p; prev = p;
                     }
-                    
-                    // Planeta interactivo (se moverá)
                     let angle = Math.random() * Math.PI * 2;
-                    geometry.push({
-                        type: 'sphere', p: {x: orb*Math.cos(angle), y: orb*Math.sin(angle), z: 0}, 
-                        r: r, c: pl.c, rawZ: 0, 
-                        orbitInfo: {orb: orb, speed: pl.speed, angle: angle}
-                    });
+                    geometry.push({ type: 'sphere', p: {x: orb*Math.cos(angle), y: orb*Math.sin(angle), z: 0}, r: r, c: pl.c, rawZ: 0, orbitInfo: {orb: orb, speed: pl.speed, angle: angle} });
                 });
-                logToScreen('✓ Planetas y órbitas cargados.');
             }
-            // RUTA 2: BICICLETA
+            // RUTA 3: BICICLETA
             else if(code.includes('bicycle')) {
                 logToScreen('Paso 8: Iniciando motor de cuadro de bicicleta...');
                 let wd = 622, fs = 560, cs = 410, rake = 45; let m;
@@ -150,9 +187,8 @@
                 addLine({x:hbx,y:20,z:hbz}, {x:fwx,y:20,z:fwz}, '#3333ff', 5); addLine({x:hbx,y:-20,z:hbz}, {x:fwx,y:-20,z:fwz}, '#3333ff', 5);
                 addLine({x:htx,y:-150,z:htz}, {x:htx,y:150,z:htz}, '#ffffff', 5);
                 addWheel(0, wd/2); addWheel(fwx, fwz);
-                logToScreen('✓ Chasis procesado con éxito.');
             } 
-            // RUTA 3: ÁRBOL FRACTAL
+            // RUTA 4: ÁRBOL FRACTAL (DEFAULT)
             else {
                 logToScreen('Paso 8: Iniciando motor recursivo de árbol...');
                 let matStack = []; let currentMat = identity();
@@ -180,13 +216,9 @@
                         geometry.push({type: 'sphere', p, r, c: `rgba(0, 200, 100, 0.7)`, rawZ: p.z});
                     }
                 }
-                logToScreen('✓ Malla fractal procesada.');
             }
         }
 
-        // ==================================================
-        // RENDERIZADOR 3D A 60FPS CON SOPORTE ANIMACIÓN ORBITAL
-        // ==================================================
         function renderScene() {
             ctx.clearRect(0, 0, width, height);
             let cx = width/2, cy = height - (height*0.2); 
@@ -206,7 +238,7 @@
                 }
             }).filter(item => item !== null);
 
-            projected.sort((a,b) => b.depth - a.depth); // Z-Buffer
+            projected.sort((a,b) => b.depth - a.depth);
 
             projected.forEach(item => {
                 if(item.type === 'line') {
@@ -214,16 +246,14 @@
                     ctx.strokeStyle = item.c; ctx.lineWidth = Math.max(0.5, item.t * zoom * 0.1); ctx.lineCap = 'round'; ctx.stroke();
                 } else {
                     ctx.beginPath(); ctx.arc(item.p.x, item.p.y, item.r * zoom * 0.2, 0, Math.PI*2);
-                    if(isWireframe) { ctx.strokeStyle = item.c; ctx.lineWidth = 1; ctx.stroke(); } 
-                    else { ctx.fillStyle = item.c; ctx.fill(); }
+                    ctx.fillStyle = item.c; ctx.fill(); 
                 }
             });
         }
 
         function animate() {
             if(autoRotate) { 
-                camRotZ -= 0.005; // Rotar cámara global
-                // Animación orbital nativa para los planetas
+                camRotZ -= 0.005; 
                 geometry.forEach(item => {
                     if(item.orbitInfo) {
                         item.orbitInfo.angle += (item.orbitInfo.speed * 0.02);
@@ -238,10 +268,9 @@
 
         fetch('/api/get_code_b64.json').then(r => r.json()).then(data => {
             if (data.code_b64) {
-                logToScreen('✓ Paso 6: Código recibido. Compilando...');
+                logToScreen('✓ Código recibido. Compilando...');
                 buildGeometry(decodeB64(data.code_b64));
                 renderScene(); animate();
-                logToScreen('✓ Paso 9: LISTO. Motor a 60FPS corriendo.');
             }
         }).catch(e => logToScreen('ERROR API: ' + e.message, true));
     </script>

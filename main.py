@@ -36,7 +36,7 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v1.4.0"
+        page.title = "NEXUS CAD v1.5.0"
         page.theme_mode = "dark"
         page.bgcolor = "#0a0a0a"
         page.padding = 0
@@ -63,10 +63,7 @@ frame_size = 560;
 module bicycle() { // Motor dinámico 3D }
 bicycle();"""
 
-        code_solar = """// Sistema Solar en OpenSCAD - 11 de Mayo 2017, 20:00h
-// Posiciones aproximadas basadas en cálculos orbitales
-
-// Tamaños de planetas (escala relativa ajustada)
+        code_solar = """// Sistema Solar en OpenSCAD
 sun_radius = 15;
 mercury_radius = 2;
 venus_radius = 3;
@@ -77,7 +74,6 @@ saturn_radius = 8;
 uranus_radius = 6;
 neptune_radius = 5.5;
 
-// Distancias orbitales
 mercury_orbit = 25;
 venus_orbit = 35;
 earth_orbit = 45;
@@ -87,19 +83,29 @@ saturn_orbit = 95;
 uranus_orbit = 115;
 neptune_orbit = 135;"""
 
+        code_eiffel = """// Eiffel Tower in OpenSCAD
+module line(start, end, diameter=1) {}
+r_outer_0 = 62.5;
+w0 = 12.5;
+h = 300;
+module eiffel_tower() {
+    // El motor interceptará esto y generará el fractal procedural
+}
+eiffel_tower();"""
+
         # =========================================================
         # COMPONENTES DE INTERFAZ
         # =========================================================
-        # FIX DE SCROLL: min_lines y max_lines para forzar crecimiento seguro
         txt_code = ft.TextField(
-            label="Código OpenSCAD", multiline=True, expand=True, min_lines=15,
-            value=code_solar, color="#00ff00", bgcolor="#050505", border_color="#333333"
+            label="Código OpenSCAD", multiline=True, expand=True, 
+            value=code_eiffel, color="#00ff00", bgcolor="#050505", border_color="#333333"
         )
         
         def load_template(tipo):
             if tipo == 'bike': txt_code.value = code_bike
             elif tipo == 'tree': txt_code.value = code_tree
-            else: txt_code.value = code_solar
+            elif tipo == 'solar': txt_code.value = code_solar
+            else: txt_code.value = code_eiffel
             page.update()
 
         def copy_code():
@@ -116,6 +122,7 @@ neptune_orbit = 135;"""
             ft.ElevatedButton("🚲", on_click=lambda _: load_template('bike'), bgcolor="#222222", color="white", tooltip="Bicicleta"),
             ft.ElevatedButton("🌲", on_click=lambda _: load_template('tree'), bgcolor="#222222", color="white", tooltip="Árbol"),
             ft.ElevatedButton("🪐", on_click=lambda _: load_template('solar'), bgcolor="#222222", color="white", tooltip="Sistema Solar"),
+            ft.ElevatedButton("🗼", on_click=lambda _: load_template('eiffel'), bgcolor="#222222", color="white", tooltip="Torre Eiffel"),
         ])
         
         row_actions = ft.Row([
@@ -123,16 +130,16 @@ neptune_orbit = 135;"""
             ft.ElevatedButton("🗑️ LIMPIAR", on_click=lambda _: clear_code(), bgcolor="#e53935", color="white"),
         ])
         
-        status_text = ft.Text("Sistema Online - v1.4.0", color="grey600")
+        status_text = ft.Text("Sistema Online - v1.5.0", color="grey600")
 
-        # FIX DE SCROLL: scroll=ft.ScrollMode.AUTO añadido a la Columna principal
+        # FIX DEFINITIVO DE SCROLL: Quitamos 'scroll=ft.ScrollMode.AUTO' del padre, dejamos que TextField expanda
         editor_container = ft.Container(
             content=ft.Column([
                 row_templates, 
                 row_actions,
                 txt_code, 
                 ft.ElevatedButton("▶ COMPILAR Y ROTAR 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=50)
-            ], expand=True, scroll=ft.ScrollMode.AUTO), 
+            ], expand=True), 
             padding=10, expand=True, bgcolor="#0a0a0a"
         )
         

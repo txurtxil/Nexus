@@ -5,17 +5,15 @@ from urllib.parse import urlparse
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
-# CONFIGURACIÓN DE RUTAS BLINDADAS (Anti-Pantalla Negra)
+# CONFIGURACIÓN DE RUTAS BLINDADAS
 # =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
-# Lógica inteligente de almacenamiento para APK vs Termux
 EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 try:
     os.makedirs(EXPORT_DIR, exist_ok=True)
 except OSError:
-    # Si falla (estamos dentro de una APK protegida de Android), usar carpeta interna segura.
     EXPORT_DIR = os.path.join(tempfile.gettempdir(), "nexus_proyectos")
     os.makedirs(EXPORT_DIR, exist_ok=True)
 
@@ -46,7 +44,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             except: self.send_response(404); self.end_headers()
     def log_message(self, *args): pass
 
-# Arrancar el visor 3D de forma silenciosa para que no crashee la app si hay error
 def start_server():
     try: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever()
     except: pass
@@ -57,7 +54,7 @@ threading.Thread(target=start_server, daemon=True).start()
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v2.8.3"
+        page.title = "NEXUS CAD v2.8.4"
         page.theme_mode = "dark"
         page.bgcolor = "#0a0a0a"
         page.padding = 0
@@ -84,7 +81,8 @@ def main(page: ft.Page):
         T_PEANA = "function main() {\n  var base = CSG.cube({center: [0, 0, 5], radius: [60, 40, 5]});\n  var soporte = CSG.cube({center: [0, 10, 25], radius: [60, 5, 25]});\n  return base.union(soporte);\n}"
         T_BANDEJA = "function main() {\n  var solido = CSG.cube({center: [0,0,5], radius: [50, 50, 5]});\n  var hueco = CSG.cylinder({start: [0,0,2], end: [0,0,10], radius: 45, slices: 6});\n  return solido.subtract(hueco);\n}"
 
-        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_CARCASA, text_size=12, color="#00ff00", font_family="monospace")
+        # FIX: Eliminado 'font_family="monospace"' que causaba el Crash en la compilación APK
+        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_CARCASA, text_size=12, color="#00ff00")
 
         def load_template(t):
             txt_code.value = t; page.update()
@@ -186,14 +184,11 @@ def main(page: ft.Page):
         update_files()
 
     except Exception as e:
-        # SISTEMA ANTI PANTALLA NEGRA
         page.clean()
         page.add(ft.SafeArea(ft.Text(f"CRASH FATAL:\n{traceback.format_exc()}", color="red", selectable=True)))
         page.update()
 
 if __name__ == "__main__":
-    # Si estamos en Termux usamos puerto dinamico y vista web.
-    # Si estamos en APK Nativa (Github), no forzamos NADA para que Flet fluya libre.
     if "TERMUX_VERSION" in os.environ:
         ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
     else:

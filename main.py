@@ -5,18 +5,17 @@ from urllib.parse import urlparse
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
-# CONFIGURACIÓN DE RUTAS ABSOLUTAS (Termux/Acode Unificado)
+# CONFIGURACIÓN DE RUTAS ABSOLUTAS (Para APK Android)
 # =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 
-# Asegurar que los directorios existan
 os.makedirs(ASSETS_DIR, exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
-# MOTOR SERVIDOR LOCAL (HTTP + API JSON)
+# MOTOR SERVIDOR LOCAL (Puerto Dinámico Anti-Zombies)
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -48,26 +47,24 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 # APLICACIÓN PRINCIPAL NEXUS CAD
 # =========================================================
 def main(page: ft.Page):
-    page.title = "NEXUS CAD v2.8.1"
+    page.title = "NEXUS CAD v2.8.2"
     page.theme_mode = "dark"
     page.bgcolor = "#0a0a0a"
     page.padding = 0
 
-    status = ft.Text(f"Base: ...{BASE_DIR[-20:]}", size=10, color="grey600")
+    status = ft.Text("Sistema estable (Puerto Dinámico)", size=10, color="grey600")
 
-    # --- SISTEMA DE PORTAPAPELES HÍBRIDO (Blindado) ---
+    # --- SISTEMA DE PORTAPAPELES HÍBRIDO ---
     def copy_to_clipboard(text):
         try:
-            # Intento 1: API de Flet
             if hasattr(page, 'set_clipboard'): page.set_clipboard(text)
             elif hasattr(page, 'clipboard'): page.clipboard.set_text(text)
             else: raise Exception("Flet Clipboard no disponible")
-            status.value = "✓ Código copiado (Flet)."
+            status.value = "✓ Código copiado."
         except:
-            # Intento 2: API Nativa de Termux
             try:
                 subprocess.run(['termux-clipboard-set'], input=text.encode('utf-8'))
-                status.value = "✓ Código copiado (Termux API)."
+                status.value = "✓ Código copiado (Nativo)."
             except:
                 status.value = "❌ Error crítico al copiar."
         page.update()
@@ -76,18 +73,19 @@ def main(page: ft.Page):
     T_CARCASA = "function main() {\n  var ext = CSG.cube({center:[0,0,10], radius:[40,25,10]});\n  var int = CSG.cube({center:[0,0,12], radius:[38,23,10]});\n  return ext.subtract(int);\n}"
     T_ENGRARE = "function main() {\n  var b = CSG.cylinder({start:[0,0,0], end:[0,0,5], radius:20});\n  return b;\n} // Plantilla simplificada"
     T_PEANA = "function main() {\n  var base = CSG.cube({center: [0, 0, 5], radius: [60, 40, 5]});\n  var soporte = CSG.cube({center: [0, 10, 25], radius: [60, 5, 25]});\n  return base.union(soporte);\n}"
+    T_BANDEJA = "function main() {\n  var solido = CSG.cube({center: [0,0,5], radius: [50, 50, 5]});\n  var hueco = CSG.cylinder({start: [0,0,2], end: [0,0,10], radius: 45, slices: 6});\n  return solido.subtract(hueco);\n}"
 
     txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_CARCASA, text_size=12, color="#00ff00", font_family="monospace")
 
     def load_template(t):
         txt_code.value = t; page.update()
 
-    # Botón de Plantillas Compacto
     btn_templates = ft.PopupMenuButton(
         items=[
             ft.PopupMenuItem(text="📦 Carcasa", on_click=lambda _: load_template(T_CARCASA)),
             ft.PopupMenuItem(text="⚙️ Engranaje", on_click=lambda _: load_template(T_ENGRARE)),
             ft.PopupMenuItem(text="📱 Peana", on_click=lambda _: load_template(T_PEANA)),
+            ft.PopupMenuItem(text="📥 Bandeja", on_click=lambda _: load_template(T_BANDEJA)),
         ],
         content=ft.Row([ft.Icon(ft.icons.MENU_BOOK, size=18), ft.Text("Plantillas", weight="bold")])
     )
@@ -96,15 +94,12 @@ def main(page: ft.Page):
     def update_files():
         file_list.controls.clear()
         for f in reversed(sorted(os.listdir(EXPORT_DIR))):
-            def make_handler(fname): # Evitar problemas de binding en bucle
+            def make_handler(fname): 
                 return lambda _: load_file_content(fname)
-            
             def make_rename_handler(fname):
                 return lambda _: prompt_rename(fname)
-
             def make_copy_handler(fname):
                 return lambda _: copy_file_to_clipboard(fname)
-
             def make_delete_handler(fname):
                 return lambda _: delete_file(fname)
 
@@ -181,4 +176,6 @@ def main(page: ft.Page):
     page.add(ft.SafeArea(content=ft.Column([tabs, status], expand=True)))
     update_files()
 
-ft.app(target=main, port=8555, view=ft.AppView.WEB_BROWSER if "TERMUX_VERSION" in os.environ else None)
+if __name__ == "__main__":
+    # SOLUCIÓN ANTI-ZOMBIES: port=0 fuerza a Android a darnos un puerto libre cada vez.
+    ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER if "TERMUX_VERSION" in os.environ else None)

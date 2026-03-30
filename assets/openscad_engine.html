@@ -4,27 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; padding: 0; background: #0a0a0a; color: #00ff00; overflow: hidden; font-family: monospace; display: flex; flex-direction: column; height: 100vh; touch-action: none; }
+        body { margin: 0; padding: 0; background: #050505; color: #00ff00; overflow: hidden; font-family: monospace; display: flex; flex-direction: column; height: 100vh; touch-action: none; }
         #visor-container { flex: 1; position: relative; border-bottom: 2px solid #1a1a1a; z-index: 10; cursor: grab; }
-        #visor-container:active { cursor: grabbing; }
-        canvas { display: block; width: 100%; height: 100%; z-index: 20; position: absolute; top: 0; left: 0; }
+        canvas { display: block; width: 100%; height: 100%; }
         
-        #overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 30; background: rgba(0,0,0,0.85); padding: 8px; border-radius: 8px; border: 1px solid #444; display: flex; flex-wrap: wrap; gap: 5px; max-width: 95%; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-        button { background: #0044cc; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; text-transform: uppercase; }
-        .btn-export { background: #d81b60; }
-        .btn-debug { background: #f57c00; }
-        .btn-tool { background: #2e7d32; }
-        .btn-cam { background: #4527a0; }
+        #overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 30; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 8px; border: 1px solid #444; display: flex; flex-wrap: wrap; gap: 4px; max-width: 95%; }
+        button { background: #0044cc; color: white; border: none; padding: 6px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; }
+        .btn-active { background: #00c853 !important; }
+        .btn-danger { background: #d81b60; }
         
-        #bbox-info { position: absolute; bottom: 15px; right: 15px; z-index: 30; background: rgba(0,255,100,0.1); border: 1px solid #00ff00; color: #00ff00; padding: 5px 10px; border-radius: 4px; font-size: 11px; pointer-events: none; }
-        
-        #log-container { height: 120px; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 40; position: relative; transition: all 0.3s ease; }
-        #log-container.fullscreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-sizing: border-box; font-size: 14px; padding-top: 50px; z-index: 1000; background: rgba(5,5,5,0.98); }
-        .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #222; padding-bottom: 4px; word-wrap: break-word; }
-        .error { color: #ff3333; font-weight: bold; }
-        .success { color: #00e676; }
-        #close-log-btn { display: none; position: absolute; top: 10px; right: 10px; background: #cc0000; font-size: 14px; padding: 8px 15px; }
-        #log-container.fullscreen #close-log-btn { display: block; }
+        #stats-ui { position: absolute; bottom: 10px; left: 10px; z-index: 30; font-size: 10px; color: #00ff00; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 4px; }
+        #bbox-info { position: absolute; bottom: 10px; right: 10px; z-index: 30; background: rgba(0,255,100,0.1); border: 1px solid #00ff00; color: #00ff00; padding: 5px; border-radius: 4px; font-size: 10px; }
     </style>
     <script src="three.min.js"></script>
     <script src="csg.js"></script>
@@ -32,192 +22,131 @@
 <body>
     <div id="visor-container">
         <div id="overlay-ui">
-            <button class="btn-tool" onclick="autoRotate = !autoRotate;">🔄 Rotar</button>
-            <button class="btn-cam" onclick="toggleCamera();">🎥 Perspectiva/Orto</button>
-            <button class="btn-cam" onclick="cycleMaterial();">🎨 Material</button>
-            <button class="btn-tool" onclick="resetCamera();">🎯 Centrar</button>
-            <button class="btn-tool" onclick="zoomIn();">➕</button>
-            <button class="btn-tool" onclick="zoomOut();">➖</button>
-            <button class="btn-export" onclick="exportSTL();">⬇️ STL</button>
-            <button class="btn-debug" onclick="toggleLog();">🖥️ DEBUG</button>
+            <button onclick="toggleRotate()" id="btn-rot">🔄 Giro: ON</button>
+            <button onclick="toggleGrid()" id="btn-grid">🏁 Rejilla</button>
+            <button onclick="cycleMaterial()">🎨 Material</button>
+            <button onclick="toggleCamera()">🎥 Persp/Orto</button>
+            <button onclick="resetCamera()">🎯 Reset</button>
+            <button class="btn-danger" onclick="exportSTL()">⬇️ STL</button>
         </div>
-        <div id="bbox-info">📐 Dimensiones: Calculando...</div>
+        <div id="stats-ui">Polígonos: <span id="poly-count">0</span></div>
+        <div id="bbox-info">Dimensiones: ---</div>
         <canvas id="cvs"></canvas>
     </div>
     
-    <div id="log-container">
-        <button id="close-log-btn" onclick="toggleLog();">❌ Cerrar Consola</button>
-    </div>
-    
     <script>
-        const logBox = document.getElementById('log-container');
-        function logToScreen(msg, isError=false) {
-            const p = document.createElement('div'); p.className = 'log-msg ' + (isError ? 'error' : (msg.includes('✓') ? 'success' : ''));
-            p.innerText = '> ' + msg; logBox.appendChild(p); logBox.scrollTop = logBox.scrollHeight;
-        }
-        window.onerror = function(msg) { logToScreen('CRASH: ' + msg, true); return false; };
-        function toggleLog() { logBox.classList.toggle('fullscreen'); }
-        function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
-
-        logToScreen('Paso 1: Motor CAD Industrial (v2.5.2) arrancado.');
-
-        // Inicialización de Memoria (FIX DE HOISTING)
-        let isOrtho = false;
-        let aspect = window.innerWidth / (window.innerHeight*0.8);
-        let camRadius = 120; let d = 100;
-        let isDragging = false, prevX = 0, prevY = 0, lon = 45, lat = 45;
-        let initialPinchDist = null;
-        let mainMesh = null; let autoRotate = true; let currentCSG = null;
-        
-        // Inicialización Three.js
+        let autoRotate = true, showGrid = true;
         const canvas = document.getElementById('cvs');
-        const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, alpha: true});
+        const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
         const scene = new THREE.Scene();
         
-        const cameraPersp = new THREE.PerspectiveCamera(45, aspect, 0.1, 2000);
-        const cameraOrtho = new THREE.OrthographicCamera(-d*aspect, d*aspect, d, -d, 0.1, 2000);
-        let activeCamera = cameraPersp;
+        let aspect = window.innerWidth / (window.innerHeight*0.8);
+        let camRadius = 150; let d = 100;
+        const cameraP = new THREE.PerspectiveCamera(45, aspect, 0.1, 2000);
+        const cameraO = new THREE.OrthographicCamera(-d*aspect, d*aspect, d, -d, 0.1, 2000);
+        let activeCam = cameraP;
 
+        // Iluminación Técnica
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const light = new THREE.DirectionalLight(0xffffff, 1); light.position.set(100, 200, 100); scene.add(light);
+        const light2 = new THREE.PointLight(0x00ff00, 0.5); light2.position.set(-100, -100, -100); scene.add(light2);
+
+        const grid = new THREE.GridHelper(400, 40, 0x00ff00, 0x112211); scene.add(grid);
+        const axes = new THREE.AxesHelper(50); scene.add(axes);
+
+        const materials = [
+            new THREE.MeshStandardMaterial({color: 0x00ff7f, metalness: 0.2, roughness: 0.4}),
+            new THREE.MeshStandardMaterial({color: 0x888888, metalness: 0.9, roughness: 0.2}),
+            new THREE.MeshStandardMaterial({color: 0x00aaff, transparent: true, opacity: 0.4}),
+            new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true})
+        ];
+        let matIdx = 0; let mainMesh = null; let currentCSG = null;
+
+        function toggleRotate() { autoRotate = !autoRotate; document.getElementById('btn-rot').innerText = autoRotate ? "🔄 Giro: ON" : "🔄 Giro: OFF"; }
+        function toggleGrid() { showGrid = !showGrid; grid.visible = showGrid; }
+        function cycleMaterial() { matIdx = (matIdx + 1) % materials.length; if(mainMesh) mainMesh.material = materials[matIdx]; }
+        function toggleCamera() { activeCam = (activeCam === cameraP) ? cameraO : cameraP; updateCamera(); }
+        function resetCamera() { lon = 45; lat = 45; camRadius = 150; updateCamera(); }
+
+        let lon = 45, lat = 45;
         function updateCamera() {
             const phi = (90 - lat) * (Math.PI / 180); const theta = lon * (Math.PI / 180);
-            
-            let px = camRadius * Math.sin(phi) * Math.cos(theta);
-            let py = camRadius * Math.cos(phi);
-            let pz = camRadius * Math.sin(phi) * Math.sin(theta);
-            
-            cameraPersp.position.set(px, py, pz); cameraPersp.lookAt(0, 0, 0);
-            cameraOrtho.position.set(px, py, pz); cameraOrtho.lookAt(0, 0, 0);
-            
-            let zoomFactor = camRadius / 100;
-            cameraOrtho.left = -d * aspect * zoomFactor; cameraOrtho.right = d * aspect * zoomFactor;
-            cameraOrtho.top = d * zoomFactor; cameraOrtho.bottom = -d * zoomFactor;
-            cameraOrtho.updateProjectionMatrix();
+            const pos = new THREE.Vector3(camRadius * Math.sin(phi) * Math.cos(theta), camRadius * Math.cos(phi), camRadius * Math.sin(phi) * Math.sin(theta));
+            cameraP.position.copy(pos); cameraP.lookAt(0,0,0);
+            cameraO.position.copy(pos); cameraO.lookAt(0,0,0);
+            let z = camRadius / 100; cameraO.left = -d*aspect*z; cameraO.right = d*aspect*z; cameraO.top = d*z; cameraO.bottom = -d*z;
+            cameraO.updateProjectionMatrix();
         }
 
-        function resetCamera() { lon = 45; lat = 45; camRadius = 120; updateCamera(); }
-        resetCamera();
-
-        const ambientLight = new THREE.AmbientLight(0x404040, 1.5); scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); dirLight.position.set(100, 200, 100); scene.add(dirLight);
-        const backLight = new THREE.DirectionalLight(0xffffff, 0.5); backLight.position.set(-100, -200, -100); scene.add(backLight);
-        
-        const gridHelper = new THREE.GridHelper(300, 30, 0x00ff00, 0x113311); scene.add(gridHelper);
-        const axesHelper = new THREE.AxesHelper( 60 ); scene.add(axesHelper); 
-
-        const matGreen = new THREE.MeshStandardMaterial({color: 0x00e676, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide});
-        const matMetal = new THREE.MeshStandardMaterial({color: 0xaaaaaa, roughness: 0.3, metalness: 0.8, side: THREE.DoubleSide});
-        const matGlass = new THREE.MeshStandardMaterial({color: 0x2196f3, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.5, side: THREE.DoubleSide});
-        const matWire = new THREE.MeshBasicMaterial({color: 0x00e676, wireframe: true});
-        const materials = [matGreen, matMetal, matGlass, matWire];
-        let currentMatIndex = 0;
-
-        function toggleCamera() { 
-            isOrtho = !isOrtho; activeCamera = isOrtho ? cameraOrtho : cameraPersp; 
-            logToScreen(isOrtho ? 'Modo: Cámara Ortográfica' : 'Modo: Perspectiva Cónica');
-            updateCamera(); 
-        }
-        function cycleMaterial() {
-            currentMatIndex = (currentMatIndex + 1) % materials.length;
-            if(mainMesh) mainMesh.material = materials[currentMatIndex];
-        }
-        const zoomIn = () => { camRadius = Math.max(10, camRadius - 20); updateCamera(); };
-        const zoomOut = () => { camRadius = Math.min(800, camRadius + 20); updateCamera(); };
-
-        canvas.addEventListener('wheel', (e) => { camRadius += e.deltaY * 0.1; camRadius = Math.max(10, Math.min(800, camRadius)); updateCamera(); });
-        canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; autoRotate=false;});
-        window.addEventListener('mouseup', () => isDragging = false);
-        window.addEventListener('mousemove', e => {
-            if(!isDragging) return;
-            lon -= (e.clientX - prevX) * 0.5; lat += (e.clientY - prevY) * 0.5;
-            lat = Math.max(-85, Math.min(85, lat)); prevX = e.clientX; prevY = e.clientY; updateCamera();
-        });
-        
-        canvas.addEventListener('touchstart', e => { if(e.touches.length === 1) { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; autoRotate=false; } });
-        window.addEventListener('touchend', () => { isDragging = false; initialPinchDist = null; });
-        window.addEventListener('touchmove', e => {
-            if(e.touches.length === 2) { 
-                let dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-                if(initialPinchDist) { camRadius -= (dist - initialPinchDist) * 0.5; camRadius = Math.max(10, Math.min(800, camRadius)); updateCamera(); }
-                initialPinchDist = dist; autoRotate=false;
-            } else if(e.touches.length === 1 && isDragging) { 
-                lon -= (e.touches[0].clientX - prevX) * 0.5; lat += (e.touches[0].clientY - prevY) * 0.5;
-                lat = Math.max(-85, Math.min(85, lat)); prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; updateCamera();
-            }
-        });
-
-        window.addEventListener('resize', () => {
-            let h = logBox.classList.contains('fullscreen') ? window.innerHeight : window.innerHeight*0.8;
-            aspect = window.innerWidth / h;
-            cameraPersp.aspect = aspect; cameraPersp.updateProjectionMatrix();
-            cameraOrtho.left = -d * aspect; cameraOrtho.right = d * aspect; cameraOrtho.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, h);
+        // Eventos táctiles
+        let isMoving = false, px = 0, py = 0;
+        canvas.addEventListener('touchstart', e => { isMoving = true; px = e.touches[0].clientX; py = e.touches[0].clientY; autoRotate = false; });
+        canvas.addEventListener('touchmove', e => {
+            if(!isMoving) return;
+            lon -= (e.touches[0].clientX - px) * 0.6; lat += (e.touches[0].clientY - py) * 0.6;
+            lat = Math.max(-85, Math.min(85, lat)); px = e.touches[0].clientX; py = e.touches[0].clientY;
             updateCamera();
         });
+        canvas.addEventListener('touchend', () => isMoving = false);
 
-        function updateBoundingBox(geom) {
-            geom.computeBoundingBox();
-            let bbox = geom.boundingBox;
-            let sizeX = Math.abs(bbox.max.x - bbox.min.x).toFixed(1);
-            let sizeY = Math.abs(bbox.max.y - bbox.min.y).toFixed(1);
-            let sizeZ = Math.abs(bbox.max.z - bbox.min.z).toFixed(1);
-            document.getElementById('bbox-info').innerText = `📐 Size: X:${sizeX} Y:${sizeY} Z:${sizeZ} mm`;
-        }
-
-        function buildGeometry(code) {
-            logToScreen('Paso 8: Evaluando código CSG Javascript...');
+        function build(code) {
             if(mainMesh) scene.remove(mainMesh);
             try {
                 const func = new Function("CSG", code + "\nreturn main();");
-                currentCSG = func(CSG); 
-                
+                currentCSG = func(CSG);
                 const geom = new THREE.BufferGeometry();
-                const vertices = []; const normals = [];
-                currentCSG.toPolygons().forEach(poly => {
-                    for(let i=2; i<poly.vertices.length; i++) {
-                        let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos, n = poly.plane.normal;
-                        vertices.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
-                        normals.push(n.x, n.y, n.z, n.x, n.y, n.z, n.x, n.y, n.z);
+                const v = []; const n = [];
+                currentCSG.toPolygons().forEach(p => {
+                    for(let i=2; i<p.vertices.length; i++) {
+                        v.push(p.vertices[0].pos.x, p.vertices[0].pos.y, p.vertices[0].pos.z);
+                        v.push(p.vertices[i-1].pos.x, p.vertices[i-1].pos.y, p.vertices[i-1].pos.z);
+                        v.push(p.vertices[i].pos.x, p.vertices[i].pos.y, p.vertices[i].pos.z);
+                        const norm = p.plane.normal;
+                        n.push(norm.x, norm.y, norm.z, norm.x, norm.y, norm.z, norm.x, norm.y, norm.z);
                     }
                 });
-                geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-                geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-                
-                mainMesh = new THREE.Mesh(geom, materials[currentMatIndex]);
+                geom.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+                geom.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
+                mainMesh = new THREE.Mesh(geom, materials[matIdx]);
                 scene.add(mainMesh);
-                updateBoundingBox(geom);
                 
-                logToScreen('✓ Malla WebGL Industrial generada.');
-            } catch(e) { 
-                logToScreen('ERROR EN CÓDIGO: ' + e.message, true); 
-                logToScreen('Abre el panel DEBUG si necesitas ver el rastro completo.', true);
-            }
+                geom.computeBoundingBox();
+                const b = geom.boundingBox;
+                document.getElementById('bbox-info').innerText = `📐 ${Math.abs(b.max.x-b.min.x).toFixed(1)}x${Math.abs(b.max.y-b.min.y).toFixed(1)}x${Math.abs(b.max.z-b.min.z).toFixed(1)}mm`;
+                document.getElementById('poly-count').innerText = v.length/9;
+            } catch(e) { console.error(e); }
         }
 
         function exportSTL() {
             if(!currentCSG) return;
-            logToScreen('Generando archivo STL sólido...');
-            let stl = "solid nexus_industrial_model\n";
-            currentCSG.toPolygons().forEach(poly => {
-                for(let i=2; i<poly.vertices.length; i++) {
-                    let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos, n = poly.plane.normal;
-                    stl += `facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${v0.x} ${v0.y} ${v0.z}\nvertex ${v1.x} ${v1.y} ${v1.z}\nvertex ${v2.x} ${v2.y} ${v2.z}\nendloop\nendfacet\n`;
+            let s = "solid nexus_v26\n";
+            currentCSG.toPolygons().forEach(p => {
+                const norm = p.plane.normal;
+                for(let i=2; i<p.vertices.length; i++) {
+                    s += `facet normal ${norm.x} ${norm.y} ${norm.z}\nouter loop\n`;
+                    [0, i-1, i].forEach(idx => {
+                        const vert = p.vertices[idx].pos;
+                        s += `vertex ${vert.x} ${vert.y} ${vert.z}\n`;
+                    });
+                    s += `endloop\nendfacet\n`;
                 }
             });
-            stl += "endsolid nexus_industrial_model\n";
-            const blob = new Blob([stl], {type: 'text/plain'});
-            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'nexus_industrial.stl'; link.click();
-            logToScreen('✓ Archivo STL descargado.');
+            s += "endsolid nexus_v26\n";
+            const b = new Blob([s], {type: 'text/plain'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'nexus_out.stl'; a.click();
         }
 
         function animate() {
-            if(autoRotate) { lon += 0.3; updateCamera(); }
-            renderer.render(scene, activeCamera);
+            if(autoRotate) { lon += 0.4; updateCamera(); }
+            renderer.render(scene, activeCam);
             requestAnimationFrame(animate);
         }
 
-        fetch('/api/get_code_b64.json').then(r => r.json()).then(data => {
-            if (data.code_b64) { buildGeometry(decodeB64(data.code_b64)); updateCamera(); animate(); }
-        }).catch(e => logToScreen('ERROR API: ' + e.message, true));
+        function decode(s) { return decodeURIComponent(atob(s).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
+        fetch('/api/get_code_b64.json').then(r => r.json()).then(d => {
+            if(d.code_b64) { build(decode(d.code_b64)); updateCamera(); animate(); }
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight*0.8);
     </script>
 </body>
 </html>

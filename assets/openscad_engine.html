@@ -16,16 +16,15 @@
         .error { color: #ff3333; font-weight: bold; }
         .success { color: #00e676; }
     </style>
+    <script src="three.min.js"></script>
+    <script src="csg.js"></script>
 </head>
 <body>
     <div id="visor-container">
         <div id="overlay-ui">
             <button onclick="autoRotate = !autoRotate;">🔄 Rotar</button>
-            <button onclick="showGrid = !showGrid; renderScene();">▦ Grid</button>
-            <button onclick="zoom *= 1.2; renderScene();">➕</button>
-            <button onclick="zoom *= 0.8; renderScene();">➖</button>
             <button class="btn-export" onclick="exportSTL();">⬇️ Guardar STL</button>
-            <div style="color:#aaa; font-size:10px; width: 100%;">👆 Arrastra para orbitar cámara</div>
+            <div style="color:#aaa; font-size:10px; width: 100%; margin-top:5px;">👆 Arrastra para orbitar la cámara 3D</div>
         </div>
         <canvas id="cvs"></canvas>
     </div>
@@ -33,244 +32,128 @@
     <script>
         const logBox = document.getElementById('log-container');
         function logToScreen(msg, isError=false) {
-            const p = document.createElement('div');
-            p.className = 'log-msg ' + (isError ? 'error' : (msg.includes('✓') ? 'success' : ''));
+            const p = document.createElement('div'); p.className = 'log-msg ' + (isError ? 'error' : (msg.includes('✓') ? 'success' : ''));
             p.innerText = '> ' + msg; logBox.appendChild(p); logBox.scrollTop = logBox.scrollHeight;
         }
         window.onerror = function(msg) { logToScreen('CRASH: ' + msg, true); return false; };
 
-        logToScreen('Paso 1: Motor WebGL 6.0 (v1.5.0) arrancado.');
-        
-        const canvas = document.getElementById('cvs'); const ctx = canvas.getContext('2d');
-        let width, height; let camRotZ = 0.5, camRotX = 0.3, zoom = 4;
-        let geometry = []; let autoRotate = true, showGrid = true;
-        
-        function resize() { width = canvas.width = canvas.parentElement.clientWidth; height = canvas.height = canvas.parentElement.clientHeight; }
-        window.addEventListener('resize', resize); resize();
+        logToScreen('Paso 1: Motor WebGL y CSG.js (v1.7.0) arrancado.');
         function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
 
-        // Core 3D
-        const identity = () => [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
-        const multiply = (a, b) => { let c = new Array(16).fill(0); for(let i=0; i<4; i++) for(let j=0; j<4; j++) for(let k=0; k<4; k++) c[i + j*4] += a[i + k*4] * b[k + j*4]; return c; };
-        const translateMat = (x,y,z) => [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
-        const rotateXMat = (d) => { let c=Math.cos(d), s=Math.sin(d); return [1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]; };
-        const rotateZMat = (d) => { let c=Math.cos(d), s=Math.sin(d); return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]; };
-        const transformPoint = (p, m) => ({ x: p.x*m[0] + p.y*m[4] + p.z*m[8] + m[12], y: p.x*m[1] + p.y*m[5] + p.z*m[9] + m[13], z: p.x*m[2] + p.y*m[6] + p.z*m[10] + m[14] });
+        // ==================================================
+        // INICIALIZACIÓN THREE.JS (Aceleración Hardware)
+        // ==================================================
+        const canvas = document.getElementById('cvs');
+        const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, alpha: true});
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight*0.8), 0.1, 1000);
+        camera.position.set(50, 50, 50); camera.lookAt(0, 0, 0);
 
-        let isDragging = false, lastX=0, lastY=0;
-        const startDrag = (x,y) => { isDragging = true; autoRotate = false; lastX = x; lastY = y; };
-        const onDrag = (x,y) => { if(!isDragging) return; camRotZ -= (x - lastX) * 0.01; camRotX += (y - lastY) * 0.01; lastX = x; lastY = y; renderScene();};
-        const endDrag = () => { isDragging = false; };
-        canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY)); window.addEventListener('mousemove', e => onDrag(e.clientX, e.clientY)); window.addEventListener('mouseup', endDrag);
-        canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY)); window.addEventListener('touchmove', e => onDrag(e.touches[0].clientX, e.touches[0].clientY)); window.addEventListener('touchend', endDrag);
+        // Iluminación Profesional
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.5); scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1); dirLight.position.set(100, 200, 50); scene.add(dirLight);
+        const gridHelper = new THREE.GridHelper(200, 20, 0x00ff00, 0x113311); scene.add(gridHelper);
+
+        let mainMesh = null; let autoRotate = true; let currentCSG = null;
+
+        // Controles de cámara orbital táctil
+        let isDragging = false, prevX = 0, prevY = 0, lon = 45, lat = 45;
+        canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; autoRotate=false;});
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', e => {
+            if(!isDragging) return;
+            lon -= (e.clientX - prevX) * 0.5; lat += (e.clientY - prevY) * 0.5;
+            lat = Math.max(-85, Math.min(85, lat)); prevX = e.clientX; prevY = e.clientY;
+            updateCamera();
+        });
+        canvas.addEventListener('touchstart', e => { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; autoRotate=false;});
+        window.addEventListener('touchend', () => isDragging = false);
+        window.addEventListener('touchmove', e => {
+            if(!isDragging) return;
+            lon -= (e.touches[0].clientX - prevX) * 0.5; lat += (e.touches[0].clientY - prevY) * 0.5;
+            lat = Math.max(-85, Math.min(85, lat)); prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+            updateCamera();
+        });
+
+        function updateCamera() {
+            const phi = (90 - lat) * (Math.PI / 180); const theta = lon * (Math.PI / 180); const radius = 80;
+            camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
+            camera.position.y = radius * Math.cos(phi);
+            camera.position.z = radius * Math.sin(phi) * Math.sin(theta);
+            camera.lookAt(0, 0, 0);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / (window.innerHeight*0.8); camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight*0.8);
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight*0.8);
 
         // ==================================================
-        // EXPORTADOR STL (NUEVO)
+        // PARSER CSG (Evaluación Dinámica de Código AI)
+        // ==================================================
+        function buildGeometry(code) {
+            logToScreen('Paso 8: Evaluando código CSG Javascript...');
+            if(mainMesh) scene.remove(mainMesh);
+            
+            try {
+                // Ejecutamos el código introducido por el usuario (o la IA)
+                const func = new Function("CSG", code + "\nreturn main();");
+                currentCSG = func(CSG); // Pasamos la librería offline CSG
+                
+                // Convertir polígonos CSG a Three.js BufferGeometry
+                const geom = new THREE.BufferGeometry();
+                const vertices = []; const normals = [];
+                
+                currentCSG.toPolygons().forEach(poly => {
+                    for(let i=2; i<poly.vertices.length; i++) {
+                        let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos;
+                        let n = poly.plane.normal;
+                        vertices.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+                        normals.push(n.x, n.y, n.z, n.x, n.y, n.z, n.x, n.y, n.z);
+                    }
+                });
+                geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+                
+                const material = new THREE.MeshStandardMaterial({color: 0x00e676, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide});
+                mainMesh = new THREE.Mesh(geom, material);
+                scene.add(mainMesh);
+                logToScreen('✓ Malla WebGL generada con éxito.');
+                
+            } catch(e) { logToScreen('ERROR EN CÓDIGO: ' + e.message, true); }
+        }
+
+        // ==================================================
+        // EXPORTADOR STL (Grado Industrial)
         // ==================================================
         function exportSTL() {
-            logToScreen('Generando archivo STL...');
-            let stl = "solid nexus_cad_model\n";
-            // Función auxiliar para escribir triángulos (facetas)
-            const addTri = (v1, v2, v3) => {
-                stl += `facet normal 0 0 1\nouter loop\nvertex ${v1.x.toFixed(4)} ${v1.y.toFixed(4)} ${v1.z.toFixed(4)}\nvertex ${v2.x.toFixed(4)} ${v2.y.toFixed(4)} ${v2.z.toFixed(4)}\nvertex ${v3.x.toFixed(4)} ${v3.y.toFixed(4)} ${v3.z.toFixed(4)}\nendloop\nendfacet\n`;
-            };
-
-            geometry.forEach(item => {
-                if(item.c === '#113311') return; // Ignorar el suelo/grid
-                if(item.type === 'line') {
-                    // Convertir línea en un prisma triangular para el STL
-                    let t = item.t || 1;
-                    let p1 = item.p1, p2 = item.p2;
-                    addTri({x:p1.x-t, y:p1.y, z:p1.z}, {x:p1.x+t, y:p1.y, z:p1.z}, {x:p2.x, y:p2.y, z:p2.z});
-                    addTri({x:p1.x, y:p1.y-t, z:p1.z}, {x:p1.x, y:p1.y+t, z:p1.z}, {x:p2.x, y:p2.y, z:p2.z});
+            if(!currentCSG) return;
+            logToScreen('Generando archivo STL sólido...');
+            let stl = "solid nexus_ai_model\n";
+            currentCSG.toPolygons().forEach(poly => {
+                for(let i=2; i<poly.vertices.length; i++) {
+                    let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos, n = poly.plane.normal;
+                    stl += `facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${v0.x} ${v0.y} ${v0.z}\nvertex ${v1.x} ${v1.y} ${v1.z}\nvertex ${v2.x} ${v2.y} ${v2.z}\nendloop\nendfacet\n`;
                 }
             });
-            stl += "endsolid nexus_cad_model\n";
-            
-            // Descargar el archivo
+            stl += "endsolid nexus_ai_model\n";
             const blob = new Blob([stl], {type: 'text/plain'});
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'nexus_modelo.stl';
-            link.click();
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'nexus_ai_modelo.stl'; link.click();
             logToScreen('✓ Archivo STL descargado.');
         }
 
-        // ==================================================
-        // MOTOR MULTI-PARSER (Añadida Torre Eiffel)
-        // ==================================================
-        function buildGeometry(code) {
-            geometry = [];
-            for(let i=-500; i<=500; i+=100) {
-                geometry.push({type: 'line', p1: {x:i, y:-500, z:0}, p2: {x:i, y:500, z:0}, c: '#113311', t: 1, rawZ:0});
-                geometry.push({type: 'line', p1: {x:-500, y:i, z:0}, p2: {x:500, y:i, z:0}, c: '#113311', t: 1, rawZ:0});
-            }
-
-            // RUTA 1: TORRE EIFFEL
-            if(code.includes('eiffel_tower')) {
-                logToScreen('Paso 8: Iniciando motor procedural de Torre Eiffel...');
-                zoom = (height * 0.5) / 350;
-                let h = 300;
-                for(let z=0; z<h; z+=10) {
-                    // Curvatura exponencial
-                    let w1 = 62.5 * Math.exp(-z/120);
-                    let w2 = 62.5 * Math.exp(-(z+10)/120);
-                    let c1 = [{x:w1,y:w1},{x:-w1,y:w1},{x:-w1,y:-w1},{x:w1,y:-w1}];
-                    let c2 = [{x:w2,y:w2},{x:-w2,y:w2},{x:-w2,y:-w2},{x:w2,y:-w2}];
-                    for(let i=0; i<4; i++) {
-                        // Pilares verticales
-                        geometry.push({type:'line', p1:{x:c1[i].x, y:c1[i].y, z:z}, p2:{x:c2[i].x, y:c2[i].y, z:z+10}, c:'#cc7722', t:3, rawZ:z});
-                        // Barras horizontales
-                        geometry.push({type:'line', p1:{x:c1[i].x, y:c1[i].y, z:z}, p2:{x:c1[(i+1)%4].x, y:c1[(i+1)%4].y, z:z}, c:'#aa5511', t:1.5, rawZ:z});
-                        // Cruces diagonales
-                        geometry.push({type:'line', p1:{x:c1[i].x, y:c1[i].y, z:z}, p2:{x:c2[(i+1)%4].x, y:c2[(i+1)%4].y, z:z+10}, c:'#884411', t:0.5, rawZ:z});
-                    }
-                }
-                logToScreen('✓ Torre Eiffel construida.');
-            }
-            // RUTA 2: SISTEMA SOLAR
-            else if(code.includes('sun_radius') || code.includes('Sistema Solar')) {
-                logToScreen('Paso 8: Iniciando motor orbital...');
-                let sun_r = 15; let m; if(m = code.match(/sun_radius\s*=\s*([\d.]+)/)) sun_r = parseFloat(m[1]);
-                zoom = (height * 0.5) / 180; 
-                geometry.push({type: 'sphere', p: {x:0,y:0,z:0}, r: sun_r, c: '#ffcc00', rawZ: 0});
-                
-                const planets = [
-                    {name: 'mercury', c: '#aaaaaa', speed: 4.1}, {name: 'venus', c: '#ffcc99', speed: 1.6},
-                    {name: 'earth', c: '#3399ff', speed: 1.0}, {name: 'mars', c: '#ff3300', speed: 0.5},
-                    {name: 'jupiter', c: '#ffaa55', speed: 0.1}, {name: 'saturn', c: '#eedd88', speed: 0.05},
-                    {name: 'uranus', c: '#55ccff', speed: 0.02}, {name: 'neptune', c: '#2255ff', speed: 0.01}
-                ];
-
-                planets.forEach(pl => {
-                    let r = 5, orb = 50;
-                    if(m = code.match(new RegExp(pl.name + "_radius\\s*=\\s*([\\d.]+)"))) r = parseFloat(m[1]);
-                    if(m = code.match(new RegExp(pl.name + "_orbit\\s*=\\s*([\\d.]+)"))) orb = parseFloat(m[1]);
-
-                    let prev = null, first = null;
-                    for(let i=0; i<=360; i+=10) {
-                        let a = i * Math.PI/180; let p = {x: orb*Math.cos(a), y: orb*Math.sin(a), z: 0};
-                        if(prev) geometry.push({type: 'line', p1: prev, p2: p, c: '#333333', t: 1, rawZ: 0});
-                        if(!first) first = p; prev = p;
-                    }
-                    let angle = Math.random() * Math.PI * 2;
-                    geometry.push({ type: 'sphere', p: {x: orb*Math.cos(angle), y: orb*Math.sin(angle), z: 0}, r: r, c: pl.c, rawZ: 0, orbitInfo: {orb: orb, speed: pl.speed, angle: angle} });
-                });
-            }
-            // RUTA 3: BICICLETA
-            else if(code.includes('bicycle')) {
-                logToScreen('Paso 8: Iniciando motor de cuadro de bicicleta...');
-                let wd = 622, fs = 560, cs = 410, rake = 45; let m;
-                if(m = code.match(/wheel_diameter\s*=\s*([\d.]+)/)) wd = parseFloat(m[1]);
-                if(m = code.match(/frame_size\s*=\s*([\d.]+)/)) fs = parseFloat(m[1]);
-                zoom = (height * 0.5) / 1000; let offX = -cs;
-                const addLine = (p1, p2, color, th) => geometry.push({type: 'line', p1: {x:p1.x+offX, y:p1.y, z:p1.z}, p2: {x:p2.x+offX, y:p2.y, z:p2.z}, c: color, t: th, rawZ: p1.z});
-                const addWheel = (cx, cz) => {
-                    let prev=null, first=null;
-                    for(let i=0; i<=360; i+=15) {
-                        let a = i * Math.PI/180; let p = {x: cx + (wd/2)*Math.cos(a), y: 0, z: cz + (wd/2)*Math.sin(a)};
-                        if(prev) addLine(prev, p, '#cccccc', 4);
-                        if(!first) first = p; prev = p;
-                        if(i%45===0) addLine({x:cx,y:0,z:cz}, p, '#444444', 1);
-                    }
-                };
-                let bbx = cs, bbz = 270;
-                let stx = bbx - fs * Math.cos(73*Math.PI/180), stz = bbz + fs * Math.sin(73*Math.PI/180);
-                let hbx = bbx + 550 * Math.sin(73*Math.PI/180), hbz = bbz + 550 * Math.cos(73*Math.PI/180);
-                let htx = hbx - 150 * Math.cos(73*Math.PI/180), htz = hbz + 150 * Math.sin(73*Math.PI/180);
-                let fwx = hbx + 360 * Math.cos(73*Math.PI/180) + rake, fwz = wd/2;
-
-                addLine({x:bbx,y:0,z:bbz}, {x:stx,y:0,z:stz}, '#ff3333', 6); addLine({x:bbx,y:0,z:bbz}, {x:hbx,y:0,z:hbz}, '#ff9900', 6);
-                addLine({x:stx,y:0,z:stz}, {x:htx,y:0,z:htz}, '#33ff33', 6); addLine({x:hbx,y:0,z:hbz}, {x:htx,y:0,z:htz}, '#3333ff', 8);
-                addLine({x:bbx,y:20,z:bbz}, {x:0,y:20,z:wd/2}, '#aa5500', 4); addLine({x:bbx,y:-20,z:bbz}, {x:0,y:-20,z:wd/2}, '#aa5500', 4);
-                addLine({x:stx,y:10,z:stz}, {x:0,y:20,z:wd/2}, '#aa00aa', 4); addLine({x:stx,y:-10,z:stz}, {x:0,y:-20,z:wd/2}, '#aa00aa', 4);
-                addLine({x:hbx,y:20,z:hbz}, {x:fwx,y:20,z:fwz}, '#3333ff', 5); addLine({x:hbx,y:-20,z:hbz}, {x:fwx,y:-20,z:fwz}, '#3333ff', 5);
-                addLine({x:htx,y:-150,z:htz}, {x:htx,y:150,z:htz}, '#ffffff', 5);
-                addWheel(0, wd/2); addWheel(fwx, fwz);
-            } 
-            // RUTA 4: ÁRBOL FRACTAL (DEFAULT)
-            else {
-                logToScreen('Paso 8: Iniciando motor recursivo de árbol...');
-                let matStack = []; let currentMat = identity();
-                const pushMat = () => matStack.push([...currentMat]); const popMat = () => currentMat = matStack.pop(); const apply = (m) => currentMat = multiply(currentMat, m);
-                let length = 20, thickness = 3, baseAngle = 25, maxDepth = 7; let match = code.match(/branch\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
-                if (match) { length = parseFloat(match[1]); thickness = parseFloat(match[2]); baseAngle = parseFloat(match[3]); maxDepth = parseInt(match[4]); }
-                zoom = (height * 0.5) / (length * 3);
-
-                function addLine(l, t) {
-                    let p1 = transformPoint({x:0, y:0, z:0}, currentMat); let p2 = transformPoint({x:0, y:0, z:l}, currentMat);
-                    geometry.push({type: 'line', p1, p2, c: '#8d6e63', t, rawZ: Math.max(p1.z, p2.z)});
-                }
-                function branch(l, t, a, d) {
-                    if(d <= 0) return; addLine(l, t); pushMat(); apply(translateMat(0, 0, l));
-                    pushMat(); apply(rotateXMat(a * Math.PI/180)); branch(l*0.7, t*0.7, a*1.1, d-1); popMat();
-                    pushMat(); apply(rotateZMat(120 * Math.PI/180)); apply(rotateXMat(-a*0.8 * Math.PI/180)); branch(l*0.7, t*0.7, a, d-1); popMat();
-                    pushMat(); apply(rotateZMat(240 * Math.PI/180)); apply(rotateXMat(a*0.5 * Math.PI/180)); branch(l*0.7, t*0.7, a*1.2, d-1); popMat();
-                    popMat();
-                }
-                branch(length, thickness, baseAngle, maxDepth);
-                if(code.includes('sphere')) {
-                    let fH = length * 2.5;
-                    for (let i = 0; i < 360; i += 15) {
-                        let r = 4 + Math.random()*2; let p = transformPoint({ x: Math.cos(i) * (Math.random()*20), y: Math.sin(i) * (Math.random()*20), z: fH + Math.random()*15 }, identity());
-                        geometry.push({type: 'sphere', p, r, c: `rgba(0, 200, 100, 0.7)`, rawZ: p.z});
-                    }
-                }
-            }
-        }
-
-        function renderScene() {
-            ctx.clearRect(0, 0, width, height);
-            let cx = width/2, cy = height - (height*0.2); 
-
-            let projected = geometry.map(item => {
-                if(!showGrid && item.c === '#113311') return null;
-                let projectPoint = (p) => {
-                    let x1 = p.x*Math.cos(camRotZ) - p.y*Math.sin(camRotZ), y1 = p.x*Math.sin(camRotZ) + p.y*Math.cos(camRotZ), z1 = p.z;
-                    let y2 = y1*Math.cos(camRotX) - z1*Math.sin(camRotX), z2 = y1*Math.sin(camRotX) + z1*Math.cos(camRotX);
-                    return { x: cx + x1*zoom, y: cy - z2*zoom, depth: y2 }; 
-                };
-
-                if(item.type === 'line') {
-                    let p1 = projectPoint(item.p1), p2 = projectPoint(item.p2); return { ...item, p1, p2, depth: (p1.depth + p2.depth)/2 };
-                } else {
-                    return { ...item, p: projectPoint(item.p), depth: projectPoint(item.p).depth };
-                }
-            }).filter(item => item !== null);
-
-            projected.sort((a,b) => b.depth - a.depth);
-
-            projected.forEach(item => {
-                if(item.type === 'line') {
-                    ctx.beginPath(); ctx.moveTo(item.p1.x, item.p1.y); ctx.lineTo(item.p2.x, item.p2.y);
-                    ctx.strokeStyle = item.c; ctx.lineWidth = Math.max(0.5, item.t * zoom * 0.1); ctx.lineCap = 'round'; ctx.stroke();
-                } else {
-                    ctx.beginPath(); ctx.arc(item.p.x, item.p.y, item.r * zoom * 0.2, 0, Math.PI*2);
-                    ctx.fillStyle = item.c; ctx.fill(); 
-                }
-            });
-        }
-
         function animate() {
-            if(autoRotate) { 
-                camRotZ -= 0.005; 
-                geometry.forEach(item => {
-                    if(item.orbitInfo) {
-                        item.orbitInfo.angle += (item.orbitInfo.speed * 0.02);
-                        item.p.x = item.orbitInfo.orb * Math.cos(item.orbitInfo.angle);
-                        item.p.y = item.orbitInfo.orb * Math.sin(item.orbitInfo.angle);
-                    }
-                });
-            }
-            renderScene();
+            if(autoRotate) { lon += 0.5; updateCamera(); }
+            renderer.render(scene, camera);
             requestAnimationFrame(animate);
         }
 
         fetch('/api/get_code_b64.json').then(r => r.json()).then(data => {
             if (data.code_b64) {
-                logToScreen('✓ Código recibido. Compilando...');
+                logToScreen('✓ Código JS-CSG recibido.');
                 buildGeometry(decodeB64(data.code_b64));
-                renderScene(); animate();
+                animate();
             }
         }).catch(e => logToScreen('ERROR API: ' + e.message, true));
     </script>

@@ -1,5 +1,6 @@
 import flet as ft
 import os, base64, traceback, sqlite3, warnings, json
+import urllib.request
 import http.server
 import threading
 import socket
@@ -8,12 +9,29 @@ from urllib.parse import urlparse
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
+# =========================================================
+# GESTOR OFFLINE (Descarga librerías JS locales)
+# =========================================================
+assets_dir = os.path.join(os.getcwd(), "assets")
+os.makedirs(assets_dir, exist_ok=True)
+libs = {
+    "three.min.js": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+    "csg.js": "https://raw.githubusercontent.com/evanw/csg.js/master/csg.js"
+}
+for name, url in libs.items():
+    path = os.path.join(assets_dir, name)
+    if not os.path.exists(path):
+        try: urllib.request.urlretrieve(url, path)
+        except: pass
+
+# =========================================================
+# MOTOR API LOCAL
+# =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('127.0.0.1', 0))
         LOCAL_PORT = s.getsockname()[1]
-except:
-    LOCAL_PORT = 8556
+except: LOCAL_PORT = 8556
 
 LATEST_CODE_B64 = ""
 
@@ -22,121 +40,135 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         global LATEST_CODE_B64
         parsed_url = urlparse(self.path)
         if parsed_url.path == '/api/get_code_b64.json':
-            self.send_response(200); self.send_header("Content-type", "application/json"); self.send_header("Cache-Control", "no-cache, no-store, must-revalidate"); self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers()
+            self.send_response(200); self.send_header("Content-type", "application/json"); self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers()
             self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64}).encode('utf-8'))
+        elif self.path == '/three.min.js' or self.path == '/csg.js':
+            try:
+                with open(os.path.join(assets_dir, self.path.replace('/', '')), "r", encoding="utf-8") as f:
+                    self.send_response(200); self.send_header("Content-type", "application/javascript"); self.end_headers(); self.wfile.write(f.read().encode('utf-8'))
+            except: self.send_response(404); self.end_headers()
         else:
             try:
-                with open(os.path.join("assets", "openscad_engine.html"), "r", encoding="utf-8") as f:
+                with open(os.path.join(assets_dir, "openscad_engine.html"), "r", encoding="utf-8") as f:
                     self.send_response(200); self.send_header("Content-type", "text/html; charset=utf-8"); self.end_headers(); self.wfile.write(f.read().encode('utf-8'))
-            except Exception as e:
-                self.send_response(500); self.end_headers()
+            except: self.send_response(500); self.end_headers()
     def log_message(self, format, *args): pass 
 
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v1.6.0"
+        page.title = "NEXUS CAD AI Core (v1.7.0)"
         page.theme_mode = "dark"
         page.bgcolor = "#0a0a0a"
         page.padding = 0
         
-        # =========================================================
-        # DIRECTORIO DE EXPORTACIÓN (MEMORIA INTERNA)
-        # =========================================================
         export_dir = os.path.join(os.environ.get("HOME", os.getcwd()), "nexus_proyectos")
         os.makedirs(export_dir, exist_ok=True)
 
-        code_eiffel = """// Eiffel Tower in OpenSCAD
-module line(start, end, diameter=1) {}
-r_outer_0 = 62.5; w0 = 12.5; h = 300;
-module eiffel_tower() { }
-eiffel_tower();"""
+        # =========================================================
+        # PLANTILLAS JS-CSG (Optimizadas para IA)
+        # =========================================================
+        code_gear = """// Pídele a la IA: "Genera código JS usando CSG.js con una función main()"
+function main() {
+    // Engranaje Básico Booleano
+    var base = CSG.cylinder({start: [0,-2,0], end: [0,2,0], radius: 15, slices: 32});
+    var hole = CSG.cylinder({start: [0,-3,0], end: [0,3,0], radius: 5, slices: 16});
+    
+    // Sustracción Real (Operación Booleana)
+    var gear = base.subtract(hole);
+    
+    for(var i=0; i<8; i++) {
+        var a = (i * 45) * Math.PI / 180;
+        var tooth = CSG.cube({center: [Math.cos(a)*15, 0, Math.sin(a)*15], radius: [2, 2, 2]});
+        gear = gear.union(tooth);
+    }
+    return gear;
+}"""
+
+        code_box = """function main() {
+    // Carcasa / Caja hueca
+    var exterior = CSG.cube({center: [0,0,0], radius: [20, 10, 15]});
+    var interior = CSG.cube({center: [0,2,0], radius: [18, 10, 13]}); // Desplazado para hacer la tapa abierta
+    
+    return exterior.subtract(interior);
+}"""
 
         # =========================================================
-        # UI COMPONENTES
+        # UI EDITOR
         # =========================================================
         txt_code = ft.TextField(
-            label="Código OpenSCAD", multiline=True, expand=True, 
-            value=code_eiffel, color="#00ff00", bgcolor="#050505", border_color="#333333",
-            text_size=12
+            label="Código IA (Javascript CSG)", multiline=True, expand=True, 
+            value=code_gear, color="#00ff00", bgcolor="#050505", border_color="#333333", text_size=12
         )
-        
-        status_text = ft.Text("Sistema Online - v1.6.0", color="grey600", size=11)
+        status_text = ft.Text("Sistema AI Online - v1.7.0", color="grey600", size=11)
 
         def save_project():
-            filename = f"proyecto_{int(time.time())}.scad"
+            filename = f"ai_model_{int(time.time())}.jscad"
             filepath = os.path.join(export_dir, filename)
-            with open(filepath, "w") as f:
-                f.write(txt_code.value)
-            status_text.value = f"✓ Guardado en Termux: {filepath}"
-            page.update()
+            with open(filepath, "w") as f: f.write(txt_code.value)
+            status_text.value = f"✓ Guardado: {filename}"; update_explorer(); page.update()
 
-        def copy_code():
-            page.set_clipboard(txt_code.value)
-            status_text.value = "✓ Código copiado al portapapeles."
-            page.update()
-            
-        def clear_code():
-            txt_code.value = ""
-            page.update()
+        def clear_code(): txt_code.value = "function main() {\n  // Pega aquí el código de la IA\n  return CSG.sphere({radius: 10});\n}"; page.update()
+        def load_template(code): txt_code.value = code; page.update()
 
-        row_templates = ft.Row([
-            ft.Text("Plantillas:", color="grey500", size=12),
-            ft.ElevatedButton("🚲", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
-            ft.ElevatedButton("🌲", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
-            ft.ElevatedButton("🪐", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
-            ft.ElevatedButton("🗼", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
-        ], scroll=ft.ScrollMode.AUTO)
-        
         row_actions = ft.Row([
-            ft.ElevatedButton("📋 Copiar", on_click=lambda _: copy_code(), bgcolor="#1e88e5", color="white", style=ft.ButtonStyle(padding=5)),
-            ft.ElevatedButton("💾 Guardar Local", on_click=lambda _: save_project(), bgcolor="#8e24aa", color="white", style=ft.ButtonStyle(padding=5)),
+            ft.ElevatedButton("⚙️ Engranaje", on_click=lambda _: load_template(code_gear), bgcolor="#222222", color="white"),
+            ft.ElevatedButton("📦 Caja", on_click=lambda _: load_template(code_box), bgcolor="#222222", color="white"),
+            ft.ElevatedButton("💾 Guardar", on_click=lambda _: save_project(), bgcolor="#8e24aa", color="white"),
             ft.ElevatedButton("🗑️", on_click=lambda _: clear_code(), bgcolor="#e53935", color="white"),
         ], scroll=ft.ScrollMode.AUTO)
         
-        # FIX DE SCROLL: Encapsular el editor para que controle su tamaño y el botón quede fijo
-        editor_scrollable_area = ft.Container(
-            content=ft.Column([row_templates, row_actions, txt_code], expand=True),
-            expand=True
-        )
-
+        editor_scrollable_area = ft.Container(content=ft.Column([row_actions, txt_code], expand=True), expand=True)
         editor_container = ft.Container(
-            content=ft.Column([
-                editor_scrollable_area, 
-                ft.ElevatedButton("▶ COMPILAR Y ROTAR 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=55, width=float('inf'))
-            ], expand=True), 
-            padding=10, expand=True, bgcolor="#0a0a0a"
+            content=ft.Column([editor_scrollable_area, ft.ElevatedButton("▶ COMPILAR MALLA BOOLEANA", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=55, width=float('inf'))], expand=True), 
+            padding=10, expand=True, bgcolor="#0a0a0a", visible=True
         )
         
+        # =========================================================
+        # UI EXPLORADOR DE ARCHIVOS
+        # =========================================================
+        lv_files = ft.ListView(expand=True, spacing=5)
+        
+        def load_file(filename):
+            with open(os.path.join(export_dir, filename), "r") as f: txt_code.value = f.read()
+            status_text.value = f"✓ Archivo cargado: {filename}"; switch(0)
+
+        def update_explorer():
+            lv_files.controls.clear()
+            for f in reversed(os.listdir(export_dir)):
+                lv_files.controls.append(
+                    ft.Container(content=ft.Row([ft.Icon(ft.icons.INSERT_DRIVE_FILE, color="blue400"), ft.Text(f, color="white")]), 
+                                 bgcolor="#1a1a1a", padding=10, border_radius=5, on_click=lambda e, fname=f: load_file(fname))
+                )
+            page.update()
+
+        explorer_container = ft.Container(content=ft.Column([ft.Text("Proyectos Locales (Termux)", color="white", weight="bold"), lv_files], expand=True), padding=10, expand=True, bgcolor="#0a0a0a", visible=False)
         viewer_container = ft.Container(content=ft.Text("Visor inactivo."), alignment=ft.Alignment(0,0), expand=True, visible=False)
 
         def switch(idx):
-            editor_container.visible = (idx == 0); viewer_container.visible = (idx == 1)
+            editor_container.visible = (idx == 0); viewer_container.visible = (idx == 1); explorer_container.visible = (idx == 2)
+            if idx == 2: update_explorer()
             page.update()
 
         def run_render():
             global LATEST_CODE_B64
-            status_text.value = "Generando..."
+            status_text.value = "Compilando operaciones booleanas..."
             switch(1) 
             try:
                 LATEST_CODE_B64 = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8').replace('\n', '').replace('\r', '')
-                viewer_container.content = ft.ElevatedButton(
-                    "🚀 ABRIR SIMULADOR 3D INTERACTIVO", url=f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}",
-                    bgcolor="blue900", color="white", expand=True
-                )
+                viewer_container.content = ft.ElevatedButton("🚀 ABRIR RENDERIZADOR HARDWARE", url=f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}", bgcolor="blue900", color="white", expand=True)
                 status_text.value = f"✓ Listo."
-            except Exception as e:
-                status_text.value = f"Error: {e}"
+            except Exception as e: status_text.value = f"Error: {e}"
             page.update()
 
         main_content = ft.SafeArea(
             content=ft.Column([
-                ft.Container(content=ft.Row([ft.TextButton("💻 EDITOR", on_click=lambda _: switch(0)), ft.TextButton("👁️ VISOR", on_click=lambda _: switch(1))], alignment="center"), bgcolor="#111111", padding=5),
-                editor_container, viewer_container, status_text
+                ft.Container(content=ft.Row([ft.TextButton("💻 EDITOR", on_click=lambda _: switch(0)), ft.TextButton("👁️ VISOR", on_click=lambda _: switch(1)), ft.TextButton("📁 ARCHIVOS", on_click=lambda _: switch(2))], alignment="center"), bgcolor="#111111", padding=5),
+                editor_container, viewer_container, explorer_container, status_text
             ], expand=True)
         )
-        page.add(main_content)
+        page.add(main_content); update_explorer()
         
     except Exception:
         page.clean(); page.add(ft.SafeArea(content=ft.Text(traceback.format_exc(), color="red", selectable=True))); page.update()

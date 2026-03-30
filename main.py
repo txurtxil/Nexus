@@ -1,26 +1,23 @@
 import flet as ft
-import os, base64, traceback, sqlite3, warnings, json
-import urllib.request
-import http.server
-import threading
-import socket
-import time
+import os, base64, json, threading, http.server, socket, time, warnings, subprocess
 from urllib.parse import urlparse
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
-assets_dir = os.path.join(os.getcwd(), "assets")
-os.makedirs(assets_dir, exist_ok=True)
-libs = {
-    "three.min.js": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
-    "csg.js": "https://raw.githubusercontent.com/evanw/csg.js/master/csg.js"
-}
-for name, url in libs.items():
-    path = os.path.join(assets_dir, name)
-    if not os.path.exists(path):
-        try: urllib.request.urlretrieve(url, path)
-        except: pass
+# =========================================================
+# CONFIGURACIÓN DE RUTAS ABSOLUTAS (Termux/Acode Unificado)
+# =========================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 
+# Asegurar que los directorios existan
+os.makedirs(ASSETS_DIR, exist_ok=True)
+os.makedirs(EXPORT_DIR, exist_ok=True)
+
+# =========================================================
+# MOTOR SERVIDOR LOCAL (HTTP + API JSON)
+# =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('127.0.0.1', 0)); LOCAL_PORT = s.getsockname()[1]
@@ -31,195 +28,157 @@ LATEST_CODE_B64 = ""
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         global LATEST_CODE_B64
-        parsed_url = urlparse(self.path)
-        if parsed_url.path == '/api/get_code_b64.json':
+        parsed = urlparse(self.path)
+        if parsed.path == '/api/get_code_b64.json':
             self.send_response(200); self.send_header("Content-type", "application/json"); self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers()
-            self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64}).encode('utf-8'))
-        elif self.path == '/three.min.js' or self.path == '/csg.js':
-            try:
-                with open(os.path.join(assets_dir, self.path.replace('/', '')), "r", encoding="utf-8") as f:
-                    self.send_response(200); self.send_header("Content-type", "application/javascript"); self.end_headers(); self.wfile.write(f.read().encode('utf-8'))
-            except: self.send_response(404); self.end_headers()
+            self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64}).encode())
         else:
             try:
-                with open(os.path.join(assets_dir, "openscad_engine.html"), "r", encoding="utf-8") as f:
-                    self.send_response(200); self.send_header("Content-type", "text/html; charset=utf-8"); self.end_headers(); self.wfile.write(f.read().encode('utf-8'))
-            except: self.send_response(500); self.end_headers()
-    def log_message(self, format, *args): pass 
+                filename = self.path.strip("/")
+                if not filename or filename == "": filename = "openscad_engine.html"
+                fpath = os.path.join(ASSETS_DIR, filename)
+                with open(fpath, "rb") as f:
+                    self.send_response(200); self.end_headers(); self.wfile.write(f.read())
+            except: self.send_response(404); self.end_headers()
+    def log_message(self, *args): pass
 
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
+# =========================================================
+# APLICACIÓN PRINCIPAL NEXUS CAD
+# =========================================================
 def main(page: ft.Page):
-    try:
-        page.title = "NEXUS CAD v2.7 (Refined Core)"
-        page.theme_mode = "dark"
-        page.bgcolor = "#0a0a0a"
-        page.padding = 0
-        
-        export_dir = os.path.join(os.environ.get("HOME", os.getcwd()), "nexus_proyectos")
-        os.makedirs(export_dir, exist_ok=True)
+    page.title = "NEXUS CAD v2.8.1"
+    page.theme_mode = "dark"
+    page.bgcolor = "#0a0a0a"
+    page.padding = 0
 
-        status_text = ft.Text("Sistema Online - v2.7 Estable", color="grey600", size=11)
+    status = ft.Text(f"Base: ...{BASE_DIR[-20:]}", size=10, color="grey600")
 
-        # =========================================================
-        # PLANTILLAS DE APRENDIZAJE IA (Sintaxis estricta CSG)
-        # =========================================================
-        code_enclosure = """function main() {
-    // Plantilla IA: Carcasa Hueca con puertos
-    var exterior = CSG.cube({center: [0,0,10], radius: [40, 25, 10]});
-    var interior = CSG.cube({center: [0,0,11], radius: [38, 23, 10]}); // Desplazado en Z
-    var caja = exterior.subtract(interior);
-    
-    // Agujero para conector USB
-    var usb = CSG.cube({center: [40, 0, 5], radius: [5, 6, 3]});
-    return caja.subtract(usb);
-}"""
-
-        code_heatsink = """function main() {
-    // Plantilla IA: Disipador Paramétrico (Patrones)
-    var base = CSG.cube({center: [0,0,2], radius: [30, 30, 2]});
-    for(var x=-25; x<=25; x+=10) {
-        var aleta = CSG.cube({center: [x, 0, 12], radius: [1, 28, 10]});
-        base = base.union(aleta);
-    }
-    return base;
-}"""
-
-        # =========================================================
-        # 1. UI EDITOR Y SNIPPETS (Arquitectura Clásica v2.5.2)
-        # =========================================================
-        txt_code = ft.TextField(
-            label="Código Javascript CSG", multiline=True, expand=True, 
-            value=code_enclosure, color="#00ff00", bgcolor="#050505", border_color="#333333", text_size=12
-        )
-
-        def save_project():
-            filename = f"nexus_{int(time.time())}.jscad"
-            filepath = os.path.join(export_dir, filename)
-            with open(filepath, "w") as f: f.write(txt_code.value)
-            status_text.value = f"✓ Guardado: {filename}"; update_explorer(); page.update()
-
-        def clear_code(): txt_code.value = "function main() {\n  return CSG.sphere({radius: 10});\n}"; page.update()
-        def load_template(code): txt_code.value = code; page.update()
-        
-        def inject_snippet(code):
-            txt_code.value += f"\n\n/* SNIPPET RAPIDO */\n{code}"
-            status_text.value = "✓ Snippet inyectado al final del código."
-            page.update()
-
-        row_templates = ft.Row([
-            ft.Text("Plantillas (IA):", color="grey500", size=11),
-            ft.ElevatedButton("📦 Carcasa", on_click=lambda _: load_template(code_enclosure), bgcolor="#222222", color="white"),
-            ft.ElevatedButton("🔥 Disipador", on_click=lambda _: load_template(code_heatsink), bgcolor="#222222", color="white"),
-            ft.ElevatedButton("💾 Guardar", on_click=lambda _: save_project(), bgcolor="#8e24aa", color="white"),
-            ft.ElevatedButton("🗑️ Limpiar", on_click=lambda _: clear_code(), bgcolor="#e53935", color="white"),
-        ], scroll=ft.ScrollMode.AUTO)
-        
-        row_snippets = ft.Row([
-            ft.Text("Inyectar:", color="grey500", size=11),
-            ft.ElevatedButton("+ Cubo", on_click=lambda _: inject_snippet("var cubo = CSG.cube({center: [0,0,0], radius: [10,10,10]});"), bgcolor="#1e88e5", color="white", height=30),
-            ft.ElevatedButton("+ Cilindro", on_click=lambda _: inject_snippet("var cil = CSG.cylinder({start: [0,0,0], end: [0,0,20], radius: 5, slices: 32});"), bgcolor="#1e88e5", color="white", height=30),
-            ft.ElevatedButton("+ Esfera", on_click=lambda _: inject_snippet("var esf = CSG.sphere({center: [0,0,0], radius: 10, slices: 32});"), bgcolor="#1e88e5", color="white", height=30),
-            ft.ElevatedButton("- Restar", on_click=lambda _: inject_snippet("var res = objeto1.subtract(objeto2);"), bgcolor="#d81b60", color="white", height=30),
-        ], scroll=ft.ScrollMode.AUTO)
-
-        btn_compile = ft.ElevatedButton("▶ COMPILAR MALLA 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=50, width=float('inf'))
-
-        editor_container = ft.Container(
-            content=ft.Column([
-                btn_compile,
-                row_templates,
-                row_snippets,
-                txt_code
-            ], expand=True), padding=10, expand=True, bgcolor="#0a0a0a", visible=True
-        )
-
-        # =========================================================
-        # 2. EXPLORADOR DE ARCHIVOS AVANZADO (FIX BUGS)
-        # =========================================================
-        lv_files = ft.ListView(expand=True, spacing=5)
-        
-        def load_file(filename):
-            with open(os.path.join(export_dir, filename), "r") as f: txt_code.value = f.read()
-            status_text.value = f"✓ Cargado: {filename}"; switch(0)
-
-        def delete_file(filename):
-            os.remove(os.path.join(export_dir, filename))
-            status_text.value = f"🗑️ Eliminado: {filename}"; update_explorer()
-
-        # FIX: Exportar archivo correctamente leyendo su contenido
-        def export_file(filename):
+    # --- SISTEMA DE PORTAPAPELES HÍBRIDO (Blindado) ---
+    def copy_to_clipboard(text):
+        try:
+            # Intento 1: API de Flet
+            if hasattr(page, 'set_clipboard'): page.set_clipboard(text)
+            elif hasattr(page, 'clipboard'): page.clipboard.set_text(text)
+            else: raise Exception("Flet Clipboard no disponible")
+            status.value = "✓ Código copiado (Flet)."
+        except:
+            # Intento 2: API Nativa de Termux
             try:
-                with open(os.path.join(export_dir, filename), "r") as f: 
-                    codigo = f.read()
-                    page.set_clipboard(codigo)
-                status_text.value = f"📤 Código copiado al portapapeles con éxito."; 
-            except Exception as e:
-                status_text.value = f"❌ Error al copiar: {str(e)}"
-            page.update()
+                subprocess.run(['termux-clipboard-set'], input=text.encode('utf-8'))
+                status.value = "✓ Código copiado (Termux API)."
+            except:
+                status.value = "❌ Error crítico al copiar."
+        page.update()
 
-        # FIX: Cerrar dialogo correctamente y refrescar
-        def rename_file(old_name, new_name, dlg):
-            if new_name:
-                os.rename(os.path.join(export_dir, old_name), os.path.join(export_dir, new_name + ".jscad"))
-                status_text.value = f"✏️ Renombrado a {new_name}.jscad"
-            dlg.open = False
-            update_explorer()
-            page.update()
+    # --- PLANTILLAS INDUSTRIALES ---
+    T_CARCASA = "function main() {\n  var ext = CSG.cube({center:[0,0,10], radius:[40,25,10]});\n  var int = CSG.cube({center:[0,0,12], radius:[38,23,10]});\n  return ext.subtract(int);\n}"
+    T_ENGRARE = "function main() {\n  var b = CSG.cylinder({start:[0,0,0], end:[0,0,5], radius:20});\n  return b;\n} // Plantilla simplificada"
+    T_PEANA = "function main() {\n  var base = CSG.cube({center: [0, 0, 5], radius: [60, 40, 5]});\n  var soporte = CSG.cube({center: [0, 10, 25], radius: [60, 5, 25]});\n  return base.union(soporte);\n}"
 
-        def prompt_rename(filename):
-            txt_new_name = ft.TextField(label="Nuevo nombre (sin extensión)")
-            dlg = ft.AlertDialog(title=ft.Text("Renombrar"), content=txt_new_name, actions=[ft.TextButton("Guardar", on_click=lambda e: rename_file(filename, txt_new_name.value, dlg))])
-            page.dialog = dlg; dlg.open = True; page.update()
+    txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_CARCASA, text_size=12, color="#00ff00", font_family="monospace")
 
-        def update_explorer():
-            lv_files.controls.clear()
-            for f in reversed(sorted(os.listdir(export_dir))):
-                filepath = os.path.join(export_dir, f)
-                size_kb = os.path.getsize(filepath) / 1024
-                row = ft.Row([
-                    ft.Column([ft.Text("📄 " + f[:20], color="white", size=13), ft.Text(f"{size_kb:.1f} KB", color="grey500", size=10)], expand=True),
-                    ft.TextButton("📂", on_click=lambda e, fname=f: load_file(fname), tooltip="Cargar"),
-                    ft.TextButton("✏️", on_click=lambda e, fname=f: prompt_rename(fname), tooltip="Renombrar"),
-                    ft.TextButton("📤", on_click=lambda e, fname=f: export_file(fname), tooltip="Copiar Código"),
-                    ft.TextButton("🗑️", on_click=lambda e, fname=f: delete_file(fname), tooltip="Eliminar")
-                ], alignment="spaceBetween")
-                lv_files.controls.append(ft.Container(content=row, bgcolor="#1a1a1a", padding=5, border_radius=5))
-            page.update()
+    def load_template(t):
+        txt_code.value = t; page.update()
 
-        explorer_container = ft.Container(content=ft.Column([ft.Text("Gestor de Proyectos", color="white", weight="bold"), lv_files], expand=True), padding=10, expand=True, bgcolor="#0a0a0a", visible=False)
+    # Botón de Plantillas Compacto
+    btn_templates = ft.PopupMenuButton(
+        items=[
+            ft.PopupMenuItem(text="📦 Carcasa", on_click=lambda _: load_template(T_CARCASA)),
+            ft.PopupMenuItem(text="⚙️ Engranaje", on_click=lambda _: load_template(T_ENGRARE)),
+            ft.PopupMenuItem(text="📱 Peana", on_click=lambda _: load_template(T_PEANA)),
+        ],
+        content=ft.Row([ft.Icon(ft.icons.MENU_BOOK, size=18), ft.Text("Plantillas", weight="bold")])
+    )
 
-        # =========================================================
-        # 3. NAVEGACIÓN (Estructura v2.5.2 Clásica)
-        # =========================================================
-        viewer_container = ft.Container(content=ft.Text("Visor inactivo."), alignment=ft.Alignment(0,0), expand=True, visible=False)
+    # --- LÓGICA DE ARCHIVOS ---
+    def update_files():
+        file_list.controls.clear()
+        for f in reversed(sorted(os.listdir(EXPORT_DIR))):
+            def make_handler(fname): # Evitar problemas de binding en bucle
+                return lambda _: load_file_content(fname)
+            
+            def make_rename_handler(fname):
+                return lambda _: prompt_rename(fname)
 
-        def switch(idx):
-            editor_container.visible = (idx == 0); viewer_container.visible = (idx == 1); explorer_container.visible = (idx == 2)
-            if idx == 2: update_explorer()
-            page.update()
+            def make_copy_handler(fname):
+                return lambda _: copy_file_to_clipboard(fname)
 
-        def run_render():
-            global LATEST_CODE_B64
-            status_text.value = "Compilando operaciones booleanas..."
-            switch(1) 
-            try:
-                LATEST_CODE_B64 = base64.b64encode(txt_code.value.encode('utf-8')).decode('utf-8').replace('\n', '').replace('\r', '')
-                viewer_container.content = ft.ElevatedButton("🚀 ABRIR RENDERIZADOR HARDWARE", url=f"http://127.0.0.1:{LOCAL_PORT}/?t={time.time()}", bgcolor="blue900", color="white", expand=True)
-                status_text.value = f"✓ Listo."
-            except Exception as e: status_text.value = f"Error: {e}"
-            page.update()
+            def make_delete_handler(fname):
+                return lambda _: delete_file(fname)
 
-        main_content = ft.SafeArea(
-            content=ft.Column([
-                ft.Row([ft.TextButton("💻 Editor", on_click=lambda _: switch(0)), ft.TextButton("👁️ Visor", on_click=lambda _: switch(1)), ft.TextButton("📁 Archivos", on_click=lambda _: switch(2))], alignment="center", scroll=ft.ScrollMode.AUTO),
-                editor_container, viewer_container, explorer_container, status_text
-            ], expand=True)
-        )
-        page.add(main_content); update_explorer()
-        
-    except Exception:
-        page.clean(); page.add(ft.SafeArea(content=ft.Text(traceback.format_exc(), color="red", selectable=True))); page.update()
+            file_list.controls.append(
+                ft.Container(
+                    content=ft.Row([
+                        ft.Text(f[:18], size=12, expand=True),
+                        ft.IconButton(ft.icons.PLAY_ARROW, on_click=make_handler(f), icon_size=18),
+                        ft.IconButton(ft.icons.EDIT, on_click=make_rename_handler(f), icon_color="amber", icon_size=18),
+                        ft.IconButton(ft.icons.COPY, on_click=make_copy_handler(f), icon_color="blue", icon_size=18),
+                        ft.IconButton(ft.icons.DELETE, on_click=make_delete_handler(f), icon_color="red", icon_size=18),
+                    ]), bgcolor="#1a1a1a", padding=5, border_radius=8
+                )
+            )
+        page.update()
 
-if __name__ == "__main__":
-    ft.app(target=main, assets_dir="assets", view="web_browser", port=8555) if "com.termux" in os.environ.get("PREFIX", "") else ft.app(target=main, assets_dir="assets")
+    def load_file_content(fname):
+        with open(os.path.join(EXPORT_DIR, fname), "r") as f: txt_code.value = f.read()
+        tabs.selected_index = 0; page.update()
+
+    def copy_file_to_clipboard(fname):
+        with open(os.path.join(EXPORT_DIR, fname), "r") as f: copy_to_clipboard(f.read())
+
+    def delete_file(fname):
+        os.remove(os.path.join(EXPORT_DIR, fname)); update_files()
+
+    def prompt_rename(old_name):
+        def do_rename(e):
+            if txt_new.value:
+                os.rename(os.path.join(EXPORT_DIR, old_name), os.path.join(EXPORT_DIR, txt_new.value + ".jscad"))
+                if hasattr(page, 'close'): page.close(dlg)
+                else: dlg.open = False
+                update_files()
+        txt_new = ft.TextField(label="Nuevo nombre")
+        dlg = ft.AlertDialog(title=ft.Text("Renombrar"), content=txt_new, actions=[ft.TextButton("OK", on_click=do_rename)])
+        if hasattr(page, 'open'): page.open(dlg)
+        else: page.dialog = dlg; dlg.open = True; page.update()
+
+    file_list = ft.ListView(expand=True, spacing=5)
+
+    # --- PESTAÑAS ---
+    editor_tab = ft.Column([
+        ft.ElevatedButton("▶ COMPILAR MALLA 3D", on_click=lambda _: run_render(), height=50, width=float('inf'), bgcolor="green900", color="white"),
+        ft.Row([
+            ft.Container(content=btn_templates, bgcolor="#222", padding=5, border_radius=5),
+            ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project(), bgcolor="blue900", color="white")
+        ]),
+        txt_code
+    ], expand=True)
+
+    def save_project():
+        fname = f"nexus_{int(time.time())}.jscad"
+        with open(os.path.join(EXPORT_DIR, fname), "w") as f: f.write(txt_code.value)
+        status.value = f"✓ Guardado: {fname}"; update_files()
+
+    def run_render():
+        global LATEST_CODE_B64
+        LATEST_CODE_B64 = base64.b64encode(txt_code.value.encode()).decode()
+        tabs.selected_index = 1; page.update()
+
+    prompts_tab = ft.Column([
+        ft.Text("Prompts para IA:", weight="bold"),
+        ft.TextField(label="Carcasa", value="Actúa como ingeniero CAD. Genera código JS (CSG.js) para una carcasa de 90x60x30mm con vaciado interno.", read_only=True),
+        ft.TextField(label="Mecánico", value="Escribe código CSG.js para un engranaje de 12 dientes, radio 20mm y eje central de 5mm.", read_only=True),
+    ], expand=True, scroll="auto")
+
+    tabs = ft.Tabs(selected_index=0, tabs=[
+        ft.Tab(text="EDITOR", content=editor_tab),
+        ft.Tab(text="VISOR", content=ft.Container(content=ft.ElevatedButton("LANZAR VISOR", url=f"http://127.0.0.1:{LOCAL_PORT}/"), alignment=ft.alignment.center)),
+        ft.Tab(text="ARCHIVOS", content=ft.Column([ft.Text("Mis Proyectos"), file_list], expand=True)),
+        ft.Tab(text="IA", content=prompts_tab)
+    ], expand=True, on_change=lambda _: update_files())
+
+    page.add(ft.SafeArea(content=ft.Column([tabs, status], expand=True)))
+    update_files()
+
+ft.app(target=main, port=8555, view=ft.AppView.WEB_BROWSER if "TERMUX_VERSION" in os.environ else None)

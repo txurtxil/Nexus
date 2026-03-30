@@ -36,76 +36,40 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v1.5.0"
+        page.title = "NEXUS CAD v1.6.0"
         page.theme_mode = "dark"
         page.bgcolor = "#0a0a0a"
         page.padding = 0
         
         # =========================================================
-        # BASES DE DATOS DE CÓDIGO (PLANTILLAS)
+        # DIRECTORIO DE EXPORTACIÓN (MEMORIA INTERNA)
         # =========================================================
-        code_tree = """module branch(length, thickness, angle, depth) {
-    if (depth > 0) {
-        cylinder(h = length, r1 = thickness, r2 = thickness * 0.6, $fn = 12);
-        translate([0, 0, length]) {
-            rotate([angle, 0, 0]) branch(length * 0.7, thickness * 0.7, angle * 1.1, depth - 1);
-            rotate([-angle * 0.8, 0, 120]) branch(length * 0.7, thickness * 0.7, angle, depth - 1);
-            rotate([angle * 0.5, 0, 240]) branch(length * 0.7, thickness * 0.7, angle * 1.2, depth - 1);
-        }
-    }
-}
-module tree() { branch(20, 3, 25, 7); }
-tree();"""
-
-        code_bike = """// Parámetros Generales de Bicicleta
-wheel_diameter = 622;
-frame_size = 560;
-module bicycle() { // Motor dinámico 3D }
-bicycle();"""
-
-        code_solar = """// Sistema Solar en OpenSCAD
-sun_radius = 15;
-mercury_radius = 2;
-venus_radius = 3;
-earth_radius = 3.5;
-mars_radius = 2.5;
-jupiter_radius = 10;
-saturn_radius = 8;
-uranus_radius = 6;
-neptune_radius = 5.5;
-
-mercury_orbit = 25;
-venus_orbit = 35;
-earth_orbit = 45;
-mars_orbit = 55;
-jupiter_orbit = 75;
-saturn_orbit = 95;
-uranus_orbit = 115;
-neptune_orbit = 135;"""
+        export_dir = os.path.join(os.environ.get("HOME", os.getcwd()), "nexus_proyectos")
+        os.makedirs(export_dir, exist_ok=True)
 
         code_eiffel = """// Eiffel Tower in OpenSCAD
 module line(start, end, diameter=1) {}
-r_outer_0 = 62.5;
-w0 = 12.5;
-h = 300;
-module eiffel_tower() {
-    // El motor interceptará esto y generará el fractal procedural
-}
+r_outer_0 = 62.5; w0 = 12.5; h = 300;
+module eiffel_tower() { }
 eiffel_tower();"""
 
         # =========================================================
-        # COMPONENTES DE INTERFAZ
+        # UI COMPONENTES
         # =========================================================
         txt_code = ft.TextField(
             label="Código OpenSCAD", multiline=True, expand=True, 
-            value=code_eiffel, color="#00ff00", bgcolor="#050505", border_color="#333333"
+            value=code_eiffel, color="#00ff00", bgcolor="#050505", border_color="#333333",
+            text_size=12
         )
         
-        def load_template(tipo):
-            if tipo == 'bike': txt_code.value = code_bike
-            elif tipo == 'tree': txt_code.value = code_tree
-            elif tipo == 'solar': txt_code.value = code_solar
-            else: txt_code.value = code_eiffel
+        status_text = ft.Text("Sistema Online - v1.6.0", color="grey600", size=11)
+
+        def save_project():
+            filename = f"proyecto_{int(time.time())}.scad"
+            filepath = os.path.join(export_dir, filename)
+            with open(filepath, "w") as f:
+                f.write(txt_code.value)
+            status_text.value = f"✓ Guardado en Termux: {filepath}"
             page.update()
 
         def copy_code():
@@ -118,27 +82,29 @@ eiffel_tower();"""
             page.update()
 
         row_templates = ft.Row([
-            ft.Text("Plantillas:", color="grey500"),
-            ft.ElevatedButton("🚲", on_click=lambda _: load_template('bike'), bgcolor="#222222", color="white", tooltip="Bicicleta"),
-            ft.ElevatedButton("🌲", on_click=lambda _: load_template('tree'), bgcolor="#222222", color="white", tooltip="Árbol"),
-            ft.ElevatedButton("🪐", on_click=lambda _: load_template('solar'), bgcolor="#222222", color="white", tooltip="Sistema Solar"),
-            ft.ElevatedButton("🗼", on_click=lambda _: load_template('eiffel'), bgcolor="#222222", color="white", tooltip="Torre Eiffel"),
-        ])
+            ft.Text("Plantillas:", color="grey500", size=12),
+            ft.ElevatedButton("🚲", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
+            ft.ElevatedButton("🌲", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
+            ft.ElevatedButton("🪐", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
+            ft.ElevatedButton("🗼", on_click=lambda _: clear_code(), bgcolor="#222222", color="white"),
+        ], scroll=ft.ScrollMode.AUTO)
         
         row_actions = ft.Row([
-            ft.ElevatedButton("📋 COPIAR", on_click=lambda _: copy_code(), bgcolor="#1e88e5", color="white"),
-            ft.ElevatedButton("🗑️ LIMPIAR", on_click=lambda _: clear_code(), bgcolor="#e53935", color="white"),
-        ])
+            ft.ElevatedButton("📋 Copiar", on_click=lambda _: copy_code(), bgcolor="#1e88e5", color="white", style=ft.ButtonStyle(padding=5)),
+            ft.ElevatedButton("💾 Guardar Local", on_click=lambda _: save_project(), bgcolor="#8e24aa", color="white", style=ft.ButtonStyle(padding=5)),
+            ft.ElevatedButton("🗑️", on_click=lambda _: clear_code(), bgcolor="#e53935", color="white"),
+        ], scroll=ft.ScrollMode.AUTO)
         
-        status_text = ft.Text("Sistema Online - v1.5.0", color="grey600")
+        # FIX DE SCROLL: Encapsular el editor para que controle su tamaño y el botón quede fijo
+        editor_scrollable_area = ft.Container(
+            content=ft.Column([row_templates, row_actions, txt_code], expand=True),
+            expand=True
+        )
 
-        # FIX DEFINITIVO DE SCROLL: Quitamos 'scroll=ft.ScrollMode.AUTO' del padre, dejamos que TextField expanda
         editor_container = ft.Container(
             content=ft.Column([
-                row_templates, 
-                row_actions,
-                txt_code, 
-                ft.ElevatedButton("▶ COMPILAR Y ROTAR 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=50)
+                editor_scrollable_area, 
+                ft.ElevatedButton("▶ COMPILAR Y ROTAR 3D", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=55, width=float('inf'))
             ], expand=True), 
             padding=10, expand=True, bgcolor="#0a0a0a"
         )

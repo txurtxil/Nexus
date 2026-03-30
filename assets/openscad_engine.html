@@ -59,9 +59,9 @@
         function toggleLog() { logBox.classList.toggle('fullscreen'); }
         function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
 
-        logToScreen('Paso 1: Motor CAD Industrial (v2.5.1) arrancado.');
+        logToScreen('Paso 1: Motor CAD Industrial (v2.5.2) arrancado.');
 
-        // Inicialización de Memoria (FIX DE HOISTING / ZONA MUERTA)
+        // Inicialización de Memoria (FIX DE HOISTING)
         let isOrtho = false;
         let aspect = window.innerWidth / (window.innerHeight*0.8);
         let camRadius = 120; let d = 100;
@@ -74,7 +74,6 @@
         const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, alpha: true});
         const scene = new THREE.Scene();
         
-        // Cámaras duales (Perspectiva y Ortográfica)
         const cameraPersp = new THREE.PerspectiveCamera(45, aspect, 0.1, 2000);
         const cameraOrtho = new THREE.OrthographicCamera(-d*aspect, d*aspect, d, -d, 0.1, 2000);
         let activeCamera = cameraPersp;
@@ -95,11 +94,9 @@
             cameraOrtho.updateProjectionMatrix();
         }
 
-        // AHORA resetCamera puede usarse porque 'lon' y 'lat' ya existen
         function resetCamera() { lon = 45; lat = 45; camRadius = 120; updateCamera(); }
         resetCamera();
 
-        // Iluminación Profesional
         const ambientLight = new THREE.AmbientLight(0x404040, 1.5); scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); dirLight.position.set(100, 200, 100); scene.add(dirLight);
         const backLight = new THREE.DirectionalLight(0xffffff, 0.5); backLight.position.set(-100, -200, -100); scene.add(backLight);
@@ -107,7 +104,6 @@
         const gridHelper = new THREE.GridHelper(300, 30, 0x00ff00, 0x113311); scene.add(gridHelper);
         const axesHelper = new THREE.AxesHelper( 60 ); scene.add(axesHelper); 
 
-        // Materiales Industriales
         const matGreen = new THREE.MeshStandardMaterial({color: 0x00e676, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide});
         const matMetal = new THREE.MeshStandardMaterial({color: 0xaaaaaa, roughness: 0.3, metalness: 0.8, side: THREE.DoubleSide});
         const matGlass = new THREE.MeshStandardMaterial({color: 0x2196f3, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.5, side: THREE.DoubleSide});
@@ -115,7 +111,6 @@
         const materials = [matGreen, matMetal, matGlass, matWire];
         let currentMatIndex = 0;
 
-        // Controles de UI
         function toggleCamera() { 
             isOrtho = !isOrtho; activeCamera = isOrtho ? cameraOrtho : cameraPersp; 
             logToScreen(isOrtho ? 'Modo: Cámara Ortográfica' : 'Modo: Perspectiva Cónica');
@@ -128,7 +123,6 @@
         const zoomIn = () => { camRadius = Math.max(10, camRadius - 20); updateCamera(); };
         const zoomOut = () => { camRadius = Math.min(800, camRadius + 20); updateCamera(); };
 
-        // Eventos Táctiles y de Ratón
         canvas.addEventListener('wheel', (e) => { camRadius += e.deltaY * 0.1; camRadius = Math.max(10, Math.min(800, camRadius)); updateCamera(); });
         canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; autoRotate=false;});
         window.addEventListener('mouseup', () => isDragging = false);

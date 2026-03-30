@@ -51,7 +51,7 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v2.5.1 (Industrial)"
+        page.title = "NEXUS CAD v2.5.2 (Industrial)"
         page.theme_mode = "dark"
         page.bgcolor = "#0a0a0a"
         page.padding = 0
@@ -59,10 +59,10 @@ def main(page: ft.Page):
         export_dir = os.path.join(os.environ.get("HOME", os.getcwd()), "nexus_proyectos")
         os.makedirs(export_dir, exist_ok=True)
 
-        status_text = ft.Text("Sistema Online - v2.5.1 Industrial", color="grey600", size=11)
+        status_text = ft.Text("Sistema Online - v2.5.2 Industrial", color="grey600", size=11)
 
         # =========================================================
-        # PLANTILLAS INDUSTRIALES
+        # PLANTILLAS INDUSTRIALES (SINTAXIS CORREGIDA)
         # =========================================================
         code_bracket = """function main() {
     // Soporte Industrial en L (L-Bracket)
@@ -75,10 +75,14 @@ def main(page: ft.Page):
     var agujero_pared1 = CSG.cylinder({start: [-35, 10, 35], end: [-15, 10, 35], radius: 3});
     var agujero_pared2 = CSG.cylinder({start: [-35, -10, 35], end: [-15, -10, 35], radius: 3});
     
-    // Redondeo de esquina
-    var corte_esquina = CSG.cylinder({start: [25, 20, 5], end: [25, -20, 5], radius: 10}).rotateX(90);
+    // Redondeo de esquina derecha (sin rotateX, posicionado por start/end)
+    var corte_esquina = CSG.cylinder({start: [30, 20, 5], end: [30, -20, 5], radius: 10});
     
-    return soporte.subtract(agujero_base).subtract(agujero_pared1).subtract(agujero_pared2);
+    // Sustracción total
+    return soporte.subtract(agujero_base)
+                  .subtract(agujero_pared1)
+                  .subtract(agujero_pared2)
+                  .subtract(corte_esquina);
 }"""
 
         code_stand = """function main() {
@@ -106,7 +110,6 @@ def main(page: ft.Page):
         def clear_code(): txt_code.value = "function main() {\n  return CSG.sphere({radius: 10});\n}"; page.update()
         def load_template(code): txt_code.value = code; page.update()
         
-        # Inyección de Snippets
         def inject_snippet(code):
             txt_code.value += f"\n\n/* SNIPPET RAPIDO */\n{code}"
             status_text.value = "✓ Snippet inyectado al final del código."

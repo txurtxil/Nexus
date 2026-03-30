@@ -8,13 +8,20 @@
         #visor-container { flex: 1; position: relative; border-bottom: 2px solid #1a1a1a; z-index: 10; cursor: grab; }
         #visor-container:active { cursor: grabbing; }
         canvas { display: block; width: 100%; height: 100%; z-index: 20; position: absolute; top: 0; left: 0; }
+        
         #overlay-ui { position: absolute; top: 10px; left: 10px; z-index: 30; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 8px; border: 1px solid #333; display: flex; flex-wrap: wrap; gap: 5px; max-width: 95%; }
         button { background: #0044cc; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-weight: bold; font-size: 12px; }
         .btn-export { background: #d81b60; }
-        #log-container { height: 120px; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 5; }
-        .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #222; padding-bottom: 4px; }
+        .btn-debug { background: #f57c00; }
+        .btn-tool { background: #4caf50; }
+        
+        #log-container { height: 120px; background: #050505; padding: 10px; overflow-y: auto; font-size: 11px; z-index: 40; position: relative; transition: all 0.3s ease; }
+        #log-container.fullscreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-sizing: border-box; font-size: 14px; padding-top: 50px; z-index: 1000; background: rgba(5,5,5,0.98); }
+        .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #222; padding-bottom: 4px; word-wrap: break-word; }
         .error { color: #ff3333; font-weight: bold; }
         .success { color: #00e676; }
+        #close-log-btn { display: none; position: absolute; top: 10px; right: 10px; background: #cc0000; font-size: 14px; padding: 8px 15px; }
+        #log-container.fullscreen #close-log-btn { display: block; }
     </style>
     <script src="three.min.js"></script>
     <script src="csg.js"></script>
@@ -23,12 +30,20 @@
     <div id="visor-container">
         <div id="overlay-ui">
             <button onclick="autoRotate = !autoRotate;">🔄 Rotar</button>
-            <button class="btn-export" onclick="exportSTL();">⬇️ Guardar STL</button>
-            <div style="color:#aaa; font-size:10px; width: 100%; margin-top:5px;">👆 Arrastra para orbitar la cámara 3D</div>
+            <button class="btn-tool" onclick="toggleWireframe();">🕸️ Malla</button>
+            <button class="btn-tool" onclick="zoomIn();">➕ Zoom</button>
+            <button class="btn-tool" onclick="zoomOut();">➖ Zoom</button>
+            <button class="btn-export" onclick="exportSTL();">⬇️ STL</button>
+            <button class="btn-debug" onclick="toggleLog();">🖥️ Consola</button>
+            <div style="color:#aaa; font-size:10px; width: 100%; margin-top:5px;">👆 Arrastra: Orbitar | 🖖 Pellizca: Zoom</div>
         </div>
         <canvas id="cvs"></canvas>
     </div>
-    <div id="log-container"></div>
+    
+    <div id="log-container">
+        <button id="close-log-btn" onclick="toggleLog();">❌ Cerrar Consola</button>
+    </div>
+    
     <script>
         const logBox = document.getElementById('log-container');
         function logToScreen(msg, isError=false) {
@@ -36,79 +51,84 @@
             p.innerText = '> ' + msg; logBox.appendChild(p); logBox.scrollTop = logBox.scrollHeight;
         }
         window.onerror = function(msg) { logToScreen('CRASH: ' + msg, true); return false; };
-
-        logToScreen('Paso 1: Motor WebGL y CSG.js (v1.7.0) arrancado.');
+        function toggleLog() { logBox.classList.toggle('fullscreen'); }
         function decodeB64(str) { return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')); }
 
-        // ==================================================
-        // INICIALIZACIÓN THREE.JS (Aceleración Hardware)
-        // ==================================================
+        logToScreen('Paso 1: Motor WebGL Pro (v2.0 Core) arrancado.');
+
         const canvas = document.getElementById('cvs');
         const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, alpha: true});
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight*0.8), 0.1, 1000);
-        camera.position.set(50, 50, 50); camera.lookAt(0, 0, 0);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight*0.8), 0.1, 2000);
+        
+        let camRadius = 120; 
+        camera.position.set(camRadius, camRadius, camRadius); camera.lookAt(0, 0, 0);
 
-        // Iluminación Profesional
         const ambientLight = new THREE.AmbientLight(0x404040, 1.5); scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 1); dirLight.position.set(100, 200, 50); scene.add(dirLight);
+        
         const gridHelper = new THREE.GridHelper(200, 20, 0x00ff00, 0x113311); scene.add(gridHelper);
+        const axesHelper = new THREE.AxesHelper( 50 ); scene.add(axesHelper); 
 
-        let mainMesh = null; let autoRotate = true; let currentCSG = null;
+        let mainMesh = null; let autoRotate = true; let currentCSG = null; let isWireframe = false;
 
-        // Controles de cámara orbital táctil
         let isDragging = false, prevX = 0, prevY = 0, lon = 45, lat = 45;
+        let initialPinchDist = null;
+
+        const zoomIn = () => { camRadius = Math.max(10, camRadius - 20); updateCamera(); };
+        const zoomOut = () => { camRadius = Math.min(800, camRadius + 20); updateCamera(); };
+        const toggleWireframe = () => { if(mainMesh) { isWireframe = !isWireframe; mainMesh.material.wireframe = isWireframe; } };
+
+        canvas.addEventListener('wheel', (e) => { camRadius += e.deltaY * 0.1; camRadius = Math.max(10, Math.min(800, camRadius)); updateCamera(); });
+
         canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; autoRotate=false;});
         window.addEventListener('mouseup', () => isDragging = false);
         window.addEventListener('mousemove', e => {
             if(!isDragging) return;
             lon -= (e.clientX - prevX) * 0.5; lat += (e.clientY - prevY) * 0.5;
-            lat = Math.max(-85, Math.min(85, lat)); prevX = e.clientX; prevY = e.clientY;
-            updateCamera();
+            lat = Math.max(-85, Math.min(85, lat)); prevX = e.clientX; prevY = e.clientY; updateCamera();
         });
-        canvas.addEventListener('touchstart', e => { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; autoRotate=false;});
-        window.addEventListener('touchend', () => isDragging = false);
+
+        canvas.addEventListener('touchstart', e => { 
+            if(e.touches.length === 1) { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; autoRotate=false; }
+        });
+        window.addEventListener('touchend', () => { isDragging = false; initialPinchDist = null; });
         window.addEventListener('touchmove', e => {
-            if(!isDragging) return;
-            lon -= (e.touches[0].clientX - prevX) * 0.5; lat += (e.touches[0].clientY - prevY) * 0.5;
-            lat = Math.max(-85, Math.min(85, lat)); prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
-            updateCamera();
+            if(e.touches.length === 2) { 
+                let dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                if(initialPinchDist) { camRadius -= (dist - initialPinchDist) * 0.5; camRadius = Math.max(10, Math.min(800, camRadius)); updateCamera(); }
+                initialPinchDist = dist; autoRotate=false;
+            } else if(e.touches.length === 1 && isDragging) { 
+                lon -= (e.touches[0].clientX - prevX) * 0.5; lat += (e.touches[0].clientY - prevY) * 0.5;
+                lat = Math.max(-85, Math.min(85, lat)); prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; updateCamera();
+            }
         });
 
         function updateCamera() {
-            const phi = (90 - lat) * (Math.PI / 180); const theta = lon * (Math.PI / 180); const radius = 80;
-            camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
-            camera.position.y = radius * Math.cos(phi);
-            camera.position.z = radius * Math.sin(phi) * Math.sin(theta);
+            const phi = (90 - lat) * (Math.PI / 180); const theta = lon * (Math.PI / 180);
+            camera.position.x = camRadius * Math.sin(phi) * Math.cos(theta);
+            camera.position.y = camRadius * Math.cos(phi);
+            camera.position.z = camRadius * Math.sin(phi) * Math.sin(theta);
             camera.lookAt(0, 0, 0);
         }
 
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / (window.innerHeight*0.8); camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight*0.8);
+            let h = logBox.classList.contains('fullscreen') ? window.innerHeight : window.innerHeight*0.8;
+            camera.aspect = window.innerWidth / h; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, h);
         });
-        renderer.setSize(window.innerWidth, window.innerHeight*0.8);
 
-        // ==================================================
-        // PARSER CSG (Evaluación Dinámica de Código AI)
-        // ==================================================
         function buildGeometry(code) {
             logToScreen('Paso 8: Evaluando código CSG Javascript...');
             if(mainMesh) scene.remove(mainMesh);
-            
             try {
-                // Ejecutamos el código introducido por el usuario (o la IA)
                 const func = new Function("CSG", code + "\nreturn main();");
-                currentCSG = func(CSG); // Pasamos la librería offline CSG
+                currentCSG = func(CSG); 
                 
-                // Convertir polígonos CSG a Three.js BufferGeometry
                 const geom = new THREE.BufferGeometry();
                 const vertices = []; const normals = [];
-                
                 currentCSG.toPolygons().forEach(poly => {
                     for(let i=2; i<poly.vertices.length; i++) {
-                        let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos;
-                        let n = poly.plane.normal;
+                        let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos, n = poly.plane.normal;
                         vertices.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
                         normals.push(n.x, n.y, n.z, n.x, n.y, n.z, n.x, n.y, n.z);
                     }
@@ -116,30 +136,29 @@
                 geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                 geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
                 
-                const material = new THREE.MeshStandardMaterial({color: 0x00e676, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide});
+                const material = new THREE.MeshStandardMaterial({color: 0x00e676, roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide, wireframe: isWireframe});
                 mainMesh = new THREE.Mesh(geom, material);
                 scene.add(mainMesh);
                 logToScreen('✓ Malla WebGL generada con éxito.');
-                
-            } catch(e) { logToScreen('ERROR EN CÓDIGO: ' + e.message, true); }
+            } catch(e) { 
+                logToScreen('ERROR EN CÓDIGO: ' + e.message, true); 
+                logToScreen('Abre la Consola para leer el error completo y corregir el código.', true);
+            }
         }
 
-        // ==================================================
-        // EXPORTADOR STL (Grado Industrial)
-        // ==================================================
         function exportSTL() {
             if(!currentCSG) return;
             logToScreen('Generando archivo STL sólido...');
-            let stl = "solid nexus_ai_model\n";
+            let stl = "solid nexus_model\n";
             currentCSG.toPolygons().forEach(poly => {
                 for(let i=2; i<poly.vertices.length; i++) {
                     let v0 = poly.vertices[0].pos, v1 = poly.vertices[i-1].pos, v2 = poly.vertices[i].pos, n = poly.plane.normal;
                     stl += `facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${v0.x} ${v0.y} ${v0.z}\nvertex ${v1.x} ${v1.y} ${v1.z}\nvertex ${v2.x} ${v2.y} ${v2.z}\nendloop\nendfacet\n`;
                 }
             });
-            stl += "endsolid nexus_ai_model\n";
+            stl += "endsolid nexus_model\n";
             const blob = new Blob([stl], {type: 'text/plain'});
-            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'nexus_ai_modelo.stl'; link.click();
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'nexus_modelo.stl'; link.click();
             logToScreen('✓ Archivo STL descargado.');
         }
 
@@ -150,11 +169,7 @@
         }
 
         fetch('/api/get_code_b64.json').then(r => r.json()).then(data => {
-            if (data.code_b64) {
-                logToScreen('✓ Código JS-CSG recibido.');
-                buildGeometry(decodeB64(data.code_b64));
-                animate();
-            }
+            if (data.code_b64) { buildGeometry(decodeB64(data.code_b64)); animate(); }
         }).catch(e => logToScreen('ERROR API: ' + e.message, true));
     </script>
 </body>

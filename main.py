@@ -25,12 +25,11 @@ for name, url in libs.items():
         except: pass
 
 # =========================================================
-# MOTOR API LOCAL
+# MOTOR API LOCAL HTTP
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('127.0.0.1', 0))
-        LOCAL_PORT = s.getsockname()[1]
+        s.bind(('127.0.0.1', 0)); LOCAL_PORT = s.getsockname()[1]
 except: LOCAL_PORT = 8556
 
 LATEST_CODE_B64 = ""
@@ -58,13 +57,15 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD AI Core (v1.7.1)"
+        page.title = "NEXUS CAD v2.0 (Core Edition)"
         page.theme_mode = "dark"
         page.bgcolor = "#0a0a0a"
         page.padding = 0
         
         export_dir = os.path.join(os.environ.get("HOME", os.getcwd()), "nexus_proyectos")
         os.makedirs(export_dir, exist_ok=True)
+
+        status_text = ft.Text("Sistema Online - v2.0 Core", color="grey600", size=11)
 
         # =========================================================
         # PLANTILLAS JS-CSG
@@ -87,34 +88,43 @@ def main(page: ft.Page):
     return exterior.subtract(interior);
 }"""
 
+        code_stand = """function main() {
+    var base = CSG.cube({center: [0, 0, 20], radius: [60, 40, 20]});
+    var ranura = CSG.cube({center: [0, 5, 35], radius: [70, 15, 30]});
+    var rebaje_frontal = CSG.cube({center: [0, -45, 45], radius: [70, 40, 30]});
+    var ventilacion = CSG.cylinder({start: [0, -50, 15], end: [0, 50, 15], radius: 20, slices: 32});
+    var peana_final = base.subtract(ranura).subtract(rebaje_frontal).subtract(ventilacion);
+    var tope_frontal = CSG.cube({center: [0, -32, 5], radius: [60, 3, 5]});
+    return peana_final.union(tope_frontal);
+}"""
+
         # =========================================================
-        # UI EDITOR (LAYOUT CORREGIDO)
+        # 1. UI EDITOR
         # =========================================================
         txt_code = ft.TextField(
-            label="Código IA (Javascript CSG)", multiline=True, expand=True, 
-            value=code_gear, color="#00ff00", bgcolor="#050505", border_color="#333333", text_size=12
+            label="Código JSCAD (Booleano)", multiline=True, expand=True, 
+            value=code_stand, color="#00ff00", bgcolor="#050505", border_color="#333333", text_size=12
         )
-        status_text = ft.Text("Sistema AI Online - v1.7.1", color="grey600", size=11)
 
         def save_project():
-            filename = f"ai_model_{int(time.time())}.jscad"
+            filename = f"nexus_{int(time.time())}.jscad"
             filepath = os.path.join(export_dir, filename)
             with open(filepath, "w") as f: f.write(txt_code.value)
             status_text.value = f"✓ Guardado: {filename}"; update_explorer(); page.update()
 
-        def clear_code(): txt_code.value = "function main() {\n  // Pega aquí el código de la IA\n  return CSG.sphere({radius: 10});\n}"; page.update()
+        def clear_code(): txt_code.value = "function main() {\n  return CSG.sphere({radius: 10});\n}"; page.update()
         def load_template(code): txt_code.value = code; page.update()
 
         row_actions = ft.Row([
             ft.ElevatedButton("⚙️", on_click=lambda _: load_template(code_gear), bgcolor="#222222", color="white", tooltip="Engranaje"),
             ft.ElevatedButton("📦", on_click=lambda _: load_template(code_box), bgcolor="#222222", color="white", tooltip="Caja"),
+            ft.ElevatedButton("📱", on_click=lambda _: load_template(code_stand), bgcolor="#222222", color="white", tooltip="Peana Consola"),
             ft.ElevatedButton("💾 Guardar", on_click=lambda _: save_project(), bgcolor="#8e24aa", color="white"),
             ft.ElevatedButton("🗑️", on_click=lambda _: clear_code(), bgcolor="#e53935", color="white"),
         ], scroll=ft.ScrollMode.AUTO)
         
         btn_compile = ft.ElevatedButton("▶ COMPILAR MALLA BOOLEANA", on_click=lambda e: run_render(), bgcolor="green900", color="white", height=50, width=float('inf'))
 
-        # NUEVO ORDEN DE INTERFAZ: Botón Compilar ARRIBA, luego acciones, luego la caja de texto infinita
         editor_container = ft.Container(
             content=ft.Column([
                 btn_compile,
@@ -123,27 +133,56 @@ def main(page: ft.Page):
             ], expand=True), 
             padding=10, expand=True, bgcolor="#0a0a0a", visible=True
         )
-        
+
         # =========================================================
-        # UI EXPLORADOR DE ARCHIVOS (FIX ICONO)
+        # 2. UI EXPLORADOR DE ARCHIVOS PRO
         # =========================================================
         lv_files = ft.ListView(expand=True, spacing=5)
         
         def load_file(filename):
             with open(os.path.join(export_dir, filename), "r") as f: txt_code.value = f.read()
-            status_text.value = f"✓ Archivo cargado: {filename}"; switch(0)
+            status_text.value = f"✓ Cargado: {filename}"; switch(0)
+
+        def delete_file(filename):
+            os.remove(os.path.join(export_dir, filename))
+            status_text.value = f"🗑️ Eliminado: {filename}"; update_explorer()
+
+        def export_file(filename):
+            with open(os.path.join(export_dir, filename), "r") as f: page.set_clipboard(f.read())
+            status_text.value = f"📤 Código copiado al portapapeles."; page.update()
+
+        def rename_file(old_name, new_name, dlg):
+            if new_name:
+                os.rename(os.path.join(export_dir, old_name), os.path.join(export_dir, new_name + ".jscad"))
+                status_text.value = f"✏️ Renombrado a {new_name}.jscad"
+            dlg.open = False; update_explorer()
+
+        def prompt_rename(filename):
+            txt_new_name = ft.TextField(label="Nuevo nombre (sin extensión)")
+            dlg = ft.AlertDialog(
+                title=ft.Text("Renombrar Archivo"), content=txt_new_name,
+                actions=[ft.TextButton("Guardar", on_click=lambda e: rename_file(filename, txt_new_name.value, dlg))]
+            )
+            page.dialog = dlg; dlg.open = True; page.update()
 
         def update_explorer():
             lv_files.controls.clear()
             for f in reversed(os.listdir(export_dir)):
-                # FIX: Sustituido el icono problemático por un emoji de texto plano "📄"
-                lv_files.controls.append(
-                    ft.Container(content=ft.Row([ft.Text("📄", size=20), ft.Text(f, color="white")]), 
-                                 bgcolor="#1a1a1a", padding=10, border_radius=5, on_click=lambda e, fname=f: load_file(fname))
-                )
+                row = ft.Row([
+                    ft.Text("📄 " + f[:18], color="white", size=13, expand=True),
+                    ft.TextButton("📂", on_click=lambda e, fname=f: load_file(fname), tooltip="Cargar"),
+                    ft.TextButton("✏️", on_click=lambda e, fname=f: prompt_rename(fname), tooltip="Renombrar"),
+                    ft.TextButton("📤", on_click=lambda e, fname=f: export_file(fname), tooltip="Copiar Código"),
+                    ft.TextButton("🗑️", on_click=lambda e, fname=f: delete_file(fname), tooltip="Eliminar")
+                ], alignment="spaceBetween")
+                lv_files.controls.append(ft.Container(content=row, bgcolor="#1a1a1a", padding=5, border_radius=5))
             page.update()
 
-        explorer_container = ft.Container(content=ft.Column([ft.Text("Proyectos Locales (Termux)", color="white", weight="bold"), lv_files], expand=True), padding=10, expand=True, bgcolor="#0a0a0a", visible=False)
+        explorer_container = ft.Container(content=ft.Column([ft.Text("Gestor de Proyectos", color="white", weight="bold"), lv_files], expand=True), padding=10, expand=True, bgcolor="#0a0a0a", visible=False)
+
+        # =========================================================
+        # 3. VISOR Y NAVEGACIÓN
+        # =========================================================
         viewer_container = ft.Container(content=ft.Text("Visor inactivo."), alignment=ft.Alignment(0,0), expand=True, visible=False)
 
         def switch(idx):
@@ -164,7 +203,11 @@ def main(page: ft.Page):
 
         main_content = ft.SafeArea(
             content=ft.Column([
-                ft.Container(content=ft.Row([ft.TextButton("💻 EDITOR", on_click=lambda _: switch(0)), ft.TextButton("👁️ VISOR", on_click=lambda _: switch(1)), ft.TextButton("📁 ARCHIVOS", on_click=lambda _: switch(2))], alignment="center"), bgcolor="#111111", padding=5),
+                ft.Row([
+                    ft.TextButton("💻 Editor", on_click=lambda _: switch(0)), 
+                    ft.TextButton("👁️ Visor", on_click=lambda _: switch(1)),
+                    ft.TextButton("📁 Archivos", on_click=lambda _: switch(2))
+                ], alignment="center", scroll=ft.ScrollMode.AUTO),
                 editor_container, viewer_container, explorer_container, status_text
             ], expand=True)
         )

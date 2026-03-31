@@ -61,15 +61,15 @@ def start_server():
 threading.Thread(target=start_server, daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL (SISTEMA DE NAVEGACIÓN PROPIO)
+# APLICACIÓN PRINCIPAL (UI PULIDA Y ESTABLE)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v3.4"
+        page.title = "NEXUS CAD v3.5"
         page.theme_mode = "dark"
         page.padding = 10
         
-        status = ft.Text("Navegacion Bare-Metal Activa", color="green")
+        status = ft.Text("Sistema Estable v3.5 Activo", color="green")
 
         # --- PORTAPAPELES ---
         def copy_to_clipboard(text_to_copy):
@@ -97,9 +97,9 @@ def main(page: ft.Page):
                 status.value = "❌ Error portapapeles."
             page.update()
 
-        # --- PLANTILLAS ---
+        # --- PLANTILLAS BÁSICAS ---
         T_CARCASA = "function main() {\n  var ext = CSG.cube({center:[0,0,10], radius:[40,25,10]});\n  var int = CSG.cube({center:[0,0,12], radius:[38,23,10]});\n  return ext.subtract(int);\n}"
-        T_ENGRARE = "function main() {\n  var b = CSG.cylinder({start:[0,0,0], end:[0,0,5], radius:20});\n  return b;\n}"
+        T_ENGRARE = "function main() {\n  var base = CSG.cylinder({start:[0,0,0], end:[0,0,5], radius:20});\n  var hueco = CSG.cylinder({start:[0,0,-1], end:[0,0,6], radius:5});\n  return base.subtract(hueco);\n}"
         T_PEANA = "function main() {\n  var base = CSG.cube({center: [0, 0, 5], radius: [60, 40, 5]});\n  var soporte = CSG.cube({center: [0, 10, 25], radius: [60, 5, 25]});\n  return base.union(soporte);\n}"
 
         txt_code = ft.TextField(label="Codigo JS-CSG", multiline=True, expand=True, value=T_CARCASA)
@@ -112,10 +112,10 @@ def main(page: ft.Page):
         btn_e = ft.ElevatedButton("⚙️ Engranaje", on_click=lambda _: load_template(T_ENGRARE))
         btn_p = ft.ElevatedButton("📱 Peana", on_click=lambda _: load_template(T_PEANA))
         
-        row_templates = ft.Row([btn_c, btn_e, btn_p], wrap=True)
+        row_templates = ft.Row(controls=[btn_c, btn_e, btn_p], wrap=True)
 
         # --- GESTOR DE ARCHIVOS ---
-        file_list = ft.ListView(expand=True)
+        file_list = ft.ListView(expand=True, spacing=10)
 
         def update_files():
             file_list.controls.clear()
@@ -123,13 +123,21 @@ def main(page: ft.Page):
                 def make_load(name): return lambda _: load_file_content(name)
                 def make_copy(name): return lambda _: copy_file_content(name)
                 def make_del(name): return lambda _: delete_file(name)
+                def make_ren(name): return lambda _: prompt_rename(name)
 
-                btn_load = ft.ElevatedButton("▶", on_click=make_load(f))
-                btn_copy = ft.ElevatedButton("📋", on_click=make_copy(f))
-                btn_del = ft.ElevatedButton("🗑️", on_click=make_del(f))
+                # Botones de acción compactos
+                acciones = ft.Row(
+                    controls=[
+                        ft.ElevatedButton("▶", on_click=make_load(f)),
+                        ft.ElevatedButton("✏️", on_click=make_ren(f)),
+                        ft.ElevatedButton("📋", on_click=make_copy(f)),
+                        ft.ElevatedButton("🗑️", on_click=make_del(f)),
+                    ],
+                    scroll="auto" # Permite scroll si la pantalla es muy estrecha
+                )
 
-                row = ft.Row([ft.Text(f[:15], expand=True), btn_load, btn_copy, btn_del])
-                file_list.controls.append(ft.Container(content=row, padding=5))
+                row = ft.Column(controls=[ft.Text(f, weight="bold"), acciones])
+                file_list.controls.append(ft.Container(content=row, padding=10, bgcolor="#1a1a1a", border_radius=8))
             page.update()
 
         def load_file_content(name):
@@ -156,6 +164,30 @@ def main(page: ft.Page):
                 status.value = "❌ Error al borrar."
             update_files()
 
+        # FIX: Renombrar restituido con un AlertDialog nativo seguro
+        def prompt_rename(old_name):
+            txt_new = ft.TextField(label="Nuevo nombre (sin .jscad)")
+            
+            def do_rename(e):
+                if txt_new.value:
+                    try:
+                        os.rename(os.path.join(EXPORT_DIR, old_name), os.path.join(EXPORT_DIR, txt_new.value + ".jscad"))
+                        status.value = "✓ Renombrado a " + txt_new.value
+                    except:
+                        status.value = "❌ Error al renombrar"
+                dlg.open = False
+                update_files()
+                page.update()
+
+            dlg = ft.AlertDialog(
+                title=ft.Text("Renombrar Archivo"), 
+                content=txt_new, 
+                actions=[ft.ElevatedButton("Guardar", on_click=do_rename)]
+            )
+            page.dialog = dlg
+            dlg.open = True
+            page.update()
+
         # --- COMPILACIÓN Y GUARDADO ---
         def run_render():
             global LATEST_CODE_B64
@@ -173,28 +205,48 @@ def main(page: ft.Page):
             update_files()
 
         # =========================================================
-        # VISTAS INDEPENDIENTES (El nuevo sistema de Pestañas)
+        # VISTAS INDEPENDIENTES 
         # =========================================================
-        view_editor = ft.Column([
-            ft.ElevatedButton("▶ COMPILAR MALLA 3D", on_click=lambda _: run_render()),
-            ft.Row([ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project()), ft.Text("Plantillas:")]),
+        
+        # PESTAÑA 1: EDITOR
+        view_editor = ft.Column(controls=[
+            ft.ElevatedButton("▶ COMPILAR MALLA 3D", on_click=lambda _: run_render(), color="white", bgcolor="green900"),
+            ft.Row(controls=[ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project(), color="white", bgcolor="blue900"), ft.Text("Plantillas:")]),
             row_templates,
             txt_code
         ], expand=True)
 
-        view_visor = ft.Container(content=ft.ElevatedButton("ABRIR VISOR NATIVO", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/"))
+        # PESTAÑA 2: VISOR (FIX: Botón centrado para que no se estire)
+        btn_visor = ft.ElevatedButton("🚀 ABRIR VISOR 3D NATIVO", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/", color="white", bgcolor="deepPurple700")
+        view_visor = ft.Column(
+            controls=[
+                ft.Container(height=50), # Espaciador
+                ft.Row(controls=[btn_visor], alignment=ft.MainAxisAlignment.CENTER),
+                ft.Container(height=20),
+                ft.Text("Haz clic arriba para abrir el motor WebGL acelerado por hardware.", text_align=ft.TextAlign.CENTER, color="grey")
+            ], 
+            expand=True
+        )
         
-        view_archivos = ft.Column([ft.Text("Mis Proyectos"), file_list], expand=True)
+        # PESTAÑA 3: ARCHIVOS
+        view_archivos = ft.Column(controls=[ft.Text("Gestor de Proyectos", weight="bold"), file_list], expand=True)
         
-        view_ia = ft.Column([
-            ft.Text("Prompts para enviar a tu IA:"),
-            ft.TextField(label="Carcasa Técnica", value="Genera codigo Javascript CSG.js para carcasa 90x60x30mm con vaciado pared 2mm. Usa center:[x,y,z].", multiline=True),
-        ], expand=True)
+        # PESTAÑA 4: PROMPTS IA (FIX: Colección completa)
+        view_ia = ft.Column(
+            controls=[
+                ft.Text("Copia el prompt y pégalo en ChatGPT/Claude/Gemini:", weight="bold"),
+                ft.TextField(label="1. Carcasa para PCB", value="Actúa como ingeniero CAD. Escribe codigo Javascript para la libreria CSG.js. Crea una carcasa hueca de 90x60x30mm con pared de 2mm. Usa center:[x,y,z] en los cubos. Devuelve la pieza final en function main().", multiline=True),
+                ft.TextField(label="2. Bandeja Organizadora", value="Genera el codigo JS (CSG.js) de una bandeja organizadora. Usa cilindros con 'slices: 6' para crear compartimentos hexagonales y réstalos de un cubo solido principal con .subtract().", multiline=True),
+                ft.TextField(label="3. Soporte en L (Ingenieria)", value="Crea un soporte en forma de L usando CSG.js. Dimensiones: 50x50x50mm, grosor 5mm. Haz 2 taladros pasantes de 4mm de radio en cada cara usando cilindros y .subtract().", multiline=True),
+                ft.TextField(label="4. Engranaje Mecanico", value="Crea un engranaje usando CSG.js. Cilindro central de radio 20mm y altura 5mm. Usa un bucle 'for' en Javascript para colocar 12 dientes alrededor usando Math.cos y Math.sin. Únelos con .union().", multiline=True),
+            ], 
+            expand=True,
+            scroll="auto"
+        )
 
         # =========================================================
-        # MOTOR DE NAVEGACIÓN PERSONALIZADO (Cero Crashes)
+        # MOTOR DE NAVEGACIÓN 
         # =========================================================
-        # Este contenedor cambiará su contenido dinámicamente según el botón que pulses
         main_container = ft.Container(content=view_editor, expand=True)
 
         def set_tab(idx):
@@ -204,21 +256,23 @@ def main(page: ft.Page):
             elif idx == 3: main_container.content = view_ia
             page.update()
 
-        # Nuestra barra de navegación fabricada a mano con botones
-        nav_bar = ft.Row([
-            ft.ElevatedButton("💻 EDITOR", on_click=lambda _: set_tab(0)),
-            ft.ElevatedButton("👁️ VISOR", on_click=lambda _: set_tab(1)),
-            ft.ElevatedButton("📁 ARCHIVOS", on_click=lambda _: (update_files(), set_tab(2))),
-            ft.ElevatedButton("🧠 IA", on_click=lambda _: set_tab(3)),
-        ])
+        # FIX: scroll="auto" añadido para que la pestaña IA sea accesible en móviles
+        nav_bar = ft.Row(
+            controls=[
+                ft.ElevatedButton("💻 EDITOR", on_click=lambda _: set_tab(0)),
+                ft.ElevatedButton("👁️ VISOR", on_click=lambda _: set_tab(1)),
+                ft.ElevatedButton("📁 ARCHIVOS", on_click=lambda _: (update_files(), set_tab(2))),
+                ft.ElevatedButton("🧠 PROMPTS IA", on_click=lambda _: set_tab(3)),
+            ],
+            scroll="auto"
+        )
 
-        # Renderizado Final
         page.add(nav_bar, main_container, status)
         update_files()
 
     except Exception:
         page.clean()
-        page.add(ft.Text("CRASH FATAL:\n" + traceback.format_exc(), color="red"))
+        page.add(ft.Text("CRASH:\n" + traceback.format_exc(), color="red"))
         page.update()
 
 if __name__ == "__main__":

@@ -55,15 +55,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.0 (FASE 1 - AGENTE IA)
+# APLICACIÓN PRINCIPAL v5.0.1 (HOTFIX)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v5.0"
+        page.title = "NEXUS CAD v5.0.1"
         page.theme_mode = "dark"
         page.padding = 0
 
-        status = ft.Text("NEXUS v5.0 | Módulo IA Activo", color="green")
+        status = ft.Text("NEXUS v5.0.1 | Módulo IA Activo", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -107,7 +107,9 @@ def main(page: ft.Page):
                     page.update()
 
         # --- EDITOR CAD ---
-        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True)
+        # FIX: Inicialización directa en el constructor para evitar el crash del update()
+        DEFAULT_CODE = "function main() {\n  return CSG.cube({center:[0,0,0], radius:[10,10,10]});\n}"
+        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=DEFAULT_CODE)
 
         def load_template(t):
             txt_code.value = t
@@ -118,10 +120,11 @@ def main(page: ft.Page):
             status.update()
 
         def clear_editor():
-            txt_code.value = "function main() {\n  return CSG.cube({center:[0,0,0], radius:[10,10,10]});\n}"
+            txt_code.value = DEFAULT_CODE
             txt_code.update()
-
-        if not txt_code.value: clear_editor()
+            status.value = "✓ Editor vaciado."
+            status.color = "green"
+            status.update()
 
         def run_render():
             global LATEST_CODE_B64
@@ -164,7 +167,6 @@ def main(page: ft.Page):
         # NUEVO MÓDULO: AGENTE IA (Groq / OpenRouter)
         # =========================================================
         
-        # Recuperar configuración guardada
         saved_key = page.client_storage.get("ai_api_key") or ""
         saved_prov = page.client_storage.get("ai_provider") or "Groq"
 
@@ -181,10 +183,9 @@ def main(page: ft.Page):
         config_row = ft.Row([provider_dd, api_key_input, btn_save_config])
 
         chat_history = ft.ListView(expand=True, spacing=10)
-        user_prompt = ft.TextField(label="Ej: Crea una peana para el móvil con 60 grados de inclinación...", multiline=True, expand=True)
+        user_prompt = ft.TextField(label="Ej: Crea una peana paramétrica...", multiline=True, expand=True)
         loading_ring = ft.ProgressRing(visible=False, width=20, height=20)
 
-        # La Regla Maestra de Ingeniería
         SYS_PROMPT = """Eres un ingeniero experto en CAD paramétrico. Genera código en Javascript PURO para la librería CSG.js. 
 REGLAS ESTRICTAS:
 1. NUNCA uses comandos como cylinder() o translate() sueltos.
@@ -203,7 +204,6 @@ REGLAS ESTRICTAS:
             user_prompt.value = ""
             loading_ring.visible = True
             
-            # Mostrar mensaje del usuario
             chat_history.controls.append(ft.Container(
                 content=ft.Text(prompt_text, color="white"),
                 bgcolor="#0d47a1", padding=10, border_radius=8, alignment=ft.alignment.center_right
@@ -220,7 +220,7 @@ REGLAS ESTRICTAS:
                         model = "llama3-70b-8192"
                     else:
                         url = "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)"
-                        model = "google/gemini-pro" # Modelo por defecto rápido en OpenRouter
+                        model = "google/gemini-pro"
 
                     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
                     data = {
@@ -236,7 +236,6 @@ REGLAS ESTRICTAS:
                         res_data = json.loads(response.read().decode('utf-8'))
                         ai_text = res_data['choices'][0]['message']['content']
                     
-                    # Extraer código JS si existe
                     extracted_code = ""
                     if "```javascript" in ai_text:
                         extracted_code = ai_text.split("```javascript")[1].split("```")[0].strip()
@@ -245,7 +244,6 @@ REGLAS ESTRICTAS:
                     elif "function main()" in ai_text:
                         extracted_code = ai_text[ai_text.find("function main()"):].strip()
 
-                    # Interfaz de respuesta de la IA
                     bot_controls = [ft.Text(ai_text, color="#e0e0e0", selectable=True)]
                     if extracted_code:
                         bot_controls.append(ft.ElevatedButton(

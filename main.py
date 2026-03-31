@@ -1,5 +1,5 @@
 import flet as ft
-import os, base64, json, threading, http.server, socket, time, warnings, subprocess, tempfile, traceback
+import os, base64, json, threading, http.server, socket, time, warnings, tempfile, traceback
 from urllib.parse import urlparse
 
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -53,59 +53,50 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
     def log_message(self, *args): pass
 
-def start_server():
-    try:
-        http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever()
-    except:
-        pass
-threading.Thread(target=start_server, daemon=True).start()
+threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL (v3.6 UI Mejorada y Funcional)
+# APLICACIÓN PRINCIPAL v4.0
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v3.6"
+        page.title = "NEXUS CAD v4.0"
         page.theme_mode = "dark"
-        page.padding = 0  # El padding lo manejaremos en un contenedor maestro
+        page.padding = 0 
         
-        status = ft.Text("Sistema Online Activo", color="green")
+        status = ft.Text("Sistema Acorazado v4.0 Activo", color="green")
 
-        # --- PORTAPAPELES (Reparado para Android 10+) ---
-        def copy_text(text_to_copy):
-            try:
-                # Intento principal nativo de Flet 0.23+
-                page.set_clipboard(str(text_to_copy))
-                status.value = "✓ Código copiado al portapapeles."
-                status.color = "green"
-            except Exception as e:
-                try:
-                    # Fallback por consola Termux si estamos en entorno no compilado
-                    subprocess.run(['termux-clipboard-set'], input=str(text_to_copy).encode('utf-8'))
-                    status.value = "✓ Código copiado (Termux)."
-                    status.color = "green"
-                except:
-                    # Mostrar el error real para diagnóstico si ambos fallan
-                    status.value = f"❌ Error portapapeles: {str(e)}"
-                    status.color = "red"
-            page.update()
+        # --- GESTOR UNIVERSAL DE CUADROS DE DIÁLOGO (Fix del Lápiz y Portapapeles) ---
+        def open_dialog(dialog):
+            try: page.open(dialog)
+            except: 
+                if dialog not in page.overlay: page.overlay.append(dialog)
+                dialog.open = True
+                page.update()
 
-        # --- PLANTILLAS JS-CSG ---
+        def close_dialog(dialog):
+            try: page.close(dialog)
+            except: dialog.open = False; page.update()
+
+        # --- PORTAPAPELES NATIVO A PRUEBA DE BLOQUEOS (Android 10+) ---
+        def export_manual(texto):
+            # Si el sistema bloquea la copia oculta, forzamos copia física visual
+            txt_copy = ft.TextField(value=texto, multiline=True, read_only=True, expand=True)
+            dlg_copy = ft.AlertDialog(
+                title=ft.Text("Exportar Código"),
+                content=ft.Column([
+                    ft.Text("Mantén pulsado dentro del cuadro azul para COPIAR TODO:", color="grey"),
+                    ft.Container(content=txt_copy, height=300)
+                ]),
+                actions=[ft.ElevatedButton("CERRAR", on_click=lambda _: close_dialog(dlg_copy))]
+            )
+            open_dialog(dlg_copy)
+
+        # --- PLANTILLAS JS-CSG RÁPIDAS ---
         T_CARCASA = "function main() {\n  var ext = CSG.cube({center:[0,0,10], radius:[40,25,10]});\n  var int = CSG.cube({center:[0,0,12], radius:[38,23,10]});\n  return ext.subtract(int);\n}"
         T_ENGRARE = "function main() {\n  var b = CSG.cylinder({start:[0,0,0], end:[0,0,5], radius:20, slices:32});\n  var h = CSG.cylinder({start:[0,0,-1], end:[0,0,6], radius:5, slices:16});\n  return b.subtract(h);\n}"
-        T_PEANA = "function main() {\n  var base = CSG.cube({center: [0, 0, 5], radius: [60, 40, 5]});\n  var soporte = CSG.cube({center: [0, 10, 25], radius: [60, 5, 25]});\n  return base.union(soporte);\n}"
 
         txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_CARCASA)
-
-        def load_template(t):
-            txt_code.value = t
-            page.update()
-
-        btn_c = ft.ElevatedButton("📦 Carcasa", on_click=lambda _: load_template(T_CARCASA))
-        btn_e = ft.ElevatedButton("⚙️ Engranaje", on_click=lambda _: load_template(T_ENGRARE))
-        btn_p = ft.ElevatedButton("📱 Peana", on_click=lambda _: load_template(T_PEANA))
-        
-        row_templates = ft.Row([btn_c, btn_e, btn_p], scroll="auto")
 
         # --- GESTOR DE ARCHIVOS ---
         file_list = ft.ListView(expand=True, spacing=10)
@@ -114,20 +105,16 @@ def main(page: ft.Page):
             file_list.controls.clear()
             for f in reversed(sorted(os.listdir(EXPORT_DIR))):
                 def make_load(name): return lambda _: load_file_content(name)
-                def make_copy(name): return lambda _: copy_file_content(name)
+                def make_copy(name): return lambda _: export_manual(open(os.path.join(EXPORT_DIR, name), "r").read())
                 def make_del(name): return lambda _: delete_file(name)
                 def make_ren(name): return lambda _: prompt_rename(name)
 
-                # Botones compactos y elegantes
-                acciones = ft.Row(
-                    [
-                        ft.ElevatedButton("▶ Abrir", on_click=make_load(f), color="white", bgcolor="#1b5e20"),
-                        ft.ElevatedButton("✏️ Editar", on_click=make_ren(f)),
-                        ft.ElevatedButton("📋 Copiar", on_click=make_copy(f)),
-                        ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#b71c1c"),
-                    ],
-                    scroll="auto"
-                )
+                acciones = ft.Row([
+                    ft.ElevatedButton("▶ Abrir", on_click=make_load(f), color="white", bgcolor="#1b5e20"),
+                    ft.ElevatedButton("✏️ Editar", on_click=make_ren(f)),
+                    ft.ElevatedButton("📤 Exportar", on_click=make_copy(f), color="white", bgcolor="#0d47a1"),
+                    ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#b71c1c"),
+                ], scroll="auto")
 
                 row = ft.Column([ft.Text(f, weight="bold"), acciones])
                 file_list.controls.append(ft.Container(content=row, padding=10, bgcolor="#1a1a1a", border_radius=8))
@@ -136,21 +123,13 @@ def main(page: ft.Page):
         def load_file_content(name):
             try:
                 with open(os.path.join(EXPORT_DIR, name), "r") as f: txt_code.value = f.read()
-                set_tab(0) # Salto al editor
+                set_tab(0) 
                 status.value = "✓ " + name + " cargado."
                 status.color = "green"
             except:
                 status.value = "❌ Error al leer."
                 status.color = "red"
             page.update()
-
-        def copy_file_content(name):
-            try:
-                with open(os.path.join(EXPORT_DIR, name), "r") as f: copy_text(f.read())
-            except:
-                status.value = "❌ Error al leer archivo para copiar."
-                status.color = "red"
-                page.update()
 
         def delete_file(name):
             try:
@@ -162,7 +141,7 @@ def main(page: ft.Page):
                 status.color = "red"
             update_files()
 
-        # --- RENOMBRAR (LÁPIZ REPARADO) ---
+        # --- RENOMBRAR (REPARADO 100%) ---
         def prompt_rename(old_name):
             txt_new = ft.TextField(label="Nuevo nombre (sin .jscad)")
             
@@ -171,32 +150,26 @@ def main(page: ft.Page):
                     try:
                         nuevo = txt_new.value + ".jscad"
                         os.rename(os.path.join(EXPORT_DIR, old_name), os.path.join(EXPORT_DIR, nuevo))
-                        status.value = f"✓ Renombrado a {nuevo}"
+                        status.value = "✓ Renombrado"
                         status.color = "green"
                     except Exception as ex:
-                        status.value = f"❌ Error: {str(ex)}"
+                        status.value = "❌ Error: " + str(ex)
                         status.color = "red"
-                # Compatibilidad universal de cerrado de Dialogs
-                try: page.close(dlg)
-                except: dlg.open = False
+                close_dialog(dlg)
                 update_files()
-                page.update()
 
             dlg = ft.AlertDialog(
                 title=ft.Text("Renombrar Proyecto"),
                 content=txt_new,
-                actions=[ft.ElevatedButton("GUARDAR", on_click=do_rename, bgcolor="blue900", color="white")]
+                actions=[ft.ElevatedButton("GUARDAR", on_click=do_rename, bgcolor="#0d47a1", color="white")]
             )
-            
-            # Compatibilidad universal de apertura de Dialogs
-            try: page.open(dlg)
-            except: page.dialog = dlg; dlg.open = True; page.update()
+            open_dialog(dlg)
 
         # --- COMPILACIÓN Y GUARDADO ---
         def run_render():
             global LATEST_CODE_B64
             LATEST_CODE_B64 = base64.b64encode(txt_code.value.encode()).decode()
-            set_tab(1) # Salto al Visor
+            set_tab(1) 
             page.update()
 
         def save_project():
@@ -211,47 +184,72 @@ def main(page: ft.Page):
             update_files()
 
         # =========================================================
+        # CARPETAS DE IA (SISTEMA ACCORDION MANUAL)
+        # =========================================================
+        def create_folder(icon, title, prompts):
+            controls = []
+            for name, text in prompts:
+                controls.append(ft.Text(name, color="amber", weight="bold"))
+                controls.append(ft.TextField(value=text, multiline=True, read_only=True, text_size=12))
+                controls.append(ft.Container(height=15))
+
+            content_col = ft.Column(controls, visible=False)
+
+            def toggle(e):
+                content_col.visible = not content_col.visible
+                page.update()
+
+            btn = ft.ElevatedButton(icon + " " + title, on_click=toggle, width=float('inf'), color="white", bgcolor="#424242")
+            return ft.Column([btn, content_col])
+
+        ia_electronica = [
+            ("Caja Raspberry Pi", "Actúa como ingeniero CAD. Usa CSG.js para hacer una caja de 90x60x30mm (pared 2mm). Añade agujeros laterales para puertos USB y Ethernet. Devuelve código puro en function main()."),
+            ("Pasacables de Escritorio", "Genera código CSG.js para un cilindro hueco paramétrico (radio exterior 30mm, interior 25mm, altura 20mm) con una ranura lateral para introducir cables."),
+        ]
+        
+        ia_hogar = [
+            ("Maceta Geométrica Low-Poly", "Crea en CSG.js una maceta combinando y rotando cubos a 45 grados para darle aspecto facetado. Hazle un vaciado cilíndrico central profundo y un agujero de drenaje inferior."),
+            ("Posavasos de Panal", "Diseña un posavasos redondo de radio 45mm y grosor 5mm en CSG.js. Usa un bucle 'for' para sustraer hexágonos (cilindros de 6 lados) y crear un patrón de panal de abejas."),
+        ]
+        
+        ia_deportes = [
+            ("Clip Mosquetón", "Programa en CSG.js la silueta de un mosquetón simple usando esferas y cilindros unidos, con una abertura lateral."),
+            ("Silbato Paramétrico", "Diseña un silbato deportivo con CSG.js. Mezcla un cilindro hueco como cámara de aire y un rectángulo como boquilla, con un corte superior para la salida del sonido."),
+        ]
+        
+        ia_herramientas = [
+            ("Soporte L con Refuerzo", "Crea un soporte de montaje en forma de L de 50x50x50mm en CSG.js. Añade un triángulo de refuerzo interno entre ambas caras. Incluye 2 agujeros de tornillo."),
+            ("Organizador de Brocas", "Haz un bloque sólido en CSG.js de 100x30x20mm. Usa un bucle for para restar cilindros de diferentes diámetros a lo largo del bloque (3mm, 4mm, 5mm...)."),
+        ]
+
+        # =========================================================
         # VISTAS INDEPENDIENTES 
         # =========================================================
         view_editor = ft.Column([
             ft.ElevatedButton("▶ COMPILAR MALLA 3D", on_click=lambda _: run_render(), color="white", bgcolor="#004d40", height=50),
-            ft.Row([ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project(), color="white", bgcolor="#0d47a1"), ft.Text("Plantillas rápidas:")]),
-            row_templates,
+            ft.Row([
+                ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project(), color="white", bgcolor="#0d47a1"),
+                ft.ElevatedButton("📦 Plantilla", on_click=lambda _: load_template(T_CARCASA)),
+            ], scroll="auto"),
             txt_code
         ], expand=True)
 
         btn_visor = ft.ElevatedButton("🚀 ABRIR VISOR 3D", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/", color="white", bgcolor="#4a148c", height=60)
         view_visor = ft.Column([
-            ft.Container(height=60), # Empujar hacia abajo
+            ft.Container(height=60), 
             ft.Row([btn_visor], alignment=ft.MainAxisAlignment.CENTER),
-            ft.Container(height=20),
-            ft.Text("El motor 3D se abrirá renderizando la última compilación.", text_align=ft.TextAlign.CENTER, color="grey")
+            ft.Text("Haz clic para abrir el motor 3D interactivo WebGL.", text_align=ft.TextAlign.CENTER, color="grey")
         ], expand=True)
         
-        view_archivos = ft.Column([ft.Text("Proyectos Locales", weight="bold"), file_list], expand=True)
-        
-        # --- NUEVA PESTAÑA PROMPTS IA ---
-        p1 = "Actúa como ingeniero CAD. Genera código Javascript para la libreria CSG.js. Crea una carcasa de 90x60x30mm con vaciado interno, pared de 2mm. Usa center:[x,y,z] en los cubos. Devuelve la pieza final en la function main()."
-        p2 = "Genera el código JS (CSG.js) de una bandeja organizadora con patrón hexagonal. Usa cilindros con 'slices: 6' para crear compartimentos hexagonales y réstalos de un cubo sólido principal."
-        p3 = "Crea un soporte paramétrico en forma de L usando CSG.js. Dimensiones base: 50x50x50mm, grosor 5mm. Haz 2 taladros pasantes de 4mm de radio en cada cara usando cilindros y .subtract()."
+        view_archivos = ft.Column([ft.Text("Proyectos", weight="bold"), file_list], expand=True)
         
         view_ia = ft.Column([
-            ft.Text("Pide código a tu IA favorita:", weight="bold", color="cyan"),
-            
-            ft.Text("1. Carcasa Electrónica", color="amber"),
-            ft.TextField(value=p1, multiline=True, read_only=True, text_size=12),
-            ft.ElevatedButton("📋 Copiar Prompt 1", on_click=lambda _: copy_text(p1)),
-            ft.Container(height=10),
-            
-            ft.Text("2. Bandeja Hexagonal", color="amber"),
-            ft.TextField(value=p2, multiline=True, read_only=True, text_size=12),
-            ft.ElevatedButton("📋 Copiar Prompt 2", on_click=lambda _: copy_text(p2)),
-            ft.Container(height=10),
-            
-            ft.Text("3. Soporte en L (Ingeniería)", color="amber"),
-            ft.TextField(value=p3, multiline=True, read_only=True, text_size=12),
-            ft.ElevatedButton("📋 Copiar Prompt 3", on_click=lambda _: copy_text(p3)),
-            
+            ft.Text("Catálogo de Prompts IA:", weight="bold", color="cyan"),
+            ft.Text("Pulsa las carpetas para abrirlas. Mantén pulsado el texto para copiarlo a ChatGPT.", color="grey", size=11),
+            create_folder("⚡", "Electrónica y PCB", ia_electronica),
+            create_folder("🏠", "Hogar y Decoración", ia_hogar),
+            create_folder("🔧", "Herramientas y Taller", ia_herramientas),
+            create_folder("🚴", "Deportes y Outdoors", ia_deportes),
         ], expand=True, scroll="auto")
 
         # =========================================================
@@ -273,7 +271,6 @@ def main(page: ft.Page):
             ft.ElevatedButton("🧠 PROMPTS IA", on_click=lambda _: set_tab(3), color="black", bgcolor="cyan"),
         ], scroll="auto")
 
-        # FIX DEL NOTCH: Este contenedor empuja toda la app 45 píxeles hacia abajo para evitar la cámara
         root_container = ft.Container(
             content=ft.Column([nav_bar, main_container, status], expand=True),
             padding=ft.padding.only(top=45, left=5, right=5, bottom=5),

@@ -2,8 +2,17 @@ import flet as ft
 import os, base64, json, threading, http.server, socket, time, warnings, subprocess, tempfile, traceback
 import urllib.request
 from urllib.error import HTTPError, URLError
+import ssl
 
 warnings.simplefilter("ignore", DeprecationWarning)
+
+# FIX GLOBAL PARA ANDROID/TERMUX: Evita cuelgues por certificados SSL no encontrados
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 # =========================================================
 # RUTAS BLINDADAS
@@ -58,15 +67,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.0.4 (DYNAMIC MODELS)
+# APLICACIÓN PRINCIPAL v5.0.5 (LOGS & MODELS)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v5.0.4"
+        page.title = "NEXUS CAD v5.0.5"
         page.theme_mode = "dark"
         page.padding = 0
 
-        status = ft.Text("NEXUS v5.0.4 | Matriz IA Lista", color="green")
+        status = ft.Text("NEXUS v5.0.5 | Matriz IA y Logs Activos", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -150,14 +159,14 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # MÓDULO: AGENTE IA (SELECTOR DE MODELOS Y BLINDAJE)
+        # MÓDULO: AGENTE IA (MODELOS ACTUALIZADOS Y DEBUGGER)
         # =========================================================
         def load_config():
             try:
                 if os.path.exists(CONFIG_FILE):
                     with open(CONFIG_FILE, "r") as f: return json.load(f)
             except: pass
-            return {"ai_api_key": "", "ai_provider": "Groq", "ai_model": "llama3-70b-8192"}
+            return {"ai_api_key": "", "ai_provider": "Groq", "ai_model": "llama-3.3-70b-versatile"}
 
         config_data = load_config()
         
@@ -165,29 +174,30 @@ def main(page: ft.Page):
         api_key_input = ft.TextField(label="API Key", value=config_data.get("ai_api_key", ""), password=True, can_reveal_password=True, expand=True)
         model_dd = ft.Dropdown(label="Modelo LLM", expand=True)
 
-        # Lógica dinámica de modelos
+        # FIX: Modelos de IA Actualizados a las últimas versiones
         def update_models(e=None):
             if provider_dd.value == "Groq":
                 model_dd.options = [
-                    ft.dropdown.Option("llama3-70b-8192"),
-                    ft.dropdown.Option("llama3-8b-8192"),
-                    ft.dropdown.Option("mixtral-8x7b-32768")
-                ]
-                if model_dd.value not in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
-                    model_dd.value = "llama3-70b-8192"
-            else:
-                model_dd.options = [
-                    ft.dropdown.Option("google/gemini-pro"),
-                    ft.dropdown.Option("openai/gpt-3.5-turbo"),
-                    ft.dropdown.Option("anthropic/claude-3-haiku"),
-                    ft.dropdown.Option("meta-llama/llama-3-8b-instruct:free") # Modelo gratuito en OpenRouter
+                    ft.dropdown.Option("llama-3.3-70b-versatile"),
+                    ft.dropdown.Option("llama-3.1-8b-instant"),
+                    ft.dropdown.Option("mixtral-8x7b-32768"),
+                    ft.dropdown.Option("gemma2-9b-it")
                 ]
                 if model_dd.value not in [o.key for o in model_dd.options]:
-                    model_dd.value = "meta-llama/llama-3-8b-instruct:free"
+                    model_dd.value = "llama-3.3-70b-versatile"
+            else:
+                model_dd.options = [
+                    ft.dropdown.Option("google/gemini-2.5-flash"),
+                    ft.dropdown.Option("openai/gpt-4o-mini"),
+                    ft.dropdown.Option("anthropic/claude-3.5-haiku"),
+                    ft.dropdown.Option("meta-llama/llama-3.3-70b-instruct:free") 
+                ]
+                if model_dd.value not in [o.key for o in model_dd.options]:
+                    model_dd.value = "meta-llama/llama-3.3-70b-instruct:free"
             page.update()
 
         provider_dd.on_change = update_models
-        update_models() # Inicializar al arrancar
+        update_models() 
         model_dd.value = config_data.get("ai_model", model_dd.value)
 
         def save_config(e):
@@ -249,7 +259,9 @@ REGLAS ESTRICTAS:
                     }
                     
                     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method='POST')
-                    with urllib.request.urlopen(req, timeout=40) as response:
+                    
+                    # Añadido timeout de 20s para que no se quede pensando eternamente
+                    with urllib.request.urlopen(req, timeout=20) as response:
                         res_data = json.loads(response.read().decode('utf-8'))
                         ai_text = res_data['choices'][0]['message']['content']
                     
@@ -275,14 +287,20 @@ REGLAS ESTRICTAS:
                     ))
 
                 except HTTPError as e:
-                    # Captura de error de API (Ej. 401 Unauthorized por mala API Key)
                     error_body = e.read().decode('utf-8')
-                    chat_history.controls.append(ft.Container(ft.Text(f"❌ HTTP Error {e.code}:\n{error_body}", color="red"), bgcolor="#424242", padding=10))
+                    chat_history.controls.append(ft.Container(ft.Text(f"❌ HTTP Error {e.code}:\n{error_body}", color="red", size=12), bgcolor="#424242", padding=10))
                 except Exception as ex:
-                    # Captura de cualquier otro cuelgue
-                    chat_history.controls.append(ft.Container(ft.Text(f"❌ Error de Sistema:\n{str(ex)}", color="red"), bgcolor="#424242", padding=10))
+                    # FIX: LOGS EXTREMOS. Imprime el traceback exacto en el chat para diagnóstico
+                    error_trace = traceback.format_exc()
+                    chat_history.controls.append(ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"❌ Error de Conexión/Sistema:", color="red", weight="bold"),
+                            ft.Text(error_trace, color="red", size=10, selectable=True)
+                        ]), 
+                        bgcolor="#424242", padding=10
+                    ))
                 finally:
-                    # GARANTÍA ABSOLUTA: El reloj siempre se detiene
+                    # Garantiza que el reloj de carga se esconde
                     loading_ring.visible = False
                     page.update()
 

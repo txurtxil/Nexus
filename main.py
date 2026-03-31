@@ -1,6 +1,7 @@
 import flet as ft
 import os, base64, json, threading, http.server, socket, time, warnings, subprocess, tempfile, traceback
 import urllib.request
+from urllib.error import HTTPError, URLError
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
@@ -57,15 +58,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.0.3 (NO-ICONS HOTFIX)
+# APLICACIÓN PRINCIPAL v5.0.4 (DYNAMIC MODELS)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v5.0.3"
+        page.title = "NEXUS CAD v5.0.4"
         page.theme_mode = "dark"
         page.padding = 0
 
-        status = ft.Text("NEXUS v5.0.3 | IA Activa", color="green")
+        status = ft.Text("NEXUS v5.0.4 | Matriz IA Lista", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -89,24 +90,6 @@ def main(page: ft.Page):
                 actions=[ft.ElevatedButton("CERRAR", on_click=lambda _: close_dialog(dlg_copy))]
             )
             open_dialog(dlg_copy)
-
-        def copy_text(text_to_copy):
-            try:
-                page.set_clipboard(str(text_to_copy))
-                status.value = "✓ Código copiado."
-                status.color = "green"
-                page.update()
-            except:
-                try:
-                    subprocess.run(['termux-clipboard-set'], input=str(text_to_copy).encode('utf-8'))
-                    status.value = "✓ Copiado (Termux)."
-                    status.color = "green"
-                    page.update()
-                except:
-                    export_manual(str(text_to_copy), "Copiar Manualmente")
-                    status.value = "⚠️ Usa copia manual."
-                    status.color = "amber"
-                    page.update()
 
         # --- EDITOR CAD ---
         DEFAULT_CODE = "function main() {\n  return CSG.cube({center:[0,0,0], radius:[10,10,10]});\n}"
@@ -167,27 +150,51 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # MÓDULO: AGENTE IA (SIN ICONOS MATERIAL)
+        # MÓDULO: AGENTE IA (SELECTOR DE MODELOS Y BLINDAJE)
         # =========================================================
         def load_config():
             try:
                 if os.path.exists(CONFIG_FILE):
                     with open(CONFIG_FILE, "r") as f: return json.load(f)
             except: pass
-            return {"ai_api_key": "", "ai_provider": "Groq"}
+            return {"ai_api_key": "", "ai_provider": "Groq", "ai_model": "llama3-70b-8192"}
 
         config_data = load_config()
-        saved_key = config_data.get("ai_api_key", "")
-        saved_prov = config_data.get("ai_provider", "Groq")
-
-        api_key_input = ft.TextField(label="API Key", value=saved_key, password=True, can_reveal_password=True, expand=True)
-        provider_dd = ft.Dropdown(options=[ft.dropdown.Option("Groq"), ft.dropdown.Option("OpenRouter")], value=saved_prov, width=120)
         
+        provider_dd = ft.Dropdown(options=[ft.dropdown.Option("Groq"), ft.dropdown.Option("OpenRouter")], value=config_data.get("ai_provider", "Groq"), width=120)
+        api_key_input = ft.TextField(label="API Key", value=config_data.get("ai_api_key", ""), password=True, can_reveal_password=True, expand=True)
+        model_dd = ft.Dropdown(label="Modelo LLM", expand=True)
+
+        # Lógica dinámica de modelos
+        def update_models(e=None):
+            if provider_dd.value == "Groq":
+                model_dd.options = [
+                    ft.dropdown.Option("llama3-70b-8192"),
+                    ft.dropdown.Option("llama3-8b-8192"),
+                    ft.dropdown.Option("mixtral-8x7b-32768")
+                ]
+                if model_dd.value not in ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]:
+                    model_dd.value = "llama3-70b-8192"
+            else:
+                model_dd.options = [
+                    ft.dropdown.Option("google/gemini-pro"),
+                    ft.dropdown.Option("openai/gpt-3.5-turbo"),
+                    ft.dropdown.Option("anthropic/claude-3-haiku"),
+                    ft.dropdown.Option("meta-llama/llama-3-8b-instruct:free") # Modelo gratuito en OpenRouter
+                ]
+                if model_dd.value not in [o.key for o in model_dd.options]:
+                    model_dd.value = "meta-llama/llama-3-8b-instruct:free"
+            page.update()
+
+        provider_dd.on_change = update_models
+        update_models() # Inicializar al arrancar
+        model_dd.value = config_data.get("ai_model", model_dd.value)
+
         def save_config(e):
             try:
                 with open(CONFIG_FILE, "w") as f:
-                    json.dump({"ai_api_key": api_key_input.value, "ai_provider": provider_dd.value}, f)
-                status.value = "✓ Configuración IA Guardada localmente."
+                    json.dump({"ai_api_key": api_key_input.value, "ai_provider": provider_dd.value, "ai_model": model_dd.value}, f)
+                status.value = "✓ Configuración de Red Guardada."
                 status.color = "green"
             except Exception as ex:
                 status.value = f"❌ Error guardando config: {str(ex)}"
@@ -195,18 +202,17 @@ def main(page: ft.Page):
             status.update()
 
         btn_save_config = ft.ElevatedButton("💾 Guardar", on_click=save_config)
-        config_row = ft.Row([provider_dd, api_key_input, btn_save_config])
-
+        
         chat_history = ft.ListView(expand=True, spacing=10)
-        user_prompt = ft.TextField(label="Ej: Crea una peana paramétrica...", multiline=True, expand=True)
+        user_prompt = ft.TextField(label="Escribe tu idea CAD...", multiline=True, expand=True)
         loading_ring = ft.ProgressRing(visible=False, width=20, height=20)
 
         SYS_PROMPT = """Eres un ingeniero experto en CAD paramétrico. Genera código en Javascript PURO para la librería CSG.js. 
 REGLAS ESTRICTAS:
 1. NUNCA uses comandos como cylinder() o translate() sueltos.
-2. Usa SIEMPRE primitivas absolutas: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:R, slices:N}), CSG.sphere({center:[x,y,z], radius:R}).
+2. Usa SIEMPRE primitivas absolutas: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:R, slices:N}).
 3. Usa pieza1.union(pieza2) y pieza1.subtract(pieza2).
-4. Devuelve SOLO el código dentro de una 'function main() { ... return pieza_final; }'. No añadas explicaciones largas, solo el código dentro de un bloque ```javascript """
+4. Devuelve SOLO el código dentro de una 'function main() { ... return pieza_final; }' dentro de un bloque ```javascript """
 
         def send_to_ai(e):
             if not api_key_input.value:
@@ -229,13 +235,9 @@ REGLAS ESTRICTAS:
                 try:
                     key = api_key_input.value
                     prov = provider_dd.value
+                    model = model_dd.value
                     
-                    if prov == "Groq":
-                        url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
-                        model = "llama3-70b-8192"
-                    else:
-                        url = "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)"
-                        model = "google/gemini-pro"
+                    url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)" if prov == "Groq" else "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)"
 
                     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
                     data = {
@@ -272,20 +274,26 @@ REGLAS ESTRICTAS:
                         bgcolor="#212121", padding=10, border_radius=8
                     ))
 
+                except HTTPError as e:
+                    # Captura de error de API (Ej. 401 Unauthorized por mala API Key)
+                    error_body = e.read().decode('utf-8')
+                    chat_history.controls.append(ft.Container(ft.Text(f"❌ HTTP Error {e.code}:\n{error_body}", color="red"), bgcolor="#424242", padding=10))
                 except Exception as ex:
-                    chat_history.controls.append(ft.Text(f"❌ Error API: {str(ex)}", color="red"))
-                
-                loading_ring.visible = False
-                page.update()
+                    # Captura de cualquier otro cuelgue
+                    chat_history.controls.append(ft.Container(ft.Text(f"❌ Error de Sistema:\n{str(ex)}", color="red"), bgcolor="#424242", padding=10))
+                finally:
+                    # GARANTÍA ABSOLUTA: El reloj siempre se detiene
+                    loading_ring.visible = False
+                    page.update()
 
             threading.Thread(target=fetch_ai, daemon=True).start()
 
-        # FIX: Reemplazado el IconButton problemático por un ElevatedButton seguro
         btn_send = ft.ElevatedButton("🚀 ENVIAR", on_click=send_to_ai, color="black", bgcolor="cyan")
 
         view_ia = ft.Column([
             ft.Text("Configuración de Motor LLM", weight="bold", color="grey"),
-            config_row,
+            ft.Row([provider_dd, api_key_input]),
+            ft.Row([model_dd, btn_save_config]),
             ft.Divider(),
             chat_history,
             ft.Row([user_prompt, loading_ring, btn_send], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)

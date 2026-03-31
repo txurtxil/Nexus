@@ -57,15 +57,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.0.2 (HOTFIX STORAGE)
+# APLICACIÓN PRINCIPAL v5.0.3 (NO-ICONS HOTFIX)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v5.0.2"
+        page.title = "NEXUS CAD v5.0.3"
         page.theme_mode = "dark"
         page.padding = 0
 
-        status = ft.Text("NEXUS v5.0.2 | Módulo IA Activo", color="green")
+        status = ft.Text("NEXUS v5.0.3 | IA Activa", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -146,7 +146,7 @@ def main(page: ft.Page):
         def update_files():
             file_list.controls.clear()
             for f in reversed(sorted(os.listdir(EXPORT_DIR))):
-                if f == "nexus_config.json": continue # Ignoramos el archivo de configuración
+                if f == "nexus_config.json": continue 
                 
                 def make_load(name): return lambda _: load_file_content(name)
                 def make_copy(name): return lambda _: export_manual(open(os.path.join(EXPORT_DIR, name), "r").read())
@@ -167,7 +167,7 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # MÓDULO: AGENTE IA (SISTEMA DE GUARDADO NATIVO REPARADO)
+        # MÓDULO: AGENTE IA (SIN ICONOS MATERIAL)
         # =========================================================
         def load_config():
             try:
@@ -280,7 +280,8 @@ REGLAS ESTRICTAS:
 
             threading.Thread(target=fetch_ai, daemon=True).start()
 
-        btn_send = ft.IconButton(ft.icons.SEND, on_click=send_to_ai, icon_color="cyan")
+        # FIX: Reemplazado el IconButton problemático por un ElevatedButton seguro
+        btn_send = ft.ElevatedButton("🚀 ENVIAR", on_click=send_to_ai, color="black", bgcolor="cyan")
 
         view_ia = ft.Column([
             ft.Text("Configuración de Motor LLM", weight="bold", color="grey"),

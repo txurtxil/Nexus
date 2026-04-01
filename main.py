@@ -56,15 +56,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.2.1 (ESTILO BLENDER)
+# APLICACIÓN PRINCIPAL v5.3 (MODO INDUSTRIAL PRO)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v5.2"
+        page.title = "NEXUS CAD v5.3"
         page.theme_mode = "dark"
         page.padding = 0 
         
-        status = ft.Text("NEXUS v5.2 | Módulos Industriales Activos", color="green")
+        status = ft.Text("NEXUS v5.3 | Catálogo Industrial Activo", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -92,7 +92,6 @@ def main(page: ft.Page):
 
         # --- EDITOR JS-CSG BASE ---
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,10], radius:[20,20,10]});\n}"
-        # PARCHE APLICADO AQUÍ: Eliminado font_family="monospace" que causaba el Crash
         txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_INICIAL, text_size=12)
 
         def load_template(t):
@@ -127,7 +126,6 @@ def main(page: ft.Page):
         # =========================================================
         # CONSTRUCTOR PARAMÉTRICO PRO (INTERFAZ BLENDER)
         # =========================================================
-        # Función Helper para crear Sliders con Feedback Numérico en Vivo
         def create_slider(label, min_v, max_v, val, is_int, on_change_fn):
             txt_val = ft.Text(f"{int(val) if is_int else val:.1f}", color="cyan", width=45, text_align="right", size=13)
             sl = ft.Slider(min=min_v, max=max_v, value=val, expand=True)
@@ -205,11 +203,46 @@ def main(page: ft.Page):
                 code += f"      if(huecos === null) huecos = cil; else huecos = huecos.union(cil);\n"
                 code += f"    }}\n  }}\n  if(huecos !== null) return base.subtract(huecos);\n  return base;\n}}"
 
+            # === NUEVAS FUNCIONES v5.3 ===
+            elif shape == "🛹 Soporte Rodamiento":
+                diam, h, t, w = sl_r_diam.value, sl_r_h.value, sl_r_t.value, sl_r_w.value
+                code = f"function main() {{\n  var w = {w}; var h = {h}; var d = {diam}; var t = {t};\n"
+                code += f"  var base = CSG.cube({{center:[0,0,h/2], radius:[w/2, (d/2)+t, h/2]}});\n"
+                code += f"  var b_hole = CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius:d/2, slices:64}});\n"
+                code += f"  var s1 = CSG.cylinder({{start:[w/2 - 6, 0, -1], end:[w/2 - 6, 0, h+1], radius:2, slices:32}});\n"
+                code += f"  var s2 = CSG.cylinder({{start:[-w/2 + 6, 0, -1], end:[-w/2 + 6, 0, h+1], radius:2, slices:32}});\n"
+                code += f"  return base.subtract(b_hole).subtract(s1).subtract(s2);\n}}"
+
+            elif shape == "🔗 Acople de Ejes":
+                d1, d2, dext, h = sl_a_d1.value, sl_a_d2.value, sl_a_dext.value, sl_a_h.value
+                code = f"function main() {{\n  var d1 = {d1}; var d2 = {d2}; var dext = {dext}; var h = {h};\n"
+                code += f"  var body = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:dext/2, slices:64}});\n"
+                code += f"  var h1 = CSG.cylinder({{start:[0,0,-1], end:[0,0,h/2 + 0.5], radius:d1/2, slices:32}});\n"
+                code += f"  var h2 = CSG.cylinder({{start:[0,0,h/2 - 0.5], end:[0,0,h+1], radius:d2/2, slices:32}});\n"
+                code += f"  var slit = CSG.cube({{center:[dext/2, 0, h/2], radius:[dext/2, 0.5, h/2 + 1]}});\n"
+                code += f"  var scr1 = CSG.cylinder({{start:[0, -dext, h/4], end:[0, dext, h/4], radius:1.5, slices:16}});\n"
+                code += f"  var scr2 = CSG.cylinder({{start:[0, -dext, 3*h/4], end:[0, dext, 3*h/4], radius:1.5, slices:16}});\n"
+                code += f"  return body.subtract(h1).subtract(h2).subtract(slit).subtract(scr1).subtract(scr2);\n}}"
+
+            elif shape == "🔌 Caja PCB":
+                px, py, h, t = sl_pcb_x.value, sl_pcb_y.value, sl_pcb_h.value, sl_pcb_t.value
+                code = f"function main() {{\n  var px = {px}; var py = {py}; var h = {h}; var t = {t};\n"
+                code += f"  var ext = CSG.cube({{center:[0,0,h/2], radius:[px/2 + t + 1, py/2 + t + 1, h/2]}});\n"
+                code += f"  var int = CSG.cube({{center:[0,0,h/2 + t], radius:[px/2 + 1, py/2 + 1, h/2]}});\n"
+                code += f"  var box = ext.subtract(int);\n"
+                code += f"  var dx = px/2 - 3; var dy = py/2 - 3;\n"
+                code += f"  var m = [ [-1,-1], [-1,1], [1,-1], [1,1] ];\n"
+                code += f"  for (var i=0; i<4; i++) {{\n"
+                code += f"    var tor = CSG.cylinder({{start:[m[i][0]*dx, m[i][1]*dy, t], end:[m[i][0]*dx, m[i][1]*dy, t+5], radius:3.5, slices:16}});\n"
+                code += f"    var hol = CSG.cylinder({{start:[m[i][0]*dx, m[i][1]*dy, t], end:[m[i][0]*dx, m[i][1]*dy, t+6], radius:1.5, slices:16}});\n"
+                code += f"    box = box.union(tor).subtract(hol);\n  }}\n  return box;\n}}"
+
             txt_code.value = code
             txt_code.update()
 
         def update_constructor_ui(e=None):
-            for col in [col_cubo, col_prisma, col_engranaje, col_escuadra, col_nema, col_matriz]: col.visible = False
+            for col in [col_cubo, col_prisma, col_engranaje, col_escuadra, col_nema, col_matriz, col_rod, col_acople, col_pcb]: 
+                col.visible = False
             v = param_shape_dd.value
             if v == "📦 Cubo / Caja": col_cubo.visible = True
             elif v == "🛢️ Revolución": col_prisma.visible = True
@@ -217,16 +250,24 @@ def main(page: ft.Page):
             elif v == "📐 Escuadra en L": col_escuadra.visible = True
             elif v == "🔩 Placa NEMA 17": col_nema.visible = True
             elif v == "🎛️ Matriz de Huecos": col_matriz.visible = True
+            elif v == "🛹 Soporte Rodamiento": col_rod.visible = True
+            elif v == "🔗 Acople de Ejes": col_acople.visible = True
+            elif v == "🔌 Caja PCB": col_pcb.visible = True
             generate_param_code()
             page.update()
 
+        opciones_herramientas = [
+            "📦 Cubo / Caja", "🛢️ Revolución", "📐 Escuadra en L", "🎛️ Matriz de Huecos",
+            "⚙️ Engranaje", "🔩 Placa NEMA 17", "🛹 Soporte Rodamiento", "🔗 Acople de Ejes", "🔌 Caja PCB"
+        ]
+
         param_shape_dd = ft.Dropdown(
-            options=[ft.dropdown.Option(x) for x in ["📦 Cubo / Caja", "🛢️ Revolución", "⚙️ Engranaje", "📐 Escuadra en L", "🔩 Placa NEMA 17", "🎛️ Matriz de Huecos"]],
+            options=[ft.dropdown.Option(x) for x in opciones_herramientas],
             value="📦 Cubo / Caja", label="1. Herramienta Paramétrica", bgcolor="#212121"
         )
         param_shape_dd.on_change = update_constructor_ui
 
-        # UI Blocks
+        # --- UI BLOCKS v5.2 ---
         sl_c_x, r_c_x = create_slider("Ancho X", 5, 200, 50, False, generate_param_code)
         sl_c_y, r_c_y = create_slider("Fondo Y", 5, 200, 30, False, generate_param_code)
         sl_c_z, r_c_z = create_slider("Alto Z", 5, 200, 20, False, generate_param_code)
@@ -252,8 +293,8 @@ def main(page: ft.Page):
         col_escuadra = ft.Column([ft.Container(content=ft.Column([r_l_l, r_l_a, r_l_g, r_l_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_n_grosor, r_n_g = create_slider("Grosor Placa", 2, 20, 5, False, generate_param_code)
-        sl_n_tol, r_n_t = create_slider("Tolerancia (mm)", 0, 2, 0.4, False, generate_param_code)
-        col_nema = ft.Column([ft.Text("Genera una placa base estándar para NEMA 17", color="grey", size=12), ft.Container(content=ft.Column([r_n_g, r_n_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        sl_n_tol, r_n_t = create_slider("Tolerancia", 0, 2, 0.4, False, generate_param_code)
+        col_nema = ft.Column([ft.Text("Genera una placa estándar NEMA 17", color="grey", size=12), ft.Container(content=ft.Column([r_n_g, r_n_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_m_w, r_m_w = create_slider("Ancho Base", 20, 200, 80, False, generate_param_code)
         sl_m_d, r_m_d = create_slider("Fondo Base", 20, 200, 60, False, generate_param_code)
@@ -265,10 +306,29 @@ def main(page: ft.Page):
         sl_m_sy, r_m_sy = create_slider("Espaciado Y", 5, 50, 15, False, generate_param_code)
         col_matriz = ft.Column([ft.Container(content=ft.Column([r_m_w, r_m_d, r_m_h, r_m_r, ft.Divider(), r_m_c, r_m_fil, r_m_sx, r_m_sy]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
+        # --- NUEVOS UI BLOCKS v5.3 ---
+        sl_r_diam, r_r_diam = create_slider("Ø Ext. Rodam.", 10, 50, 22, False, generate_param_code) # 22mm = 608ZZ
+        sl_r_h, r_r_h = create_slider("Grosor (Z)", 4, 30, 7, False, generate_param_code)
+        sl_r_t, r_r_t = create_slider("Pared Borde", 1, 15, 4, False, generate_param_code)
+        sl_r_w, r_r_w = create_slider("Ancho Base", 30, 150, 50, False, generate_param_code)
+        col_rod = ft.Column([ft.Text("Soporte para rodamientos (Ej: 608ZZ = Ø22mm, h=7mm)", color="grey", size=12), ft.Container(content=ft.Column([r_r_diam, r_r_h, r_r_t, r_r_w]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+
+        sl_a_d1, r_a_d1 = create_slider("Diámetro Eje 1", 2, 20, 5, False, generate_param_code)
+        sl_a_d2, r_a_d2 = create_slider("Diámetro Eje 2", 2, 20, 8, False, generate_param_code)
+        sl_a_dext, r_a_dext = create_slider("Ø Exterior", 10, 50, 20, False, generate_param_code)
+        sl_a_h, r_a_h = create_slider("Longitud Total", 10, 80, 25, False, generate_param_code)
+        col_acople = ft.Column([ft.Text("Acople rígido con ranura tensora", color="grey", size=12), ft.Container(content=ft.Column([r_a_d1, r_a_d2, r_a_dext, r_a_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+
+        sl_pcb_x, r_pcb_x = create_slider("Largo PCB", 20, 200, 70, False, generate_param_code)
+        sl_pcb_y, r_pcb_y = create_slider("Ancho PCB", 20, 200, 50, False, generate_param_code)
+        sl_pcb_h, r_pcb_h = create_slider("Altura Caja", 10, 100, 20, False, generate_param_code)
+        sl_pcb_t, r_pcb_t = create_slider("Grosor Pared", 1, 10, 2, False, generate_param_code)
+        col_pcb = ft.Column([ft.Text("Caja con 4 torretas M3 esquineras autogeneradas", color="grey", size=12), ft.Container(content=ft.Column([r_pcb_x, r_pcb_y, r_pcb_h, r_pcb_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+
         view_constructor = ft.Column([
             ft.Text("🛠️ Constructores Industriales (Modo Blender)", weight="bold", color="amber", size=16),
             param_shape_dd,
-            col_cubo, col_prisma, col_engranaje, col_escuadra, col_nema, col_matriz,
+            col_cubo, col_prisma, col_engranaje, col_escuadra, col_nema, col_matriz, col_rod, col_acople, col_pcb,
             ft.Container(height=10),
             ft.ElevatedButton("▶ PROCESAR Y VER EN 3D", on_click=lambda _: run_render(), color="black", bgcolor="amber", height=60, width=float('inf'))
         ], expand=True, scroll="auto")

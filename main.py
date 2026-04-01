@@ -56,15 +56,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v11.0 (AERO & ADVANCED ENG)
+# APLICACIÓN PRINCIPAL v11.1 (AERO & HOTFIX)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v11.0"
+        page.title = "NEXUS CAD v11.1"
         page.theme_mode = "dark"
         page.padding = 0 
         
-        status = ft.Text("NEXUS v11.0 | Fases 3 y 4 Desplegadas", color="green")
+        status = ft.Text("NEXUS v11.1 | Fases 3 y 4 (Hotfix) Activas", color="green")
 
         def copy_text(text_to_copy):
             try:
@@ -100,6 +100,16 @@ def main(page: ft.Page):
             LATEST_CODE_B64 = base64.b64encode(txt_code.value.encode()).decode()
             set_tab(2)
             page.update()
+
+        # =========================================================
+        # BUG SOLUCIONADO: SE RESTAURA EL BLOQUE DE SNIPPETS DE CÓDIGO
+        # =========================================================
+        row_snippets = ft.Row([
+            ft.Text("Primitivas:", color="grey", size=12),
+            ft.ElevatedButton("+ Cubo", on_click=lambda _: inject_snippet("  var cubo = CSG.cube({center:[0,0,0], radius:[5,5,5]});")),
+            ft.ElevatedButton("+ Cilindro", on_click=lambda _: inject_snippet("  var cil = CSG.cylinder({start:[0,0,0], end:[0,0,10], radius:5, slices:32});")),
+            ft.ElevatedButton("- Restar", on_click=lambda _: inject_snippet("  pieza = pieza.subtract(pieza2);")),
+        ], scroll="auto")
 
         herramienta_actual = "custom"
 
@@ -391,14 +401,11 @@ def main(page: ft.Page):
                 code += f"      }}\n  }}\n  return base.subtract(vents);\n}}"
                 txt_code.value = code
 
-            # ==========================================
-            # FASE 3 y 4: LOS NUEVOS MÓDULOS DE LA v11.0
-            # ==========================================
             elif h == "muelle":
                 r_res = sl_mue_r.value; r_hilo = sl_mue_h.value; vueltas = sl_mue_v.value; alt = sl_mue_alt.value
                 code = f"function main() {{\n  var r_res = {r_res}; var r_hilo = {r_hilo}; var h = {alt}; var vueltas = {vueltas};\n"
                 code += f"  var resorte = new CSG();\n"
-                code += f"  var pasos = Math.floor(vueltas * 24); // Resolución optimizada\n"
+                code += f"  var pasos = Math.floor(vueltas * 24);\n"
                 code += f"  var paso_z = h / pasos; var a_step = (Math.PI * 2 * vueltas) / pasos;\n"
                 code += f"  for(var i=0; i<pasos; i++) {{\n"
                 code += f"      var a1 = i * a_step; var a2 = (i+1) * a_step;\n"
@@ -412,12 +419,12 @@ def main(page: ft.Page):
             elif h == "acme":
                 d = sl_acme_d.value; pitch = sl_acme_p.value; length = sl_acme_l.value
                 code = f"function main() {{\n  var r = {d/2}; var pitch = {pitch}; var len = {length};\n"
-                code += f"  var r_core = r - (pitch * 0.4); // Profundidad trapezoidal estándar\n"
+                code += f"  var r_core = r - (pitch * 0.4);\n"
                 code += f"  var eje = CSG.cylinder({{start:[0,0,0], end:[0,0,len], radius:r_core, slices:32}});\n"
                 code += f"  var thread = new CSG();\n"
                 code += f"  var steps = Math.floor((len / pitch) * 24);\n"
                 code += f"  var z_step = len / steps; var a_step = (Math.PI * 2 * (len/pitch)) / steps;\n"
-                code += f"  var w = pitch * 0.35; // Grosor de la cresta trapezoidal\n"
+                code += f"  var w = pitch * 0.35;\n"
                 code += f"  for(var i=0; i<steps; i++) {{\n"
                 code += f"      var a1 = i * a_step; var a2 = (i+1) * a_step;\n"
                 code += f"      var z1 = i * z_step; var z2 = (i+1) * z_step;\n"
@@ -455,14 +462,12 @@ def main(page: ft.Page):
                 cuerda, grosor, envergadura = sl_naca_c.value, sl_naca_g.value, sl_naca_e.value
                 code = f"function main() {{\n  var cuerda = {cuerda}; var grosor = {grosor}; var envergadura = {envergadura};\n"
                 code += f"  var ala = new CSG();\n"
-                code += f"  var num_pasos = 40; // Resolución longitudinal del ala\n"
+                code += f"  var num_pasos = 40;\n"
                 code += f"  for(var i=0; i<=num_pasos; i++) {{\n"
                 code += f"      var x = i/num_pasos;\n"
-                code += f"      // Ecuación oficial NACA 4-digit airfoil (simétrica)\n"
                 code += f"      var yt = 5 * (grosor/100) * (0.2969*Math.sqrt(x) - 0.1260*x - 0.3516*(x*x) + 0.2843*Math.pow(x,3) - 0.1015*Math.pow(x,4));\n"
                 code += f"      var x_real = x * cuerda;\n"
-                code += f"      var yt_real = Math.max(yt * cuerda, 0.1); // Evitar grosor cero en la punta\n"
-                code += f"      // El barrido (sweep) se simula mediante cilindros solapados en el eje Z\n"
+                code += f"      var yt_real = Math.max(yt * cuerda, 0.1);\n"
                 code += f"      var cyl = CSG.cylinder({{start:[x_real, 0, 0], end:[x_real, 0, envergadura], radius: yt_real, slices: 16}});\n"
                 code += f"      ala = ala.union(cyl);\n  }}\n  return ala;\n}}"
                 txt_code.value = code
@@ -470,14 +475,14 @@ def main(page: ft.Page):
             txt_code.update()
 
         # =========================================================
-        # GESTIÓN DE PANELES UI (AHORA SOMOS 21 HERRAMIENTAS)
+        # GESTIÓN DE PANELES UI (21 HERRAMIENTAS COMPLETAS)
         # =========================================================
         def update_constructor_ui(e=None):
             paneles = [
                 col_custom, col_cubo, col_cilindro, col_escuadra, col_engranaje, col_pcb, 
                 col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, 
                 col_planetario, col_polea, col_helice, col_texto, col_rotula, col_carcasa,
-                col_muelle, col_acme, col_codo, col_naca # LOS 4 NUEVOS
+                col_muelle, col_acme, col_codo, col_naca
             ]
             for p in paneles: p.visible = False
             
@@ -510,135 +515,113 @@ def main(page: ft.Page):
         # =========================================================
         # DEFINICIÓN DE CONTROLES E INSTRUCCIONES
         # =========================================================
-        col_custom = ft.Column([
-            ft.Text("Módulo Activo: Tu Código de IA", color="green", weight="bold"),
-            ft.Text("Escribe o pega tus algoritmos JS-CSG personalizados. Usa el botón 'Actualizar' para renderizar.", color="grey", size=12),
-            ft.Row([
-                ft.ElevatedButton("🕳️ Vaciado", on_click=lambda _: inject_snippet("  var vaciado = pieza.scale([0.9, 0.9, 0.9]);\n  pieza = pieza.subtract(vaciado);"), bgcolor="#4e342e", color="white"),
-                ft.ElevatedButton("🔄 Redondeo", on_click=lambda _: inject_snippet("  pieza = pieza.expand(2, 16);"), bgcolor="#1b5e20", color="white"),
-            ], scroll="auto")
-        ], visible=True)
-
         sl_c_x, r_c_x = create_slider("Ancho X", 5, 200, 50, False, generate_param_code)
         sl_c_y, r_c_y = create_slider("Fondo Y", 5, 200, 30, False, generate_param_code)
         sl_c_z, r_c_z = create_slider("Alto Z", 5, 200, 20, False, generate_param_code)
         sl_c_grosor, r_c_g = create_slider("Grosor Pared", 0, 20, 0, False, generate_param_code)
-        col_cubo = ft.Column([ft.Text("Generador de Cubos/Cajas. Modifica el grosor de pared para hacer cajas huecas.", color="grey", size=12), ft.Container(content=ft.Column([r_c_x, r_c_y, r_c_z, r_c_g]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_cubo = ft.Column([ft.Text("Cubo/Caja Hueca.", color="grey", size=12), ft.Container(content=ft.Column([r_c_x, r_c_y, r_c_z, r_c_g]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_p_rext, r_p_rext = create_slider("Radio Ext", 5, 100, 25, False, generate_param_code)
         sl_p_rint, r_p_rint = create_slider("Radio Int", 0, 95, 15, False, generate_param_code)
         sl_p_h, r_p_h = create_slider("Altura", 2, 200, 10, False, generate_param_code)
-        sl_p_lados, r_p_lados = create_slider("Caras/Resol.", 3, 64, 64, True, generate_param_code)
-        col_cilindro = ft.Column([ft.Text("Generador de Cilindros. Cambia 'Radio Int' para hacer tubos huecos.", color="grey", size=12), ft.Container(content=ft.Column([r_p_rext, r_p_rint, r_p_h, r_p_lados]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        sl_p_lados, r_p_lados = create_slider("Caras", 3, 64, 64, True, generate_param_code)
+        col_cilindro = ft.Column([ft.Text("Cilindro/Tubo.", color="grey", size=12), ft.Container(content=ft.Column([r_p_rext, r_p_rint, r_p_h, r_p_lados]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_l_largo, r_l_l = create_slider("Largo Brazos", 10, 100, 40, False, generate_param_code)
         sl_l_ancho, r_l_a = create_slider("Ancho Perfil", 5, 50, 15, False, generate_param_code)
         sl_l_grosor, r_l_g = create_slider("Grosor Chapa", 1, 20, 3, False, generate_param_code)
-        sl_l_hueco, r_l_h = create_slider("Radio Agujero", 0, 10, 2, False, generate_param_code)
-        col_escuadra = ft.Column([ft.Text("Soporte en L (Escuadra). Para reforzar ensambles a 90 grados.", color="grey", size=12), ft.Container(content=ft.Column([r_l_l, r_l_a, r_l_g, r_l_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        sl_l_hueco, r_l_h = create_slider("Agujero", 0, 10, 2, False, generate_param_code)
+        col_escuadra = ft.Column([ft.Text("Escuadra en L.", color="grey", size=12), ft.Container(content=ft.Column([r_l_l, r_l_a, r_l_g, r_l_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
         
         sl_e_dientes, r_e_d = create_slider("Dientes", 6, 40, 16, True, generate_param_code)
         sl_e_radio, r_e_r = create_slider("Radio Base", 10, 100, 30, False, generate_param_code)
         sl_e_grosor, r_e_g = create_slider("Grosor", 2, 50, 5, False, generate_param_code)
         sl_e_eje, r_e_e = create_slider("Hueco Eje", 0, 30, 5, False, generate_param_code)
-        col_engranaje = ft.Column([ft.Text("Generador de piñón recto básico.", color="grey", size=12), ft.Container(content=ft.Column([r_e_d, r_e_r, r_e_g, r_e_e]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_engranaje = ft.Column([ft.Text("Piñón Recto.", color="grey", size=12), ft.Container(content=ft.Column([r_e_d, r_e_r, r_e_g, r_e_e]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
         
         sl_pcb_x, r_pcb_x = create_slider("Largo PCB", 20, 200, 70, False, generate_param_code)
         sl_pcb_y, r_pcb_y = create_slider("Ancho PCB", 20, 200, 50, False, generate_param_code)
         sl_pcb_h, r_pcb_h = create_slider("Altura Caja", 10, 100, 20, False, generate_param_code)
         sl_pcb_t, r_pcb_t = create_slider("Grosor Pared", 1, 10, 2, False, generate_param_code)
-        col_pcb = ft.Column([ft.Text("Caja Básica PCB con 4 pivotes de esquina.", color="grey", size=12), ft.Container(content=ft.Column([r_pcb_x, r_pcb_y, r_pcb_h, r_pcb_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_pcb = ft.Column([ft.Text("Caja Básica PCB.", color="grey", size=12), ft.Container(content=ft.Column([r_pcb_x, r_pcb_y, r_pcb_h, r_pcb_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
         
         sl_v_l, r_v_l = create_slider("Longitud", 10, 300, 50, False, generate_param_code)
-        col_vslot = ft.Column([ft.Text("Perfil V-Slot 2020 de aluminio extruido.", color="grey", size=12), ft.Container(content=ft.Column([r_v_l]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_vslot = ft.Column([ft.Text("V-Slot 2020.", color="grey", size=12), ft.Container(content=ft.Column([r_v_l]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
         
         sl_bi_l, r_bi_l = create_slider("Largo Total", 10, 100, 30, False, generate_param_code)
         sl_bi_d, r_bi_d = create_slider("Diámetro Eje", 5, 30, 10, False, generate_param_code)
-        sl_bi_tol, r_bi_tol = create_slider("Gap Tolerancia", 0.1, 1.0, 0.3, False, generate_param_code)
-        col_bisagra = ft.Column([ft.Text("Bisagra Print-in-Place articulada.", color="grey", size=12), ft.Container(content=ft.Column([r_bi_l, r_bi_d, r_bi_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        sl_bi_tol, r_bi_tol = create_slider("Tolerancia", 0.1, 1.0, 0.3, False, generate_param_code)
+        col_bisagra = ft.Column([ft.Text("Bisagra Print-in-Place.", color="grey", size=12), ft.Container(content=ft.Column([r_bi_l, r_bi_d, r_bi_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
         
         sl_clamp_d, r_clamp_d = create_slider("Ø Tubo", 10, 100, 25, False, generate_param_code)
         sl_clamp_g, r_clamp_g = create_slider("Grosor Arco", 2, 15, 5, False, generate_param_code)
         sl_clamp_w, r_clamp_w = create_slider("Ancho Pieza", 5, 50, 15, False, generate_param_code)
-        col_abrazadera = ft.Column([ft.Text("Abrazadera media luna para tuberías, con aletas M3.", color="grey", size=12), ft.Container(content=ft.Column([r_clamp_d, r_clamp_g, r_clamp_w]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_abrazadera = ft.Column([ft.Text("Abrazadera media luna M3.", color="grey", size=12), ft.Container(content=ft.Column([r_clamp_d, r_clamp_g, r_clamp_w]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_fij_m, r_fij_m = create_slider("Métrica (M)", 3, 20, 8, True, generate_param_code)
         sl_fij_l, r_fij_l = create_slider("Largo Tornillo", 0, 100, 30, False, generate_param_code)
         sl_fij_tol, r_fij_tol = create_slider("Tolerancia", 0, 1.0, 0.2, False, generate_param_code)
-        col_fijacion = ft.Column([ft.Text("Tornillería ISO. Si Largo=0 genera Tuerca. Si Largo>0 genera Tornillo.", color="amber", size=12), ft.Container(content=ft.Column([r_fij_m, r_fij_l, r_fij_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_fijacion = ft.Column([ft.Text("Tuerca (0) / Tornillo (>0).", color="amber", size=12), ft.Container(content=ft.Column([r_fij_m, r_fij_l, r_fij_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_rod_dint, r_rod_dint = create_slider("Ø Eje Interno", 3, 50, 8, False, generate_param_code)
         sl_rod_dext, r_rod_dext = create_slider("Ø Externo", 10, 100, 22, False, generate_param_code)
-        sl_rod_h, r_rod_h = create_slider("Altura (mm)", 3, 30, 7, False, generate_param_code)
-        col_rodamiento = ft.Column([ft.Text("Rodamiento con cálculo de esferas dinámico.", color="amber", size=12), ft.Container(content=ft.Column([r_rod_dint, r_rod_dext, r_rod_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        sl_rod_h, r_rod_h = create_slider("Altura", 3, 30, 7, False, generate_param_code)
+        col_rodamiento = ft.Column([ft.Text("Ensamblaje Rodamiento.", color="amber", size=12), ft.Container(content=ft.Column([r_rod_dint, r_rod_dext, r_rod_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_plan_rs, r_plan_rs = create_slider("Radio Sol", 5, 40, 10, False, generate_param_code)
         sl_plan_rp, r_plan_rp = create_slider("Radio Planetas", 4, 30, 8, False, generate_param_code)
         sl_plan_h, r_plan_h = create_slider("Grosor Total", 3, 30, 6, False, generate_param_code)
-        col_planetario = ft.Column([ft.Text("Engranaje Planetario cicloidal (Sol, 3 Planetas, Corona).", color="amber", size=12), ft.Container(content=ft.Column([r_plan_rs, r_plan_rp, r_plan_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_planetario = ft.Column([ft.Text("Mecanismo Planetario.", color="amber", size=12), ft.Container(content=ft.Column([r_plan_rs, r_plan_rp, r_plan_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_pol_t, r_pol_t = create_slider("Nº Dientes", 10, 60, 20, True, generate_param_code)
         sl_pol_w, r_pol_w = create_slider("Ancho Correa", 4, 20, 6, False, generate_param_code)
         sl_pol_d, r_pol_d = create_slider("Ø Eje Motor", 2, 12, 5, False, generate_param_code)
-        col_polea = ft.Column([ft.Text("Polea de tracción GT2 para impresoras 3D.", color="cyan", size=12), ft.Container(content=ft.Column([r_pol_t, r_pol_w, r_pol_d]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_polea = ft.Column([ft.Text("Polea GT2 de Tracción.", color="cyan", size=12), ft.Container(content=ft.Column([r_pol_t, r_pol_w, r_pol_d]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_hel_r, r_hel_r = create_slider("Radio Total", 20, 150, 50, False, generate_param_code)
         sl_hel_n, r_hel_n = create_slider("Nº Aspas", 2, 12, 4, True, generate_param_code)
         sl_hel_p, r_hel_p = create_slider("Torsión (Pitch)", 10, 80, 45, False, generate_param_code)
-        col_helice = ft.Column([ft.Text("Hélice Aerodinámica con interpolación de vectores 3D.", color="cyan", size=12), ft.Container(content=ft.Column([r_hel_r, r_hel_n, r_hel_p]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_helice = ft.Column([ft.Text("Hélice Vectorial 3D.", color="cyan", size=12), ft.Container(content=ft.Column([r_hel_r, r_hel_n, r_hel_p]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_rot_r, r_rot_r = create_slider("Radio Bola", 5, 30, 10, False, generate_param_code)
-        sl_rot_tol, r_rot_tol = create_slider("Gap de Impresión", 0.1, 1.0, 0.4, False, generate_param_code)
-        col_rotula = ft.Column([ft.Text("Rótula esférica (Ball Joint) Print-in-Place.", color="cyan", size=12), ft.Container(content=ft.Column([r_rot_r, r_rot_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        sl_rot_tol, r_rot_tol = create_slider("Gap Tolerancia", 0.1, 1.0, 0.4, False, generate_param_code)
+        col_rotula = ft.Column([ft.Text("Rótula Print-in-Place.", color="cyan", size=12), ft.Container(content=ft.Column([r_rot_r, r_rot_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_car_x, r_car_x = create_slider("Ancho (X)", 20, 200, 80, False, generate_param_code)
         sl_car_y, r_car_y = create_slider("Largo (Y)", 20, 200, 120, False, generate_param_code)
         sl_car_z, r_car_z = create_slider("Alto (Z)", 10, 100, 30, False, generate_param_code)
         sl_car_t, r_car_t = create_slider("Grosor Pared", 1, 5, 2, False, generate_param_code)
-        col_carcasa = ft.Column([ft.Text("Carcasa Smart con standoffs y rejillas paramétricas.", color="cyan", size=12), ft.Container(content=ft.Column([r_car_x, r_car_y, r_car_z, r_car_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        col_carcasa = ft.Column([ft.Text("Carcasa Smart Electrónica.", color="cyan", size=12), ft.Container(content=ft.Column([r_car_x, r_car_y, r_car_z, r_car_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
-        tf_texto = ft.TextField(label="Escribe tu Texto (Max 12)", value="NEXUS", max_length=12, on_change=generate_param_code)
-        sl_txt_h, r_txt_h = create_slider("Grosor Placa/Texto", 1, 20, 5, False, generate_param_code)
-        col_texto = ft.Column([ft.Text("Letras 3D con motor Voxel binario nativo.", color="cyan", size=12), ft.Container(content=ft.Column([tf_texto, r_txt_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+        tf_texto = ft.TextField(label="Escribe tu Texto", value="NEXUS", max_length=12, on_change=generate_param_code)
+        sl_txt_h, r_txt_h = create_slider("Grosor Extrusión", 1, 20, 5, False, generate_param_code)
+        col_texto = ft.Column([ft.Text("Letras Voxel 3D.", color="cyan", size=12), ft.Container(content=ft.Column([tf_texto, r_txt_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
-        # NUEVOS CONTROLES v11.0
         sl_mue_r, r_mue_r = create_slider("Radio Resorte", 5, 50, 15, False, generate_param_code)
         sl_mue_h, r_mue_h = create_slider("Radio del Hilo", 1, 10, 2, False, generate_param_code)
         sl_mue_v, r_mue_v = create_slider("Nº Vueltas", 2, 20, 5, False, generate_param_code)
         sl_mue_alt, r_mue_alt = create_slider("Altura Total", 10, 200, 40, False, generate_param_code)
-        col_muelle = ft.Column([
-            ft.Text("Resorte Paramétrico. Calculado concatenando un bucle espiral de cilindros esféricos interconectados.", color="amber", size=12),
-            ft.Container(content=ft.Column([r_mue_r, r_mue_h, r_mue_v, r_mue_alt]), bgcolor="#1e1e1e", padding=10, border_radius=8)
-        ], visible=False)
+        col_muelle = ft.Column([ft.Text("Resorte Paramétrico en Espiral.", color="amber", size=12), ft.Container(content=ft.Column([r_mue_r, r_mue_h, r_mue_v, r_mue_alt]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_acme_d, r_acme_d = create_slider("Diámetro Eje", 4, 30, 8, False, generate_param_code)
         sl_acme_p, r_acme_p = create_slider("Paso (Pitch)", 1, 10, 2, False, generate_param_code)
         sl_acme_l, r_acme_l = create_slider("Longitud Eje", 10, 200, 50, False, generate_param_code)
-        col_acme = ft.Column([
-            ft.Text("Eje de transmisión Lineal ACME (Rosca Trapezoidal). Para maquinaria CNC e impresoras 3D.", color="amber", size=12),
-            ft.Container(content=ft.Column([r_acme_d, r_acme_p, r_acme_l]), bgcolor="#1e1e1e", padding=10, border_radius=8)
-        ], visible=False)
+        col_acme = ft.Column([ft.Text("Eje Trapezoidal (ACME).", color="amber", size=12), ft.Container(content=ft.Column([r_acme_d, r_acme_p, r_acme_l]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_codo_r, r_codo_r = create_slider("Radio Tubo", 2, 50, 10, False, generate_param_code)
-        sl_codo_c, r_codo_c = create_slider("Radio Curvatura", 10, 150, 30, False, generate_param_code)
+        sl_codo_c, r_codo_c = create_slider("Radio Curva", 10, 150, 30, False, generate_param_code)
         sl_codo_a, r_codo_a = create_slider("Ángulo Giroº", 10, 180, 90, False, generate_param_code)
         sl_codo_g, r_codo_g = create_slider("Grosor Hueco", 0, 10, 2, False, generate_param_code)
-        col_codo = ft.Column([
-            ft.Text("Tubo Curvo (Sweep). Falsifica la extrusión sobre ruta usando un barrido sectorial de arcos.", color="cyan", size=12),
-            ft.Container(content=ft.Column([r_codo_r, r_codo_c, r_codo_a, r_codo_g]), bgcolor="#1e1e1e", padding=10, border_radius=8)
-        ], visible=False)
+        col_codo = ft.Column([ft.Text("Tubo Curvo (Simulador Sweep).", color="cyan", size=12), ft.Container(content=ft.Column([r_codo_r, r_codo_c, r_codo_a, r_codo_g]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         sl_naca_c, r_naca_c = create_slider("Cuerda (Largo)", 20, 200, 80, False, generate_param_code)
         sl_naca_g, r_naca_g = create_slider("Grosor Max %", 5, 30, 15, False, generate_param_code)
         sl_naca_e, r_naca_e = create_slider("Envergadura Z", 10, 300, 100, False, generate_param_code)
-        col_naca = ft.Column([
-            ft.Text("Perfil Alar NACA de 4 dígitos. Aplica la ecuación real aerodinámica para generar alas o aspas de drones.", color="cyan", size=12),
-            ft.Container(content=ft.Column([r_naca_c, r_naca_g, r_naca_e]), bgcolor="#1e1e1e", padding=10, border_radius=8)
-        ], visible=False)
+        col_naca = ft.Column([ft.Text("Perfil Alar NACA (NASA Formula).", color="cyan", size=12), ft.Container(content=ft.Column([r_naca_c, r_naca_g, r_naca_e]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
 
         # =========================================================
-        # SISTEMA MULTI-CARRUSEL (v11.0: 21 HERRAMIENTAS)
+        # SISTEMA MULTI-CARRUSEL (21 HERRAMIENTAS ACTIVAS)
         # =========================================================
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
@@ -656,15 +639,14 @@ def main(page: ft.Page):
             thumbnail("🔠", "Texto 3D", "texto", "#c2185b"),
         ], scroll="auto")
 
-        # NUEVA CATEGORÍA AERO
         cat_aero = ft.Row([
-            thumbnail("✈️", "Perfil NACA", "naca", "#0277bd"), # NUEVO v11
+            thumbnail("✈️", "Perfil NACA", "naca", "#0277bd"),
             thumbnail("🚁", "Hélice", "helice", "#00838f"),
-            thumbnail("🚰", "Tubo Curvo", "codo", "#00695c"), # NUEVO v11
+            thumbnail("🚰", "Tubo Curvo", "codo", "#00695c"),
         ], scroll="auto")
 
         cat_mecanismos = ft.Row([
-            thumbnail("🌀", "Muelle", "muelle", "#4e342e"), # NUEVO v11
+            thumbnail("🌀", "Muelle", "muelle", "#4e342e"),
             thumbnail("🦾", "Rótula", "rotula", "#d84315"), 
             thumbnail("⚙️", "Planetario", "planetario", "#e65100"), 
             thumbnail("🛼", "Polea GT2", "polea", "#0277bd"), 
@@ -672,9 +654,9 @@ def main(page: ft.Page):
         ], scroll="auto")
 
         cat_ingenieria = ft.Row([
-            thumbnail("🚧", "Eje ACME", "acme", "#424242"), # NUEVO v11
+            thumbnail("🚧", "Eje ACME", "acme", "#424242"),
             thumbnail("🗃️", "Carcasa Pro", "carcasa", "#2e7d32"), 
-            thumbnail("🔩", "Tornillería", "fijacion", "#c62828"),
+            thumbnail("🔩", "Tornillos", "fijacion", "#c62828"),
             thumbnail("🗜️", "Abrazadera", "abrazadera", "#1565c0"),
             thumbnail("🔌", "Caja PCB", "pcb", "#004d40"),
             thumbnail("🚪", "Bisagra", "bisagra", "#4a148c"),
@@ -696,7 +678,7 @@ def main(page: ft.Page):
             ft.Text("📦 Geometría Básica:", size=12, color="grey"), cat_basico,
             ft.Divider(),
             
-            # LAS 21 INTERFACES CARGADAS
+            # EL GRID COMPLETO Y BLINDADO
             col_custom, col_texto, col_naca, col_helice, col_codo,
             col_muelle, col_rotula, col_planetario, col_polea, col_rodamiento, 
             col_acme, col_carcasa, col_fijacion, col_abrazadera, col_pcb, col_bisagra, 
@@ -707,50 +689,14 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # GESTOR DE ARCHIVOS Y RUTINAS BASE
+        # VISTAS FINALES
         # =========================================================
-        file_list = ft.ListView(expand=True, spacing=10)
-
-        def update_files():
-            file_list.controls.clear()
-            for f in reversed(sorted(os.listdir(EXPORT_DIR))):
-                if f == "nexus_config.json": continue
-                def make_load(name): return lambda _: load_file_content(name)
-                def make_copy(name): return lambda _: export_manual(open(os.path.join(EXPORT_DIR, name), "r").read())
-                def make_del(name): return lambda _: delete_file(name)
-
-                acciones = ft.Row([
-                    ft.ElevatedButton("▶ Cargar", on_click=make_load(f), color="white", bgcolor="#1b5e20"),
-                    ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#b71c1c"),
-                ], scroll="auto")
-                row = ft.Column([ft.Text(f, weight="bold"), acciones])
-                file_list.controls.append(ft.Container(content=row, padding=10, bgcolor="#1a1a1a", border_radius=8))
-            page.update()
-
-        def load_file_content(name):
-            try:
-                with open(os.path.join(EXPORT_DIR, name), "r") as f: txt_code.value = f.read()
-                set_tab(0) 
-                status.value = f"✓ {name} cargado."
-            except: pass
-            page.update()
-
-        def delete_file(name):
-            os.remove(os.path.join(EXPORT_DIR, name)); update_files()
-
-        def save_project():
-            fname = f"nexus_{int(time.time())}.jscad"
-            with open(os.path.join(EXPORT_DIR, fname), "w") as f: f.write(txt_code.value)
-            update_files()
-            status.value = f"✓ Guardado: {fname}"
-            page.update()
-
         view_editor = ft.Column([
             ft.Row([
                 ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project(), color="white", bgcolor="#0d47a1"),
                 ft.ElevatedButton("🗑️ RESET", on_click=lambda _: clear_editor(), color="white", bgcolor="#b71c1c"), 
             ], scroll="auto"),
-            row_snippets,
+            row_snippets, # <- EL BUG: ESTA ERA LA VARIABLE QUE FALTABA
             txt_code
         ], expand=True)
 
@@ -763,8 +709,34 @@ def main(page: ft.Page):
             ft.Text("📦 Usa el botón del visor Web para exportar a STL.", color="grey", text_align="center", size=12)
         ], expand=True)
         
-        view_archivos = ft.Column([ft.Text("Mis Archivos", weight="bold"), file_list], expand=True)
+        file_list = ft.ListView(expand=True, spacing=10)
+        def update_files():
+            file_list.controls.clear()
+            for f in reversed(sorted(os.listdir(EXPORT_DIR))):
+                if f == "nexus_config.json": continue
+                def make_load(name): return lambda _: load_file_content(name)
+                def make_del(name): return lambda _: delete_file(name)
+                acciones = ft.Row([
+                    ft.ElevatedButton("▶", on_click=make_load(f), color="white", bgcolor="#1b5e20"),
+                    ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#b71c1c"),
+                ], scroll="auto")
+                file_list.controls.append(ft.Container(content=ft.Row([ft.Text(f, weight="bold", width=150), acciones]), padding=10, bgcolor="#1a1a1a", border_radius=8))
+            page.update()
 
+        def load_file_content(name):
+            try:
+                with open(os.path.join(EXPORT_DIR, name), "r") as f: txt_code.value = f.read()
+                set_tab(0); status.value = f"✓ {name} cargado."
+            except: pass
+            page.update()
+
+        def delete_file(name): os.remove(os.path.join(EXPORT_DIR, name)); update_files()
+        def save_project():
+            fname = f"nexus_{int(time.time())}.jscad"
+            with open(os.path.join(EXPORT_DIR, fname), "w") as f: f.write(txt_code.value)
+            update_files(); status.value = f"✓ Guardado: {fname}"; page.update()
+
+        view_archivos = ft.Column([ft.Text("Mis Archivos", weight="bold"), file_list], expand=True)
         main_container = ft.Container(content=view_editor, expand=True)
 
         def set_tab(idx):

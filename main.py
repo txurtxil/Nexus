@@ -56,15 +56,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v7.0.2 (ULTIMATE SUITE FIX)
+# APLICACIÓN PRINCIPAL v7.0.3 (BULLETPROOF)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v7.0"
+        page.title = "NEXUS CAD v7.0.3"
         page.theme_mode = "dark"
         page.padding = 0 
         
-        status = ft.Text("NEXUS v7.0 | Motor Blender Activo", color="green")
+        status = ft.Text("NEXUS v7.0 | Motor Industrial Activo", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -92,7 +92,7 @@ def main(page: ft.Page):
 
         # --- EDITOR JS-CSG BASE ---
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,10], radius:[20,20,10]});\n}"
-        txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, text_size=12)
+        txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL)
 
         def clear_editor():
             txt_code.value = "function main() {\n  return CSG.cube({center:[0,0,0], radius:[10,10,10]});\n}"
@@ -242,7 +242,7 @@ def main(page: ft.Page):
                 code += f"  var cut_pin = CSG.cylinder({{start:[0,0,l/3-d/2], end:[0,0,2*l/3+d/2], radius:d/4, slices:32}});\n"
                 code += f"  var fijo = fix.union(fix2).subtract(cut_pin).union(pin);\n"
                 code += f"  var movil = move.subtract(cut_pin);\n"
-                code += f"  return fijo.union(movil.translate([0, d+2, 0])); // Separados para ver interior\n}}"
+                code += f"  return fijo.union(movil.translate([0, d+2, 0])); // Offset para ver interior\n}}"
 
             txt_code.value = code
             txt_code.update()
@@ -323,14 +323,15 @@ def main(page: ft.Page):
             herramienta_actual = nombre_herramienta
             update_constructor_ui()
 
+        # FIX SEGURO: ft.Container no recibe parámetros raros
         def create_thumbnail(icon, title, tool_id, color):
             return ft.Container(
                 content=ft.Column([
                     ft.Text(icon, size=35), 
                     ft.Text(title, size=11, text_align="center", weight="bold")
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                width=90, height=90, bgcolor=color, border_radius=12,
-                on_click=lambda _: select_tool(tool_id), ink=True
+                width=90, height=90, bgcolor=color, border_radius=12, ink=True,
+                on_click=lambda _: select_tool(tool_id)
             )
 
         row_miniaturas = ft.Row([
@@ -435,10 +436,10 @@ def main(page: ft.Page):
             ft.ElevatedButton("📁 FILES", on_click=lambda _: set_tab(3)),
         ], scroll="auto")
 
-        # FIX DEFINITIVO APLICADO: Pasamos el nombre del icono en formato string crudo.
-        # Esto salta la búsqueda de atributos de Python y se lo pasa directo al motor gráfico de Flutter (que siempre tiene el icono "play_arrow").
+        # FIX DEFINITIVO (BLINDADO): Eliminado el argumento 'text' que causaba el Crash en Termux.
+        # Solo conservamos 'icon', 'on_click' y 'bgcolor', que son 100% universales en cualquier versión de Flet.
         page.floating_action_button = ft.FloatingActionButton(
-            icon="play_arrow", text="3D", on_click=lambda _: set_tab(2), bgcolor="amber"
+            icon="play_arrow", on_click=lambda _: set_tab(2), bgcolor="amber"
         )
 
         root_container = ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True)

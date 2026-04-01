@@ -56,7 +56,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.2 (ESTILO BLENDER)
+# APLICACIÓN PRINCIPAL v5.2.1 (ESTILO BLENDER)
 # =========================================================
 def main(page: ft.Page):
     try:
@@ -92,7 +92,8 @@ def main(page: ft.Page):
 
         # --- EDITOR JS-CSG BASE ---
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,10], radius:[20,20,10]});\n}"
-        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_INICIAL, text_size=12, font_family="monospace")
+        # PARCHE APLICADO AQUÍ: Eliminado font_family="monospace" que causaba el Crash
+        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_INICIAL, text_size=12)
 
         def load_template(t):
             txt_code.value = t

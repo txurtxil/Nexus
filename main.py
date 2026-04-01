@@ -56,7 +56,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.0 (FASE 1 - CONSTRUCTOR VISUAL)
+# APLICACIÓN PRINCIPAL v5.0 (FASE 1 - COMPATIBILIDAD)
 # =========================================================
 def main(page: ft.Page):
     try:
@@ -64,7 +64,7 @@ def main(page: ft.Page):
         page.theme_mode = "dark"
         page.padding = 0 
         
-        status = ft.Text("NEXUS v5.0 | Motor Paramétrico Activo", color="green")
+        status = ft.Text("NEXUS v5.0 | Constructor Paramétrico Activo", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -145,14 +145,13 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # FASE 1: EL MOTOR PARAMÉTRICO VISUAL (NUEVO)
+        # FASE 1: EL MOTOR PARAMÉTRICO VISUAL (PARCHEADO)
         # =========================================================
         def generate_param_code(e=None):
             shape = param_shape_dd.value
             if shape == "Cubo Sólido":
                 code = f"function main() {{\n  return CSG.cube({{center:[0,0,{sl_c_z.value/2}], radius:[{sl_c_x.value/2}, {sl_c_y.value/2}, {sl_c_z.value/2}]}});\n}}"
             elif shape == "Tubo / Cilindro":
-                # Asegurar que el radio interior nunca sea mayor al exterior
                 rint = min(sl_t_rin.value, sl_t_rext.value - 1)
                 if rint < 0: rint = 0
                 
@@ -178,31 +177,42 @@ def main(page: ft.Page):
             generate_param_code()
             page.update()
 
+        # PARCHE: Inicializar sin on_change y asignarlo después
         param_shape_dd = ft.Dropdown(
             options=[ft.dropdown.Option("Cubo Sólido"), ft.dropdown.Option("Tubo / Cilindro"), ft.dropdown.Option("Caja Hueca")],
             value="Cubo Sólido",
-            on_change=update_constructor_ui,
             label="1. Selecciona Primitiva Paramétrica",
             bgcolor="#212121"
         )
+        param_shape_dd.on_change = update_constructor_ui
 
-        # Sliders del Cubo
-        sl_c_x = ft.Slider(min=1, max=200, value=20, label="Ancho (X): {value}mm", on_change=generate_param_code)
-        sl_c_y = ft.Slider(min=1, max=200, value=20, label="Profundidad (Y): {value}mm", on_change=generate_param_code)
-        sl_c_z = ft.Slider(min=1, max=200, value=20, label="Alto (Z): {value}mm", on_change=generate_param_code)
+        # Sliders del Cubo (Parcheados)
+        sl_c_x = ft.Slider(min=1, max=200, value=20, label="Ancho (X): {value}mm")
+        sl_c_y = ft.Slider(min=1, max=200, value=20, label="Profundidad (Y): {value}mm")
+        sl_c_z = ft.Slider(min=1, max=200, value=20, label="Alto (Z): {value}mm")
+        sl_c_x.on_change = generate_param_code
+        sl_c_y.on_change = generate_param_code
+        sl_c_z.on_change = generate_param_code
         col_cubo = ft.Column([ft.Text("2. Ajusta las dimensiones en milímetros:", color="grey"), sl_c_x, sl_c_y, sl_c_z], visible=True)
 
-        # Sliders del Tubo
-        sl_t_rext = ft.Slider(min=2, max=100, value=20, label="Radio Exterior: {value}mm", on_change=generate_param_code)
-        sl_t_rin = ft.Slider(min=0, max=99, value=15, label="Radio Interior: {value}mm", on_change=generate_param_code)
-        sl_t_h = ft.Slider(min=1, max=200, value=10, label="Altura (Z): {value}mm", on_change=generate_param_code)
+        # Sliders del Tubo (Parcheados)
+        sl_t_rext = ft.Slider(min=2, max=100, value=20, label="Radio Exterior: {value}mm")
+        sl_t_rin = ft.Slider(min=0, max=99, value=15, label="Radio Interior: {value}mm")
+        sl_t_h = ft.Slider(min=1, max=200, value=10, label="Altura (Z): {value}mm")
+        sl_t_rext.on_change = generate_param_code
+        sl_t_rin.on_change = generate_param_code
+        sl_t_h.on_change = generate_param_code
         col_tubo = ft.Column([ft.Text("2. Ajusta radios y altura:", color="grey"), sl_t_rext, sl_t_rin, sl_t_h], visible=False)
 
-        # Sliders de Caja Hueca
-        sl_b_x = ft.Slider(min=5, max=200, value=50, label="Ancho (X): {value}mm", on_change=generate_param_code)
-        sl_b_y = ft.Slider(min=5, max=200, value=30, label="Profundidad (Y): {value}mm", on_change=generate_param_code)
-        sl_b_z = ft.Slider(min=5, max=200, value=20, label="Alto (Z): {value}mm", on_change=generate_param_code)
-        sl_b_g = ft.Slider(min=1, max=20, value=2, label="Grosor Pared: {value}mm", on_change=generate_param_code)
+        # Sliders de Caja Hueca (Parcheados)
+        sl_b_x = ft.Slider(min=5, max=200, value=50, label="Ancho (X): {value}mm")
+        sl_b_y = ft.Slider(min=5, max=200, value=30, label="Profundidad (Y): {value}mm")
+        sl_b_z = ft.Slider(min=5, max=200, value=20, label="Alto (Z): {value}mm")
+        sl_b_g = ft.Slider(min=1, max=20, value=2, label="Grosor Pared: {value}mm")
+        sl_b_x.on_change = generate_param_code
+        sl_b_y.on_change = generate_param_code
+        sl_b_z.on_change = generate_param_code
+        sl_b_g.on_change = generate_param_code
         col_caja = ft.Column([ft.Text("2. Ajusta volumen exterior y grosor de pared:", color="grey"), sl_b_x, sl_b_y, sl_b_z, sl_b_g], visible=False)
 
         view_constructor = ft.Column([

@@ -56,7 +56,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v7.0.1 (ULTIMATE SUITE FIX)
+# APLICACIÓN PRINCIPAL v7.0.2 (ULTIMATE SUITE FIX)
 # =========================================================
 def main(page: ft.Page):
     try:
@@ -242,7 +242,7 @@ def main(page: ft.Page):
                 code += f"  var cut_pin = CSG.cylinder({{start:[0,0,l/3-d/2], end:[0,0,2*l/3+d/2], radius:d/4, slices:32}});\n"
                 code += f"  var fijo = fix.union(fix2).subtract(cut_pin).union(pin);\n"
                 code += f"  var movil = move.subtract(cut_pin);\n"
-                code += f"  return fijo.union(movil.translate([0, d+2, 0])); // Offset para ver la articulacion\n}}"
+                code += f"  return fijo.union(movil.translate([0, d+2, 0])); // Separados para ver interior\n}}"
 
             txt_code.value = code
             txt_code.update()
@@ -318,7 +318,6 @@ def main(page: ft.Page):
         sl_bi_tol, r_bi_tol = create_slider("Tolerancia", 0.1, 1.0, 0.3, False, generate_param_code)
         col_bisagra = ft.Column([ft.Text("Despiece de bisagra Print-in-Place.", color="grey", size=12), ft.Container(content=ft.Column([r_bi_l, r_bi_d, r_bi_tol]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
-        # FIX APLICADO: Carrusel de Miniaturas sin atributos no soportados
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
             herramienta_actual = nombre_herramienta
@@ -436,9 +435,10 @@ def main(page: ft.Page):
             ft.ElevatedButton("📁 FILES", on_click=lambda _: set_tab(3)),
         ], scroll="auto")
 
-        # FIX APLICADO: Botón Flotante con icono PLAY_ARROW ultra-seguro y compatible
+        # FIX DEFINITIVO APLICADO: Pasamos el nombre del icono en formato string crudo.
+        # Esto salta la búsqueda de atributos de Python y se lo pasa directo al motor gráfico de Flutter (que siempre tiene el icono "play_arrow").
         page.floating_action_button = ft.FloatingActionButton(
-            icon=ft.icons.PLAY_ARROW, on_click=lambda _: set_tab(2), bgcolor="amber"
+            icon="play_arrow", text="3D", on_click=lambda _: set_tab(2), bgcolor="amber"
         )
 
         root_container = ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True)

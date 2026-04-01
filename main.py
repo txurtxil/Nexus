@@ -18,7 +18,7 @@ except:
     os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
-# MOTOR SERVIDOR LOCAL
+# MOTOR SERVIDOR LOCAL (VISOR 3D)
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -56,15 +56,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v5.1 (CONSTRUCTOR PRO FIX)
+# APLICACIÓN PRINCIPAL v5.2 (ESTILO BLENDER)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v5.1"
+        page.title = "NEXUS CAD v5.2"
         page.theme_mode = "dark"
         page.padding = 0 
         
-        status = ft.Text("NEXUS v5.1 | Constructor PRO Activo", color="green")
+        status = ft.Text("NEXUS v5.2 | Módulos Industriales Activos", color="green")
 
         def open_dialog(dialog):
             try: page.open(dialog)
@@ -77,45 +77,28 @@ def main(page: ft.Page):
             try: page.close(dialog)
             except: dialog.open = False; page.update()
 
-        def export_manual(texto, titulo="Exportar Código"):
-            txt_copy = ft.TextField(value=texto, multiline=True, read_only=True, expand=True)
-            dlg_copy = ft.AlertDialog(
-                title=ft.Text(titulo),
-                content=ft.Column([
-                    ft.Text("Mantén pulsado en el texto para COPIAR:", color="grey"),
-                    ft.Container(content=txt_copy, height=300)
-                ]),
-                actions=[ft.ElevatedButton("CERRAR", on_click=lambda _: close_dialog(dlg_copy))]
-            )
-            open_dialog(dlg_copy)
-
         def copy_text(text_to_copy):
             try:
                 page.set_clipboard(str(text_to_copy))
                 status.value = "✓ Código copiado."
                 status.color = "green"
-                page.update()
             except:
                 try:
                     subprocess.run(['termux-clipboard-set'], input=str(text_to_copy).encode('utf-8'))
                     status.value = "✓ Copiado (Termux)."
                     status.color = "green"
-                    page.update()
-                except:
-                    export_manual(str(text_to_copy), "Copiar Prompt Manualmente")
-                    status.value = "⚠️ Usa copia manual."
-                    status.color = "amber"
-                    page.update()
+                except: pass
+            page.update()
 
         # --- EDITOR JS-CSG BASE ---
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,10], radius:[20,20,10]});\n}"
-        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_INICIAL)
+        txt_code = ft.TextField(label="Código JS-CSG", multiline=True, expand=True, value=T_INICIAL, text_size=12, font_family="monospace")
 
         def load_template(t):
             txt_code.value = t
             txt_code.update() 
             set_tab(0) 
-            status.value = "✓ Código cargado."
+            status.value = "✓ Código inyectado."
             status.color = "green"
             status.update()
 
@@ -141,131 +124,152 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # CONSTRUCTOR PARAMÉTRICO PRO (FASE 1.5)
+        # CONSTRUCTOR PARAMÉTRICO PRO (INTERFAZ BLENDER)
         # =========================================================
+        # Función Helper para crear Sliders con Feedback Numérico en Vivo
+        def create_slider(label, min_v, max_v, val, is_int, on_change_fn):
+            txt_val = ft.Text(f"{int(val) if is_int else val:.1f}", color="cyan", width=45, text_align="right", size=13)
+            sl = ft.Slider(min=min_v, max=max_v, value=val, expand=True)
+            if is_int: sl.divisions = int(max_v - min_v)
+                
+            def internal_change(e):
+                txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"
+                txt_val.update()
+                on_change_fn(e)
+                
+            sl.on_change = internal_change
+            row = ft.Row([ft.Text(label, width=110, size=12, color="white"), sl, txt_val])
+            return sl, row
+
         def generate_param_code(e=None):
             shape = param_shape_dd.value
             
-            # 1. CUBO / CAJA HUECA
             if shape == "📦 Cubo / Caja":
                 g = sl_c_grosor.value
                 code = f"function main() {{\n  var ext = CSG.cube({{center:[0,0,{sl_c_z.value/2}], radius:[{sl_c_x.value/2}, {sl_c_y.value/2}, {sl_c_z.value/2}]}});\n"
                 if g > 0:
-                    g = min(g, min(sl_c_x.value, sl_c_y.value) / 2.1) # Evitar que el grosor supere el tamaño
+                    g = min(g, min(sl_c_x.value, sl_c_y.value) / 2.1)
                     code += f"  var int = CSG.cube({{center:[0,0,{sl_c_z.value/2 + g}], radius:[{sl_c_x.value/2 - g}, {sl_c_y.value/2 - g}, {sl_c_z.value/2}]}});\n  return ext.subtract(int);\n}}"
-                else:
-                    code += f"  return ext;\n}}"
+                else: code += f"  return ext;\n}}"
 
-            # 2. CILINDRO / POLÍGONO (Tuercas)
-            elif shape == "🛢️ Cilindro / Polígono":
+            elif shape == "🛢️ Revolución":
                 rint = min(sl_p_rint.value, sl_p_rext.value - 0.5)
                 if rint < 0: rint = 0
-                caras = int(sl_p_lados.value)
-                code = f"function main() {{\n  var ext = CSG.cylinder({{start:[0,0,0], end:[0,0,{sl_p_h.value}], radius:{sl_p_rext.value}, slices:{caras}}});\n"
+                c = int(sl_p_lados.value)
+                code = f"function main() {{\n  var ext = CSG.cylinder({{start:[0,0,0], end:[0,0,{sl_p_h.value}], radius:{sl_p_rext.value}, slices:{c}}});\n"
                 if rint > 0:
-                    # AQUÍ ESTABA EL ERROR (faltaba una llave extra para cerrar el objeto JS en el f-string)
-                    code += f"  var int = CSG.cylinder({{start:[0,0,-1], end:[0,0,{sl_p_h.value+2}], radius:{rint}, slices:{caras}}});\n  return ext.subtract(int);\n}}"
-                else:
-                    code += f"  return ext;\n}}"
+                    code += f"  var int = CSG.cylinder({{start:[0,0,-1], end:[0,0,{sl_p_h.value+2}], radius:{rint}, slices:{c}}});\n  return ext.subtract(int);\n}}"
+                else: code += f"  return ext;\n}}"
                     
-            # 3. ENGRANAJE DINÁMICO
             elif shape == "⚙️ Engranaje":
-                d = int(sl_e_dientes.value)
-                r = sl_e_radio.value
-                h = sl_e_grosor.value
-                eje = sl_e_eje.value
-                
-                # Tamaño proporcional del diente
-                d_x = r * 0.15
-                d_y = r * 0.2
-                
-                code = f"function main() {{\n  var dientes = {d}; var r = {r}; var h = {h};\n"
-                code += f"  var base = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:r, slices:64}});\n"
-                code += f"  for(var i=0; i<dientes; i++) {{\n"
-                code += f"    var a = (i * Math.PI * 2) / dientes;\n"
-                code += f"    var x = Math.cos(a) * r;\n    var y = Math.sin(a) * r;\n"
-                code += f"    var diente = CSG.cube({{center:[x,y,h/2], radius:[{d_x}, {d_y}, h/2]}});\n"
-                code += f"    base = base.union(diente);\n  }}\n"
-                if eje > 0:
-                    code += f"  var hueco = CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius:{eje}, slices:32}});\n  return base.subtract(hueco);\n}}"
-                else:
-                    code += f"  return base;\n}}"
+                d, r, h, eje = int(sl_e_dientes.value), sl_e_radio.value, sl_e_grosor.value, sl_e_eje.value
+                d_x, d_y = r * 0.15, r * 0.2
+                code = f"function main() {{\n  var dientes = {d}; var r = {r}; var h = {h};\n  var base = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:r, slices:64}});\n"
+                code += f"  for(var i=0; i<dientes; i++) {{\n    var a = (i * Math.PI * 2) / dientes;\n"
+                code += f"    var diente = CSG.cube({{center:[Math.cos(a)*r, Math.sin(a)*r, h/2], radius:[{d_x}, {d_y}, h/2]}});\n    base = base.union(diente);\n  }}\n"
+                if eje > 0: code += f"  var hueco = CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius:{eje}, slices:32}});\n  return base.subtract(hueco);\n}}"
+                else: code += f"  return base;\n}}"
             
-            # 4. ESFERA
-            elif shape == "⚽ Esfera":
-                r = sl_s_radio.value
-                res = int(sl_s_res.value)
-                code = f"function main() {{\n  return CSG.sphere({{center:[0,0,{r}], radius:{r}, resolution:{res}}});\n}}"
+            elif shape == "📐 Escuadra en L":
+                l, w, t, hr = sl_l_largo.value, sl_l_ancho.value, sl_l_grosor.value, sl_l_hueco.value
+                code = f"function main() {{\n  var l = {l}; var w = {w}; var t = {t}; var r = {hr};\n"
+                code += f"  var base = CSG.cube({{center:[l/2, w/2, t/2], radius:[l/2, w/2, t/2]}});\n"
+                code += f"  var wall = CSG.cube({{center:[t/2, w/2, l/2], radius:[t/2, w/2, l/2]}});\n"
+                code += f"  var bracket = base.union(wall);\n"
+                if hr > 0:
+                    code += f"  var h1 = CSG.cylinder({{start:[l*0.7, w/2, -1], end:[l*0.7, w/2, t+1], radius:r, slices:32}});\n"
+                    code += f"  var h2 = CSG.cylinder({{start:[-1, w/2, l*0.7], end:[t+1, w/2, l*0.7], radius:r, slices:32}});\n"
+                    code += f"  bracket = bracket.subtract(h1).subtract(h2);\n"
+                code += f"  return bracket;\n}}"
+
+            elif shape == "🔩 Placa NEMA 17":
+                t, tol = sl_n_grosor.value, sl_n_tol.value
+                w, c_hole, m3, dist = 42.3, 11 + tol, 1.5 + tol, 15.5
+                code = f"function main() {{\n  var t = {t};\n  var base = CSG.cube({{center:[0,0,t/2], radius:[{w/2}, {w/2}, t/2]}});\n"
+                code += f"  var c_hole = CSG.cylinder({{start:[0,0,-1], end:[0,0,t+1], radius:{c_hole}, slices:64}});\n"
+                code += f"  var h1 = CSG.cylinder({{start:[{dist}, {dist}, -1], end:[{dist}, {dist}, t+1], radius:{m3}, slices:32}});\n"
+                code += f"  var h2 = CSG.cylinder({{start:[{-dist}, {dist}, -1], end:[{-dist}, {dist}, t+1], radius:{m3}, slices:32}});\n"
+                code += f"  var h3 = CSG.cylinder({{start:[{dist}, {-dist}, -1], end:[{dist}, {-dist}, t+1], radius:{m3}, slices:32}});\n"
+                code += f"  var h4 = CSG.cylinder({{start:[{-dist}, {-dist}, -1], end:[{-dist}, {-dist}, t+1], radius:{m3}, slices:32}});\n"
+                code += f"  return base.subtract(c_hole).subtract(h1).subtract(h2).subtract(h3).subtract(h4);\n}}"
+
+            elif shape == "🎛️ Matriz de Huecos":
+                w, d, h, r = sl_m_w.value, sl_m_d.value, sl_m_h.value, sl_m_r.value
+                cols, rows, sx, sy = int(sl_m_c.value), int(sl_m_fil.value), sl_m_sx.value, sl_m_sy.value
+                code = f"function main() {{\n  var base = CSG.cube({{center:[0,0,{h/2}], radius:[{w/2}, {d/2}, {h/2}]}});\n"
+                code += f"  var huecos = null;\n  var start_x = -(({cols}-1)*{sx})/2;\n  var start_y = -(({rows}-1)*{sy})/2;\n"
+                code += f"  for(var i=0; i<{cols}; i++) {{\n    for(var j=0; j<{rows}; j++) {{\n"
+                code += f"      var x = start_x + (i*{sx});\n      var y = start_y + (j*{sy});\n"
+                code += f"      var cil = CSG.cylinder({{start:[x,y,-1], end:[x,y,{h+1}], radius:{r}, slices:32}});\n"
+                code += f"      if(huecos === null) huecos = cil; else huecos = huecos.union(cil);\n"
+                code += f"    }}\n  }}\n  if(huecos !== null) return base.subtract(huecos);\n  return base;\n}}"
 
             txt_code.value = code
             txt_code.update()
-            status.value = f"✓ {shape} generado."
-            status.color = "amber"
-            status.update()
 
         def update_constructor_ui(e=None):
-            col_cubo.visible = param_shape_dd.value == "📦 Cubo / Caja"
-            col_prisma.visible = param_shape_dd.value == "🛢️ Cilindro / Polígono"
-            col_engranaje.visible = param_shape_dd.value == "⚙️ Engranaje"
-            col_esfera.visible = param_shape_dd.value == "⚽ Esfera"
+            for col in [col_cubo, col_prisma, col_engranaje, col_escuadra, col_nema, col_matriz]: col.visible = False
+            v = param_shape_dd.value
+            if v == "📦 Cubo / Caja": col_cubo.visible = True
+            elif v == "🛢️ Revolución": col_prisma.visible = True
+            elif v == "⚙️ Engranaje": col_engranaje.visible = True
+            elif v == "📐 Escuadra en L": col_escuadra.visible = True
+            elif v == "🔩 Placa NEMA 17": col_nema.visible = True
+            elif v == "🎛️ Matriz de Huecos": col_matriz.visible = True
             generate_param_code()
             page.update()
 
-        # Instanciación segura sin on_change
         param_shape_dd = ft.Dropdown(
-            options=[
-                ft.dropdown.Option("📦 Cubo / Caja"), 
-                ft.dropdown.Option("🛢️ Cilindro / Polígono"), 
-                ft.dropdown.Option("⚙️ Engranaje"),
-                ft.dropdown.Option("⚽ Esfera")
-            ],
-            value="📦 Cubo / Caja",
-            label="1. Primitiva Avanzada",
-            bgcolor="#212121"
+            options=[ft.dropdown.Option(x) for x in ["📦 Cubo / Caja", "🛢️ Revolución", "⚙️ Engranaje", "📐 Escuadra en L", "🔩 Placa NEMA 17", "🎛️ Matriz de Huecos"]],
+            value="📦 Cubo / Caja", label="1. Herramienta Paramétrica", bgcolor="#212121"
         )
         param_shape_dd.on_change = update_constructor_ui
 
-        # 1. UI Cubo / Caja
-        sl_c_x = ft.Slider(min=5, max=200, value=50, label="Ancho (X): {value}mm")
-        sl_c_y = ft.Slider(min=5, max=200, value=30, label="Profundidad (Y): {value}mm")
-        sl_c_z = ft.Slider(min=5, max=200, value=20, label="Alto (Z): {value}mm")
-        sl_c_grosor = ft.Slider(min=0, max=20, value=0, label="Grosor Pared (0=Macizo): {value}mm")
-        for sl in [sl_c_x, sl_c_y, sl_c_z, sl_c_grosor]: sl.on_change = generate_param_code
-        col_cubo = ft.Column([ft.Text("Dimensiones Base:", color="cyan"), sl_c_x, sl_c_y, sl_c_z, sl_c_grosor], visible=True)
+        # UI Blocks
+        sl_c_x, r_c_x = create_slider("Ancho X", 5, 200, 50, False, generate_param_code)
+        sl_c_y, r_c_y = create_slider("Fondo Y", 5, 200, 30, False, generate_param_code)
+        sl_c_z, r_c_z = create_slider("Alto Z", 5, 200, 20, False, generate_param_code)
+        sl_c_grosor, r_c_g = create_slider("Grosor Pared", 0, 20, 0, False, generate_param_code)
+        col_cubo = ft.Column([ft.Container(content=ft.Column([r_c_x, r_c_y, r_c_z, r_c_g]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=True)
 
-        # 2. UI Prisma / Tubo
-        sl_p_rext = ft.Slider(min=5, max=100, value=25, label="Radio Exterior: {value}mm")
-        sl_p_rint = ft.Slider(min=0, max=95, value=15, label="Radio Interior (0=Macizo): {value}mm")
-        sl_p_h = ft.Slider(min=2, max=200, value=10, label="Altura: {value}mm")
-        sl_p_lados = ft.Slider(min=3, max=64, value=6, divisions=61, label="Caras (3=Tri, 6=Hex, 64=Círculo): {value}")
-        for sl in [sl_p_rext, sl_p_rint, sl_p_h, sl_p_lados]: sl.on_change = generate_param_code
-        col_prisma = ft.Column([ft.Text("Ajustes de Revolución (¡Prueba a poner 6 caras!):", color="cyan"), sl_p_rext, sl_p_rint, sl_p_h, sl_p_lados], visible=False)
+        sl_p_rext, r_p_rext = create_slider("Radio Ext", 5, 100, 25, False, generate_param_code)
+        sl_p_rint, r_p_rint = create_slider("Radio Int", 0, 95, 15, False, generate_param_code)
+        sl_p_h, r_p_h = create_slider("Altura", 2, 200, 10, False, generate_param_code)
+        sl_p_lados, r_p_lados = create_slider("Caras/Resol.", 3, 64, 6, True, generate_param_code)
+        col_prisma = ft.Column([ft.Container(content=ft.Column([r_p_rext, r_p_rint, r_p_h, r_p_lados]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
-        # 3. UI Engranaje
-        sl_e_dientes = ft.Slider(min=6, max=40, value=16, divisions=34, label="Número Dientes: {value}")
-        sl_e_radio = ft.Slider(min=10, max=100, value=30, label="Radio Base: {value}mm")
-        sl_e_grosor = ft.Slider(min=2, max=50, value=5, label="Grosor: {value}mm")
-        sl_e_eje = ft.Slider(min=0, max=30, value=5, label="Hueco Eje (0=Macizo): {value}mm")
-        for sl in [sl_e_dientes, sl_e_radio, sl_e_grosor, sl_e_eje]: sl.on_change = generate_param_code
-        col_engranaje = ft.Column([ft.Text("Parámetros de Engranaje Recto:", color="cyan"), sl_e_dientes, sl_e_radio, sl_e_grosor, sl_e_eje], visible=False)
+        sl_e_dientes, r_e_d = create_slider("Dientes", 6, 40, 16, True, generate_param_code)
+        sl_e_radio, r_e_r = create_slider("Radio Base", 10, 100, 30, False, generate_param_code)
+        sl_e_grosor, r_e_g = create_slider("Grosor", 2, 50, 5, False, generate_param_code)
+        sl_e_eje, r_e_e = create_slider("Hueco Eje", 0, 30, 5, False, generate_param_code)
+        col_engranaje = ft.Column([ft.Container(content=ft.Column([r_e_d, r_e_r, r_e_g, r_e_e]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
-        # 4. UI Esfera
-        sl_s_radio = ft.Slider(min=5, max=100, value=30, label="Radio: {value}mm")
-        sl_s_res = ft.Slider(min=8, max=64, value=32, divisions=56, label="Resolución de malla: {value}")
-        for sl in [sl_s_radio, sl_s_res]: sl.on_change = generate_param_code
-        col_esfera = ft.Column([ft.Text("Parámetros de Esfera:", color="cyan"), sl_s_radio, sl_s_res], visible=False)
+        sl_l_largo, r_l_l = create_slider("Largo Brazos", 10, 100, 40, False, generate_param_code)
+        sl_l_ancho, r_l_a = create_slider("Ancho Perfil", 5, 50, 15, False, generate_param_code)
+        sl_l_grosor, r_l_g = create_slider("Grosor Chapa", 1, 20, 3, False, generate_param_code)
+        sl_l_hueco, r_l_h = create_slider("Radio Agujero", 0, 10, 2, False, generate_param_code)
+        col_escuadra = ft.Column([ft.Container(content=ft.Column([r_l_l, r_l_a, r_l_g, r_l_h]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+
+        sl_n_grosor, r_n_g = create_slider("Grosor Placa", 2, 20, 5, False, generate_param_code)
+        sl_n_tol, r_n_t = create_slider("Tolerancia (mm)", 0, 2, 0.4, False, generate_param_code)
+        col_nema = ft.Column([ft.Text("Genera una placa base estándar para NEMA 17", color="grey", size=12), ft.Container(content=ft.Column([r_n_g, r_n_t]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
+
+        sl_m_w, r_m_w = create_slider("Ancho Base", 20, 200, 80, False, generate_param_code)
+        sl_m_d, r_m_d = create_slider("Fondo Base", 20, 200, 60, False, generate_param_code)
+        sl_m_h, r_m_h = create_slider("Alto Base", 1, 50, 5, False, generate_param_code)
+        sl_m_r, r_m_r = create_slider("Radio Huecos", 1, 20, 3, False, generate_param_code)
+        sl_m_c, r_m_c = create_slider("Nº Columnas", 1, 10, 4, True, generate_param_code)
+        sl_m_fil, r_m_fil = create_slider("Nº Filas", 1, 10, 3, True, generate_param_code)
+        sl_m_sx, r_m_sx = create_slider("Espaciado X", 5, 50, 15, False, generate_param_code)
+        sl_m_sy, r_m_sy = create_slider("Espaciado Y", 5, 50, 15, False, generate_param_code)
+        col_matriz = ft.Column([ft.Container(content=ft.Column([r_m_w, r_m_d, r_m_h, r_m_r, ft.Divider(), r_m_c, r_m_fil, r_m_sx, r_m_sy]), bgcolor="#1e1e1e", padding=10, border_radius=8)], visible=False)
 
         view_constructor = ft.Column([
-            ft.Text("🛠️ Motor Paramétrico Avanzado", weight="bold", color="amber", size=18),
-            ft.Text("Diseña piezas complejas sin tocar una línea de código.", color="grey", size=12),
+            ft.Text("🛠️ Constructores Industriales (Modo Blender)", weight="bold", color="amber", size=16),
             param_shape_dd,
-            ft.Divider(),
-            col_cubo,
-            col_prisma,
-            col_engranaje,
-            col_esfera,
-            ft.Divider(),
-            ft.ElevatedButton("▶ GENERAR MALLA 3D", on_click=lambda _: run_render(), color="black", bgcolor="amber", height=60, width=float('inf'))
+            col_cubo, col_prisma, col_engranaje, col_escuadra, col_nema, col_matriz,
+            ft.Container(height=10),
+            ft.ElevatedButton("▶ PROCESAR Y VER EN 3D", on_click=lambda _: run_render(), color="black", bgcolor="amber", height=60, width=float('inf'))
         ], expand=True, scroll="auto")
 
         # =========================================================
@@ -309,29 +313,6 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # LIBRERÍA DE INGENIERÍA
-        # =========================================================
-        def create_gallery(icon, title, examples):
-            controls = []
-            for name, code in examples:
-                controls.append(ft.Text(name, color="green", weight="bold"))
-                controls.append(ft.ElevatedButton("▶ Cargar Código", on_click=lambda e, c=code: load_template(c), bgcolor="#1b5e20", color="white"))
-                controls.append(ft.Container(height=15))
-            col = ft.Column(controls, visible=False)
-            btn = ft.ElevatedButton(icon + " " + title, on_click=lambda _: (setattr(col, "visible", not col.visible), page.update()), width=float('inf'), color="black", bgcolor="cyan")
-            return ft.Column([btn, col])
-
-        CODE_ESTACION = "function main() {\n  var base = CSG.cube({center: [0,0,12.5], radius: [80,60,12.5]});\n  for(var x = -70; x <= -10; x += 22) {\n    for(var y = -50; y <= 10; y += 22) {\n      base = base.subtract(CSG.cube({center: [x,y,14.5], radius: [9,9,12.5]}));\n    }\n  }\n  return base;\n}"
-
-        view_ia = ft.Column([
-            ft.Text("Plantillas Industriales:", weight="bold", color="cyan"),
-            create_gallery("📚", "ESTACIÓN DE SOLDADURA", [("Base Multi-Huecos SMD", CODE_ESTACION)]),
-            ft.Container(height=20),
-            ft.Text("💡 Tip Pro:", color="amber", weight="bold"),
-            ft.Text("Ve a la pestaña BUILD. Selecciona 'Cilindro / Polígono'. Ajusta las 'Caras' a 6 y ponle Radio Interior. Acabas de crear una tuerca hexagonal para impresión 3D.", color="grey", size=13)
-        ], expand=True, scroll="auto")
-
-        # =========================================================
         # VISTAS INDEPENDIENTES 
         # =========================================================
         view_editor = ft.Column([
@@ -346,13 +327,12 @@ def main(page: ft.Page):
 
         btn_visor = ft.ElevatedButton("🚀 ABRIR VISOR 3D", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/", color="black", bgcolor="white", height=60)
         view_visor = ft.Column([ft.Container(height=80), ft.Row([btn_visor], alignment=ft.MainAxisAlignment.CENTER)], expand=True)
-        
         view_archivos = ft.Column([ft.Text("Mis Proyectos", weight="bold"), file_list], expand=True)
 
         main_container = ft.Container(content=view_editor, expand=True)
 
         def set_tab(idx):
-            tabs = [view_editor, view_constructor, view_visor, view_archivos, view_ia]
+            tabs = [view_editor, view_constructor, view_visor, view_archivos]
             main_container.content = tabs[idx]
             if idx == 3: update_files()
             page.update()
@@ -362,7 +342,6 @@ def main(page: ft.Page):
             ft.ElevatedButton("🛠️ BUILD", on_click=lambda _: set_tab(1), color="black", bgcolor="amber"),
             ft.ElevatedButton("👁️ 3D", on_click=lambda _: set_tab(2)),
             ft.ElevatedButton("📁 FILE", on_click=lambda _: set_tab(3)),
-            ft.ElevatedButton("📚 LIB", on_click=lambda _: set_tab(4), color="black", bgcolor="cyan"),
         ], scroll="auto")
 
         root_container = ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True)

@@ -95,14 +95,14 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v17.0 PRO"
+        page.title = "NEXUS CAD v17.5 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v17.0 PRO | Motor Pulido y Terminado", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v17.5 PRO | Bugs Corregidos", color="#00E5FF", weight="bold")
 
-        T_INICIAL = "function main() {\n  var GW=50; var GL=50; var GH=20; var GT=2;\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
+        T_INICIAL = "function main() {\n  var GW = 50; var GL = 50; var GH = 20; var GT = 2;\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
         ensamble_stack = []
@@ -112,7 +112,7 @@ def main(page: ft.Page):
         def clear_editor():
             nonlocal ensamble_stack
             ensamble_stack = []
-            txt_code.value = "function main() {\n  // Plantilla limpia. Usa GW, GL, GH, GT\n  return CSG.cube({radius:[0,0,0]});\n}"
+            txt_code.value = "function main() {\n  var GW = 50; var GL = 50; var GH = 20; var GT = 2;\n  // Plantilla limpia\n  return CSG.cube({radius:[0,0,0]});\n}"
             status.value = "✓ Código borrado por completo."
             status.color = "#B71C1C"
             txt_code.update(); page.update()
@@ -171,17 +171,65 @@ def main(page: ft.Page):
         sl_g_t, r_g_t = create_slider("Grosor (GT)", 0.5, 20, 2, False)
         sl_g_tol, r_g_tol = create_slider("Tol. Global (mm)", 0.0, 1.0, 0.2, False)
 
+        sw_ensamble = ft.Switch(label="Activar Ensamblador", value=False, active_color="#FFAB00", label_style=ft.TextStyle(size=12))
+        def toggle_ensamble(e):
+            nonlocal modo_ensamble
+            modo_ensamble = sw_ensamble.value
+            panel_ensamble_ops.visible = modo_ensamble; page.update()
+        sw_ensamble.on_change = toggle_ensamble
+
+        def parse_current_tool_to_stack_var():
+            code_lines = txt_code.value.split('\n')
+            var_name = f"obj_{len(ensamble_stack)}"
+            body = []
+            for line in code_lines[2:-1]: 
+                if line.strip().startswith("return "):
+                    ret_val = line.replace("return", "").replace(";", "").strip()
+                    body.append(f"  var {var_name} = {ret_val};")
+                else: body.append(line)
+            return "\n".join(body), var_name
+
+        def add_to_stack(op_type):
+            nonlocal ensamble_stack
+            body, var_name = parse_current_tool_to_stack_var()
+            if not ensamble_stack:
+                ensamble_stack.append({"body": body, "var": var_name, "op": "base"})
+                status.value = f"✓ Pieza Base añadida al Ensamble."
+            else:
+                ensamble_stack.append({"body": body, "var": var_name, "op": op_type})
+                status.value = f"✓ Operación [{op_type}] añadida a la pila."
+            status.color = "#00E676"
+            compile_stack_to_editor()
+
+        def compile_stack_to_editor():
+            if not ensamble_stack: return
+            final_code = f"function main() {{\n  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value};\n"
+            final_var = ""
+            for i, item in enumerate(ensamble_stack):
+                final_code += f"  // --- Modificador {i} ({item['op']}) ---\n"
+                final_code += item["body"] + "\n"
+                if item["op"] == "base": final_var = item["var"]
+                elif item["op"] == "union": final_code += f"  {final_var} = {final_var}.union({item['var']});\n"
+                elif item["op"] == "subtract": final_code += f"  {final_var} = {final_var}.subtract({item['var']});\n"
+            final_code += f"  return {final_var};\n}}"
+            txt_code.value = final_code; txt_code.update(); page.update()
+
+        panel_ensamble_ops = ft.Row([
+            ft.ElevatedButton("➕ UNIR", on_click=lambda _: add_to_stack("union"), bgcolor="#1B5E20", color="white", expand=True),
+            ft.ElevatedButton("➖ RESTAR", on_click=lambda _: add_to_stack("subtract"), bgcolor="#B71C1C", color="white", expand=True)
+        ], visible=False)
+
         panel_globales = ft.Container(
             content=ft.Column([
-                ft.Row([ft.Text("🌐 PARÁMETROS GLOBALES", color="#00E5FF", weight="bold", size=11)]),
-                r_g_w, r_g_l, r_g_h, r_g_t, r_g_tol
+                ft.Row([ft.Text("🌐 PARÁMETROS GLOBALES", color="#00E5FF", weight="bold", size=11), sw_ensamble], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                r_g_w, r_g_l, r_g_h, r_g_t, r_g_tol, panel_ensamble_ops
             ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333")
         )
 
-        col_custom = ft.Column([ft.Text("Código Libre (Se inyectan GW, GL, GH...)", color="#00E676")], visible=True)
+        col_custom = ft.Column([ft.Text("Código Libre (No se sobrescribe al mover sliders)", color="#00E676")], visible=True)
 
         # === HERRAMIENTAS Y SUS INSTRUCCIONES ===
-        def inst(texto): return ft.Text("ℹ️ " + texto, color="#8B949E", size=10, italic=True)
+        def inst(texto): return ft.Text("ℹ️ " + texto, color="#FFD54F", size=11, italic=True)
 
         tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=10, bgcolor="#161B22")
         dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel"), ft.dropdown.Option("Braille")], value="Voxel", expand=True, bgcolor="#161B22")
@@ -358,7 +406,8 @@ def main(page: ft.Page):
             h = herramienta_actual; tol_global = sl_g_tol.value 
             code = f"function main() {{\n  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value};\n"
             
-            if h == "custom" and not modo_ensamble: pass 
+            if h == "custom":
+                pass # BUG 1 RESUELTO: No hacemos nada si es custom para no borrar el return del usuario.
             elif h == "texto":
                 txt_input = tf_texto.value.upper()[:10]; estilo = dd_txt_estilo.value; base = dd_txt_base.value
                 code += f"  var texto = \"{txt_input}\"; var h = GH;\n"
@@ -737,7 +786,9 @@ def main(page: ft.Page):
                 code += f"      var cyl = CSG.cylinder({{start:[x_real, 0, 0], end:[x_real, 0, envergadura], radius: yt_real, slices: 16}});\n"
                 code += f"      if(ala === null) ala = cyl; else ala = ala.union(cyl);\n  }}\n  return ala;\n}}"
 
-            if not modo_ensamble: txt_code.value = code
+            # BUG 1 RESUELTO: Solo actualizamos el txt_code si NO estamos en "custom"
+            if not modo_ensamble and h != "custom": 
+                txt_code.value = code
             txt_code.update()
 
         def select_tool(nombre_herramienta):
@@ -829,13 +880,22 @@ def main(page: ft.Page):
         ], expand=True)
         
         # =========================================================
-        # PESTAÑA DB: GESTOR DE DESCARGAS Y RENOMBRADO
+        # PESTAÑA DB: GESTOR DE DESCARGAS Y RENOMBRADO (V3)
         # =========================================================
         file_list = ft.ListView(expand=True, spacing=10)
         tf_fb_url = ft.TextField(label="URL Firebase Realtime DB (Ej: https://tudb.firebaseio.com)", bgcolor="#161B22", text_size=12)
         
         rename_tf = ft.TextField(label="Nuevo Nombre (Manten la extensión)")
         current_rename_file = ""
+
+        # BUG 3 RESUELTO: Compatibilidad total con Flet 0.22+ y antiguos usando un Wrapper
+        def close_dialog(dlg):
+            if hasattr(page, 'close'): page.close(dlg)
+            else: dlg.open = False; page.update()
+
+        def open_dialog(dlg):
+            if hasattr(page, 'open'): page.open(dlg)
+            else: page.dialog = dlg; dlg.open = True; page.update()
 
         def confirm_rename(e):
             nonlocal current_rename_file
@@ -846,23 +906,21 @@ def main(page: ft.Page):
                     new_path += os.path.splitext(current_rename_file)[1]
                 try: os.rename(old_path, new_path)
                 except Exception as ex: print(ex)
-            page.dialog.open = False
-            update_files(); page.update()
+            close_dialog(rename_dlg)
+            update_files()
 
         rename_dlg = ft.AlertDialog(
             title=ft.Text("Renombrar Archivo", color="#00E5FF"),
             content=rename_tf,
-            actions=[ft.TextButton("Cancelar", on_click=lambda _: setattr(page.dialog, 'open', False) or page.update()), ft.TextButton("Guardar", on_click=confirm_rename)],
+            actions=[ft.TextButton("Cancelar", on_click=lambda _: close_dialog(rename_dlg)), ft.TextButton("Guardar", on_click=confirm_rename)],
             bgcolor="#161B22"
         )
-        page.dialog = rename_dlg
 
         def open_rename(name):
             nonlocal current_rename_file
             current_rename_file = name
             rename_tf.value = name
-            page.dialog.open = True
-            page.update()
+            open_dialog(rename_dlg)
 
         def update_files():
             file_list.controls.clear()
@@ -872,23 +930,28 @@ def main(page: ft.Page):
                 
                 def make_del(name): return lambda _: (os.remove(os.path.join(EXPORT_DIR, name)), update_files())
                 def make_ren(name): return lambda _: open_rename(name)
+                def make_down(name): return lambda _: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/exports/{name}")
                 
                 btn_del = ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#B71C1C", width=60)
                 btn_ren = ft.ElevatedButton("✏️", on_click=make_ren(f), color="black", bgcolor="#FFAB00", width=60)
                 
+                # BUG 4 RESUELTO: Exportaciones explícitas según el tipo
                 if f.endswith('.jscad'):
                     def make_load(name): return lambda _: (setattr(txt_code, 'value', open(os.path.join(EXPORT_DIR, name)).read()), set_tab(0), page.update())
-                    acciones = ft.Row([ft.ElevatedButton("▶", on_click=make_load(f), color="white", bgcolor="#1B5E20"), btn_ren, btn_del])
-                    icon = "🧩"
-                elif f.endswith('.stl') or f.endswith('.obj'):
-                    def make_down(name): return lambda _: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/exports/{name}")
-                    acciones = ft.Row([ft.ElevatedButton("⬇️ DESCARGAR", on_click=make_down(f), color="black", bgcolor="#00E5FF"), btn_ren, btn_del])
-                    icon = "🧊"
+                    acciones = ft.Row([ft.ElevatedButton("▶ CARGAR", on_click=make_load(f), color="white", bgcolor="#1B5E20"), btn_ren, btn_del])
+                    icon = "🧩"; tipo = "Código Fuente (Proyecto CAD)"
+                elif f.endswith('.stl'):
+                    acciones = ft.Row([ft.ElevatedButton("⬇️ BAJAR STL", on_click=make_down(f), color="black", bgcolor="#00E5FF"), btn_ren, btn_del])
+                    icon = "🧊"; tipo = "Modelo 3D (Slicer/Impresión)"
+                elif f.endswith('.obj'):
+                    acciones = ft.Row([ft.ElevatedButton("⬇️ BAJAR OBJ", on_click=make_down(f), color="white", bgcolor="#C51162"), btn_ren, btn_del])
+                    icon = "📦"; tipo = "Modelo 3D (Blender/Unity)"
                 else:
                     continue
 
                 file_list.controls.append(ft.Container(content=ft.Column([
-                    ft.Text(f"{icon} {f}", weight="bold", color="#E6EDF3", size=12), 
+                    ft.Text(f"{icon} {f}", weight="bold", color="#E6EDF3", size=13),
+                    ft.Text(tipo, color="#8B949E", size=10),
                     acciones
                 ]), padding=10, bgcolor="#161B22", border_radius=8))
             page.update()

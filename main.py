@@ -95,12 +95,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v17.5 PRO"
+        page.title = "NEXUS CAD v17.6 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v17.5 PRO | Bugs Corregidos", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v17.6 PRO | Sistema Estable", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var GW = 50; var GL = 50; var GH = 20; var GT = 2;\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -171,7 +171,8 @@ def main(page: ft.Page):
         sl_g_t, r_g_t = create_slider("Grosor (GT)", 0.5, 20, 2, False)
         sl_g_tol, r_g_tol = create_slider("Tol. Global (mm)", 0.0, 1.0, 0.2, False)
 
-        sw_ensamble = ft.Switch(label="Activar Ensamblador", value=False, active_color="#FFAB00", label_style=ft.TextStyle(size=12))
+        # CORRECCIÓN DE BUG FATAL: Eliminado 'label_style' que crasheaba Flet en Android
+        sw_ensamble = ft.Switch(label="Activar Ensamblador", value=False, active_color="#FFAB00")
         def toggle_ensamble(e):
             nonlocal modo_ensamble
             modo_ensamble = sw_ensamble.value
@@ -407,7 +408,7 @@ def main(page: ft.Page):
             code = f"function main() {{\n  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value};\n"
             
             if h == "custom":
-                pass # BUG 1 RESUELTO: No hacemos nada si es custom para no borrar el return del usuario.
+                pass
             elif h == "texto":
                 txt_input = tf_texto.value.upper()[:10]; estilo = dd_txt_estilo.value; base = dd_txt_base.value
                 code += f"  var texto = \"{txt_input}\"; var h = GH;\n"
@@ -786,7 +787,6 @@ def main(page: ft.Page):
                 code += f"      var cyl = CSG.cylinder({{start:[x_real, 0, 0], end:[x_real, 0, envergadura], radius: yt_real, slices: 16}});\n"
                 code += f"      if(ala === null) ala = cyl; else ala = ala.union(cyl);\n  }}\n  return ala;\n}}"
 
-            # BUG 1 RESUELTO: Solo actualizamos el txt_code si NO estamos en "custom"
             if not modo_ensamble and h != "custom": 
                 txt_code.value = code
             txt_code.update()
@@ -888,7 +888,6 @@ def main(page: ft.Page):
         rename_tf = ft.TextField(label="Nuevo Nombre (Manten la extensión)")
         current_rename_file = ""
 
-        # BUG 3 RESUELTO: Compatibilidad total con Flet 0.22+ y antiguos usando un Wrapper
         def close_dialog(dlg):
             if hasattr(page, 'close'): page.close(dlg)
             else: dlg.open = False; page.update()
@@ -935,7 +934,6 @@ def main(page: ft.Page):
                 btn_del = ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#B71C1C", width=60)
                 btn_ren = ft.ElevatedButton("✏️", on_click=make_ren(f), color="black", bgcolor="#FFAB00", width=60)
                 
-                # BUG 4 RESUELTO: Exportaciones explícitas según el tipo
                 if f.endswith('.jscad'):
                     def make_load(name): return lambda _: (setattr(txt_code, 'value', open(os.path.join(EXPORT_DIR, name)).read()), set_tab(0), page.update())
                     acciones = ft.Row([ft.ElevatedButton("▶ CARGAR", on_click=make_load(f), color="white", bgcolor="#1B5E20"), btn_ren, btn_del])

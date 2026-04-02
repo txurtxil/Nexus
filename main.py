@@ -6,7 +6,7 @@ import urllib.request
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
-# RUTAS
+# RUTAS DE ALMACENAMIENTO PERMANENTE
 # =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
@@ -19,7 +19,7 @@ except:
     os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
-# SERVIDOR LOCAL WEBGL
+# SERVIDOR LOCAL WEBGL & DATA HANDLER
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -31,9 +31,34 @@ except:
 LATEST_CODE_B64 = ""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        # RECIBIR MODELOS 3D DEL WEBVIEW
+        parsed = urlparse(self.path)
+        if parsed.path == '/api/save_export':
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                try:
+                    post_data = self.rfile.read(content_length)
+                    data = json.loads(post_data.decode('utf-8'))
+                    filepath = os.path.join(EXPORT_DIR, data['filename'])
+                    with open(filepath, 'w') as f:
+                        f.write(data['data'])
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(b'{"status": "ok"}')
+                    return
+                except Exception as e:
+                    pass
+            self.send_response(500)
+            self.end_headers()
+
     def do_GET(self):
         global LATEST_CODE_B64
         parsed = urlparse(self.path)
+        
+        # Enviar Código al visor
         if parsed.path == '/api/get_code_b64.json':
             self.send_response(200)
             self.send_header("Content-type", "application/json")
@@ -41,6 +66,22 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64}).encode())
             LATEST_CODE_B64 = "" 
+            
+        # DESCARGAS NATIVAS AL NAVEGADOR DEL MÓVIL
+        elif parsed.path.startswith('/exports/'):
+            filename = parsed.path.replace('/exports/', '')
+            filepath = os.path.join(EXPORT_DIR, filename)
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as f:
+                    self.send_response(200)
+                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self.end_headers()
+                
+        # Servir Interfaz WebGL
         else:
             try:
                 filename = self.path.strip("/")
@@ -52,6 +93,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             except:
                 self.send_response(404)
                 self.end_headers()
+                
     def log_message(self, *args): pass
 
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
@@ -66,7 +108,7 @@ def main(page: ft.Page):
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v16.5 PRO | Catálogo Completo + Cloud", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v16.5 PRO | Gestor de Descargas Activo", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var GW=50; var GL=50; var GH=20; var GT=2;\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D")
@@ -99,7 +141,7 @@ def main(page: ft.Page):
             code_lines = txt_code.value.split('\n')
             var_name = f"obj_{len(ensamble_stack)}"
             body = []
-            for line in code_lines[2:-1]: # Saltamos la declaración global
+            for line in code_lines[2:-1]: 
                 if line.strip().startswith("return "):
                     ret_val = line.replace("return", "").replace(";", "").strip()
                     body.append(f"  var {var_name} = {ret_val};")
@@ -133,8 +175,8 @@ def main(page: ft.Page):
 
         row_snippets = ft.Row([
             ft.Text("IA / Manual:", color="#8B949E", size=12),
-            ft.ElevatedButton("+ Cubo (Usa Globals)", on_click=lambda _: inject_snippet("  var cubo = CSG.cube({center:[0,0,0], radius:[GW/2, GL/2, GH/2]});"), bgcolor="#21262D", color="white"),
-            ft.ElevatedButton("+ Cil (Usa Globals)", on_click=lambda _: inject_snippet("  var cil = CSG.cylinder({start:[0,0,0], end:[0,0,GH], radius:GW/2, slices:32});"), bgcolor="#21262D", color="white"),
+            ft.ElevatedButton("+ Cubo", on_click=lambda _: inject_snippet("  var cubo = CSG.cube({center:[0,0,0], radius:[GW/2, GL/2, GH/2]});"), bgcolor="#21262D", color="white"),
+            ft.ElevatedButton("+ Cil", on_click=lambda _: inject_snippet("  var cil = CSG.cylinder({start:[0,0,0], end:[0,0,GH], radius:GW/2, slices:32});"), bgcolor="#21262D", color="white"),
         ], scroll="auto")
 
         def update_code_wrapper(e=None): generate_param_code()
@@ -145,14 +187,12 @@ def main(page: ft.Page):
             if is_int: sl.divisions = int(max_v - min_v)
             def internal_change(e):
                 txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"
-                txt_val.update()
+                txt_val.update(); 
                 if not modo_ensamble: update_code_wrapper()
             sl.on_change = internal_change
             return sl, ft.Row([ft.Text(label, width=110, size=12, color="#E6EDF3"), sl, txt_val])
 
-        # =========================================================
-        # PARÁMETROS GLOBALES
-        # =========================================================
+        # === PARAMETROS GLOBALES ===
         sl_g_w, r_g_w = create_slider("Ancho (GW)", 1, 300, 50, False)
         sl_g_l, r_g_l = create_slider("Largo (GL)", 1, 300, 50, False)
         sl_g_h, r_g_h = create_slider("Alto (GH)", 1, 300, 20, False)
@@ -163,8 +203,7 @@ def main(page: ft.Page):
         def toggle_ensamble(e):
             nonlocal modo_ensamble
             modo_ensamble = sw_ensamble.value
-            panel_ensamble_ops.visible = modo_ensamble
-            page.update()
+            panel_ensamble_ops.visible = modo_ensamble; page.update()
         sw_ensamble.on_change = toggle_ensamble
 
         panel_ensamble_ops = ft.Row([
@@ -181,9 +220,7 @@ def main(page: ft.Page):
 
         col_custom = ft.Column([ft.Text("Código Libre usando GW, GL, GH...", color="#00E676")], visible=True)
 
-        # =========================================================
-        # RESTAURACIÓN DEL CATÁLOGO DE PIEZAS (LOS 30 MÓDULOS)
-        # =========================================================
+        # === HERRAMIENTAS ===
         tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=10, bgcolor="#161B22")
         dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel"), ft.dropdown.Option("Braille")], value="Voxel", expand=True, bgcolor="#161B22")
         dd_txt_base = ft.Dropdown(options=[ft.dropdown.Option("Texto Libre"), ft.dropdown.Option("Llavero (Anilla)"), ft.dropdown.Option("Placa Atornillable"), ft.dropdown.Option("Soporte de Mesa")], value="Placa Atornillable", expand=True, bgcolor="#161B22")
@@ -354,12 +391,11 @@ def main(page: ft.Page):
         sl_naca_e, r_naca_e = create_slider("Envergadura Z", 10, 300, 100, False)
         col_naca = ft.Column([ft.Text("Perfil NACA", color="#00E5FF", size=12), ft.Container(content=ft.Column([r_naca_c, r_naca_g, r_naca_e]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-
+        # === GENERADOR DE CÓDIGO JS ===
         def generate_param_code():
             h = herramienta_actual
             tol_global = sl_g_tol.value 
             
-            # INYECCIÓN DE VARIABLES GLOBALES EN EL CÓDIGO GENERADO
             code = f"function main() {{\n  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value};\n"
             
             if h == "custom" and not modo_ensamble: pass 
@@ -743,9 +779,7 @@ def main(page: ft.Page):
                 code += f"      var cyl = CSG.cylinder({{start:[x_real, 0, 0], end:[x_real, 0, envergadura], radius: yt_real, slices: 16}});\n"
                 code += f"      if(ala === null) ala = cyl; else ala = ala.union(cyl);\n  }}\n  return ala;\n}}"
 
-            if not modo_ensamble: 
-                txt_code.value = code
-
+            if not modo_ensamble: txt_code.value = code
             txt_code.update()
 
         def select_tool(nombre_herramienta):
@@ -787,7 +821,6 @@ def main(page: ft.Page):
             elif nombre_herramienta == "acme": col_acme.visible = True
             elif nombre_herramienta == "codo": col_codo.visible = True
             elif nombre_herramienta == "naca": col_naca.visible = True
-            
             generate_param_code(); page.update()
 
         def thumbnail(icon, title, tool_id, color): return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: select_tool(tool_id), ink=True, border=ft.border.all(1, "#30363D"))
@@ -819,7 +852,6 @@ def main(page: ft.Page):
             ft.Text("📦 Geometría Básica (Integrados a Globales):", size=12, color="#8B949E"), cat_basico,
             ft.Divider(color="#30363D"),
             
-            # PANELES (Ocultos hasta que se selecciona la herramienta)
             col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca,
             
             ft.Container(height=10),
@@ -838,17 +870,36 @@ def main(page: ft.Page):
         ], expand=True)
         
         # =========================================================
-        # ALMACENAMIENTO EN LA NUBE (FIREBASE)
+        # PESTAÑA DB: GESTOR DE DESCARGAS Y NUBE
         # =========================================================
         file_list = ft.ListView(expand=True, spacing=10)
         tf_fb_url = ft.TextField(label="URL Firebase Realtime DB (Ej: https://tudb.firebaseio.com)", bgcolor="#161B22", text_size=12)
         
         def update_files():
             file_list.controls.clear()
+            if not os.path.exists(EXPORT_DIR): return
             for f in reversed(sorted(os.listdir(EXPORT_DIR))):
                 if f == "nexus_config.json": continue
-                def make_load(name): return lambda _: (setattr(txt_code, 'value', open(os.path.join(EXPORT_DIR, name)).read()), set_tab(0), page.update())
-                file_list.controls.append(ft.Container(content=ft.Row([ft.Text(f, weight="bold", color="#E6EDF3", width=150), ft.ElevatedButton("▶", on_click=make_load(f), color="white", bgcolor="#1B5E20")]), padding=10, bgcolor="#161B22", border_radius=8))
+                
+                def make_del(name): return lambda _: (os.remove(os.path.join(EXPORT_DIR, name)), update_files())
+                btn_del = ft.ElevatedButton("🗑️", on_click=make_del(f), color="white", bgcolor="#B71C1C")
+                
+                if f.endswith('.jscad'):
+                    def make_load(name): return lambda _: (setattr(txt_code, 'value', open(os.path.join(EXPORT_DIR, name)).read()), set_tab(0), page.update())
+                    acciones = ft.Row([ft.ElevatedButton("▶ CARGAR", on_click=make_load(f), color="white", bgcolor="#1B5E20"), btn_del])
+                    icon = "🧩"
+                elif f.endswith('.stl') or f.endswith('.obj'):
+                    # ENLACE DE DESCARGA NATIVO AL NAVEGADOR
+                    def make_down(name): return lambda _: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/exports/{name}")
+                    acciones = ft.Row([ft.ElevatedButton("⬇️ DESCARGAR", on_click=make_down(f), color="black", bgcolor="#00E5FF"), btn_del])
+                    icon = "🧊"
+                else:
+                    continue
+
+                file_list.controls.append(ft.Container(content=ft.Row([
+                    ft.Text(f"{icon} {f}", weight="bold", color="#E6EDF3", width=180, size=12), 
+                    acciones
+                ], scroll="auto"), padding=10, bgcolor="#161B22", border_radius=8))
             page.update()
 
         def save_project():
@@ -889,7 +940,7 @@ def main(page: ft.Page):
             tf_fb_url,
             ft.Row([ft.ElevatedButton("⬆️ SUBIR", on_click=sync_cloud, bgcolor="#212121", color="#00E676", expand=True), ft.ElevatedButton("⬇️ BAJAR", on_click=download_cloud, bgcolor="#212121", color="#00B0FF", expand=True)]),
             ft.Divider(color="#30363D"),
-            ft.Text("Almacenamiento Local (Dispositivo)", color="#00E5FF", weight="bold"), file_list
+            ft.Text("Modelos Terminados y Proyectos (Dispositivo)", color="#00E5FF", weight="bold"), file_list
         ], expand=True)
 
         main_container = ft.Container(content=view_editor, expand=True)
@@ -906,7 +957,7 @@ def main(page: ft.Page):
             ft.ElevatedButton("💻 CODE", on_click=lambda _: set_tab(0), bgcolor="#21262D", color="white"),
             ft.ElevatedButton("🌐 PARAM", on_click=lambda _: set_tab(1), color="black", bgcolor="#FFAB00"),
             ft.ElevatedButton("👁️ 3D", on_click=lambda _: set_tab(2), color="black", bgcolor="#00E5FF"),
-            ft.ElevatedButton("☁️ CLOUD", on_click=lambda _: set_tab(3), bgcolor="#21262D", color="white"),
+            ft.ElevatedButton("☁️ DB", on_click=lambda _: set_tab(3), bgcolor="#21262D", color="white"),
         ], scroll="auto")
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))

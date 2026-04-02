@@ -56,16 +56,16 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# APLICACIÓN PRINCIPAL v12.0 (THE APEX - DARK INDUSTRIAL)
+# APLICACIÓN PRINCIPAL v13.0 (MULTI-BODY & REVOLVE)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v12.0"
+        page.title = "NEXUS CAD v13.0"
         page.theme_mode = "dark"
-        page.bgcolor = "#0B0E14" # Dark Industrial Background
+        page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v12.0 PRO | Motor Macro y Tolerancia Global en línea", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v13.0 PRO | Fases 7 y 8 Desplegadas (Multi-Cuerpo y Revolución)", color="#00E676", weight="bold")
 
         def copy_text(text_to_copy):
             try:
@@ -123,7 +123,7 @@ def main(page: ft.Page):
             sl.on_change = internal_change
             return sl, ft.Row([ft.Text(label, width=110, size=12, color="#E6EDF3"), sl, txt_val])
 
-        # FASE 5: CONTROLADOR DE TOLERANCIA GLOBAL
+        # FASE 5: CONTROLADOR DE TOLERANCIA GLOBAL (Mantenido y funcional)
         sl_g_tol, r_g_tol = create_slider("Tol. Global (mm)", 0.0, 1.0, 0.2, False, lambda e: generate_param_code())
         panel_tolerancia = ft.Container(
             content=ft.Column([
@@ -133,14 +133,71 @@ def main(page: ft.Page):
         )
 
         # =========================================================
-        # MOTOR PARAMÉTRICO - LÓGICA DE GENERACIÓN
+        # MOTOR PARAMÉTRICO - LÓGICA DE GENERACIÓN (AHORA 24 HERRAMIENTAS)
         # =========================================================
         def generate_param_code(e=None):
             h = herramienta_actual
-            tol_global = sl_g_tol.value # FASE 5: Variable inyectada
+            tol_global = sl_g_tol.value 
             
             if h == "custom": pass 
 
+            # ===== FASE 7: MULTI-CUERPO =====
+            elif h == "multicaja":
+                w, l, ht, tol_tapa, sep = sl_mc_x.value, sl_mc_y.value, sl_mc_z.value, sl_mc_tol.value, sl_mc_sep.value
+                code = f"function main() {{\n  var w = {w}; var l = {l}; var h = {ht}; var tol = {tol_tapa}; var sep = {sep};\n"
+                code += f"  var t = 2; // Grosor de pared fijo\n"
+                code += f"  // 1. CAJA BASE\n"
+                code += f"  var ext = CSG.cube({{center:[0,0,h/2], radius:[w/2, l/2, h/2]}});\n"
+                code += f"  var int = CSG.cube({{center:[0,0,h/2+t], radius:[w/2-t, l/2-t, h/2]}});\n"
+                code += f"  var caja = ext.subtract(int);\n"
+                code += f"  // 2. TAPA MULTI-CUERPO (Cálculo de tolerancia invertida)\n"
+                code += f"  var tapa_b = CSG.cube({{center:[0,0,t/2], radius:[w/2, l/2, t/2]}});\n"
+                code += f"  var tapa_i = CSG.cube({{center:[0,0,-t/2], radius:[w/2-t-tol, l/2-t-tol, t/2]}});\n"
+                code += f"  var tapa = tapa_b.union(tapa_i).translate([0, 0, h + sep]);\n"
+                code += f"  // El motor renderiza ambos cuerpos simultáneamente en el mismo espacio\n"
+                code += f"  return caja.union(tapa);\n}}"
+                txt_code.value = code
+
+            # ===== FASE 8: PERFILES Y REVOLUCIÓN =====
+            elif h == "perfil":
+                puntas, rext, rint, ht = int(sl_perf_p.value), sl_perf_re.value, sl_perf_ri.value, sl_perf_h.value
+                code = f"function main() {{\n  var puntas = {puntas}; var rext = {rext}; var rint = {rint}; var h = {ht};\n"
+                code += f"  var pieza = new CSG();\n"
+                code += f"  var d_theta = (Math.PI * 2) / puntas;\n"
+                code += f"  // Extrusión polar 2D->3D de un polígono estrellado\n"
+                code += f"  for(var i=0; i<puntas; i++) {{\n"
+                code += f"     var a = i * d_theta;\n"
+                code += f"     var wedge = CSG.cube({{center:[0,0,h/2], radius:[rext, rint * 0.3, h/2]}});\n"
+                code += f"     wedge = wedge.rotateZ( (a * 180) / Math.PI );\n"
+                code += f"     pieza = pieza.union(wedge);\n  }}\n"
+                code += f"  var centro = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:rint, slices:32}});\n"
+                code += f"  return pieza.union(centro);\n}}"
+                txt_code.value = code
+
+            elif h == "revolucion":
+                ht, r1, r2, grosor = sl_rev_h.value, sl_rev_r1.value, sl_rev_r2.value, sl_rev_g.value
+                code = f"function main() {{\n  var h = {ht}; var r1 = {r1}; var r2 = {r2}; var grosor = {grosor};\n"
+                code += f"  var res = 60; // Alta resolución de revolución\n"
+                code += f"  var dz = h / res;\n"
+                code += f"  var solido = new CSG();\n  var hueco = new CSG();\n"
+                code += f"  for(var i=0; i<res; i++) {{\n"
+                code += f"      var z = i * dz;\n"
+                code += f"      // Ecuación Orgánica de Revolución (Senoide interpolada)\n"
+                code += f"      var f = Math.sin((z/h) * Math.PI);\n"
+                code += f"      var rad = r1 + (r2 - r1)*(z/h) + (f * 15);\n"
+                code += f"      var capa = CSG.cylinder({{start:[0,0,z], end:[0,0,z+dz], radius:rad, slices:32}});\n"
+                code += f"      solido = solido.union(capa);\n"
+                code += f"      // Cálculo dinámico del vaciado interno\n"
+                code += f"      if (grosor > 0 && z > grosor) {{\n"
+                code += f"         var r_int = Math.max(0.1, rad - grosor);\n"
+                code += f"         var capa_h = CSG.cylinder({{start:[0,0,z], end:[0,0,z+dz+0.1], radius:r_int, slices:32}});\n"
+                code += f"         hueco = hueco.union(capa_h);\n"
+                code += f"      }}\n  }}\n"
+                code += f"  if(grosor > 0) solido = solido.subtract(hueco);\n"
+                code += f"  return solido;\n}}"
+                txt_code.value = code
+
+            # ===== HERRAMIENTAS ANTERIORES (MAINTAINED) =====
             elif h == "cubo":
                 g = sl_c_grosor.value
                 code = f"function main() {{\n  var pieza = CSG.cube({{center:[0,0,{sl_c_z.value/2}], radius:[{sl_c_x.value/2}, {sl_c_y.value/2}, {sl_c_z.value/2}]}});\n"
@@ -159,16 +216,14 @@ def main(page: ft.Page):
                 code += f"  return pieza;\n}}"
                 txt_code.value = code
             
-            # FASE 5: CHAFLANES NATIVOS EN ESCUADRA
             elif h == "escuadra":
                 l, w, t, hr, chaf = sl_l_largo.value, sl_l_ancho.value, sl_l_grosor.value, sl_l_hueco.value, sl_l_chaf.value
                 code = f"function main() {{\n  var l = {l}; var w = {w}; var t = {t}; var r = {hr}; var chaf = {chaf};\n"
                 code += f"  var base = CSG.cube({{center:[l/2, w/2, t/2], radius:[l/2, w/2, t/2]}});\n"
                 code += f"  var wall = CSG.cube({{center:[t/2, w/2, l/2], radius:[t/2, w/2, l/2]}});\n  var pieza = base.union(wall);\n"
                 if chaf > 0:
-                    # Sustracción de chaflán a 45 grados en el vértice interior
                     code += f"  var chaflan = CSG.cube({{center:[0, w/2, 0], radius:[chaf, w/2+1, chaf]}}).translate([t, 0, t]).rotateY(45);\n"
-                    code += f"  pieza = pieza.union(chaflan); // Relleno de esquina para refuerzo estructural\n"
+                    code += f"  pieza = pieza.union(chaflan);\n"
                 if hr > 0:
                     code += f"  var h1 = CSG.cylinder({{start:[l*0.7, w/2, -1], end:[l*0.7, w/2, t+1], radius:r, slices:32}});\n"
                     code += f"  var h2 = CSG.cylinder({{start:[-1, w/2, l*0.7], end:[t+1, w/2, l*0.7], radius:r, slices:32}});\n"
@@ -190,12 +245,12 @@ def main(page: ft.Page):
             elif h == "fijacion":
                 m, l_tornillo = sl_fij_m.value, sl_fij_l.value
                 r_hex = (m * 1.8) / 2; h_cabeza = m * 0.8; r_eje = m / 2
-                if l_tornillo == 0: # Hembra (Aplica Tol Global sumando al hueco)
+                if l_tornillo == 0: 
                     code = f"function main() {{\n  var m = {m}; var h = {h_cabeza}; var g_tol = {tol_global};\n"
                     code += f"  var cuerpo = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:{r_hex}, slices:6}});\n"
                     code += f"  var agujero = CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius:({r_eje} + g_tol), slices:32}});\n"
                     code += f"  return cuerpo.subtract(agujero);\n}}"
-                else: # Macho (Aplica Tol Global restando al eje)
+                else: 
                     code = f"function main() {{\n"
                     code += f"  var m = {m}; var l_tornillo = {l_tornillo}; var g_tol = {tol_global};\n"
                     code += f"  var h_cabeza = {h_cabeza}; var r_hex = {r_hex};\n"
@@ -490,7 +545,7 @@ def main(page: ft.Page):
             txt_code.update()
 
         # =========================================================
-        # SECCIÓN CRÍTICA: DEFINICIÓN DE INTERFACES ANTES DE USO
+        # SECCIÓN CRÍTICA: DEFINICIÓN DE INTERFACES (24 HERRAMIENTAS)
         # =========================================================
         col_custom = ft.Column([
             ft.Text("Módulo Activo: Tu Código de IA", color="#00E676", weight="bold"),
@@ -498,11 +553,32 @@ def main(page: ft.Page):
             ft.Row([
                 ft.ElevatedButton("🕳️ Vaciado", on_click=lambda _: inject_snippet("  var vaciado = pieza.scale([0.9, 0.9, 0.9]);\n  pieza = pieza.subtract(vaciado);"), bgcolor="#4E342E", color="white"),
                 ft.ElevatedButton("🔄 Redondeo", on_click=lambda _: inject_snippet("  pieza = pieza.expand(2, 16);"), bgcolor="#1B5E20", color="white"),
-                # FASE 5: MACRO DE CHAFLÁN
                 ft.ElevatedButton("🪚 Chaflán", on_click=lambda _: inject_snippet("  var chaflan = CSG.cube({center:[0,0,0], radius:[5,5,5]}).rotateX(45).translate([0,0,10]);\n  pieza = pieza.subtract(chaflan);"), bgcolor="#E65100", color="white"),
             ], scroll="auto")
         ], visible=True)
 
+        # NUEVAS UI: FASE 7 (Multi-Body)
+        sl_mc_x, r_mc_x = create_slider("Ancho X", 20, 200, 60, False, generate_param_code)
+        sl_mc_y, r_mc_y = create_slider("Largo Y", 20, 200, 40, False, generate_param_code)
+        sl_mc_z, r_mc_z = create_slider("Alto Z", 10, 100, 30, False, generate_param_code)
+        sl_mc_tol, r_mc_tol = create_slider("Tol. Encaje", 0.0, 2.0, 0.4, False, generate_param_code)
+        sl_mc_sep, r_mc_sep = create_slider("Sep. Visual (Z)", 0, 50, 15, False, generate_param_code)
+        col_multicaja = ft.Column([ft.Text("Ensamblaje Caja+Tapa. Genera dos sólidos separados en el espacio.", color="#7CB342", size=12), ft.Container(content=ft.Column([r_mc_x, r_mc_y, r_mc_z, r_mc_tol, r_mc_sep]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
+        # NUEVAS UI: FASE 8 (2D a 3D)
+        sl_perf_p, r_perf_p = create_slider("Nº Puntas", 3, 20, 5, True, generate_param_code)
+        sl_perf_re, r_perf_re = create_slider("Radio Externo", 10, 100, 40, False, generate_param_code)
+        sl_perf_ri, r_perf_ri = create_slider("Radio Interno", 5, 80, 15, False, generate_param_code)
+        sl_perf_h, r_perf_h = create_slider("Grosor (Z)", 2, 50, 10, False, generate_param_code)
+        col_perfil = ft.Column([ft.Text("Perfil Extruido (Estrella paramétrica) vía barrido polar.", color="#AB47BC", size=12), ft.Container(content=ft.Column([r_perf_p, r_perf_re, r_perf_ri, r_perf_h]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
+        sl_rev_h, r_rev_h = create_slider("Altura Total", 20, 200, 80, False, generate_param_code)
+        sl_rev_r1, r_rev_r1 = create_slider("Radio Base", 10, 100, 30, False, generate_param_code)
+        sl_rev_r2, r_rev_r2 = create_slider("Radio Cuello", 5, 80, 15, False, generate_param_code)
+        sl_rev_g, r_rev_g = create_slider("Grosor Pared", 0, 15, 2, False, generate_param_code)
+        col_revolucion = ft.Column([ft.Text("Sólido de Revolución Orgánico. Cálculos sinusoidales en tiempo real.", color="#AB47BC", size=12), ft.Container(content=ft.Column([r_rev_h, r_rev_r1, r_rev_r2, r_rev_g]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
+        # UI MANTENIDAS (Fases 1 a 6)
         sl_c_x, r_c_x = create_slider("Ancho X", 5, 200, 50, False, generate_param_code)
         sl_c_y, r_c_y = create_slider("Fondo Y", 5, 200, 30, False, generate_param_code)
         sl_c_z, r_c_z = create_slider("Alto Z", 5, 200, 20, False, generate_param_code)
@@ -515,7 +591,6 @@ def main(page: ft.Page):
         sl_p_lados, r_p_lados = create_slider("Caras", 3, 64, 64, True, generate_param_code)
         col_cilindro = ft.Column([ft.Text("Cilindro/Tubo.", color="#8B949E", size=12), ft.Container(content=ft.Column([r_p_rext, r_p_rint, r_p_h, r_p_lados]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # FASE 5: CHAFLÁN INTEGRADO EN ESCUADRA
         sl_l_largo, r_l_l = create_slider("Largo Brazos", 10, 100, 40, False, generate_param_code)
         sl_l_ancho, r_l_a = create_slider("Ancho Perfil", 5, 50, 15, False, generate_param_code)
         sl_l_grosor, r_l_g = create_slider("Grosor Chapa", 1, 20, 3, False, generate_param_code)
@@ -607,14 +682,15 @@ def main(page: ft.Page):
         col_naca = ft.Column([ft.Text("Perfil Alar NACA (NASA).", color="#00E5FF", size=12), ft.Container(content=ft.Column([r_naca_c, r_naca_g, r_naca_e]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
         # =========================================================
-        # FUNCIONES UI Y CARRUSELES
+        # GESTIÓN Y RENDERIZADO DE LOS CARRUSELES
         # =========================================================
         def update_constructor_ui(e=None):
             paneles = [
                 col_custom, col_cubo, col_cilindro, col_escuadra, col_engranaje, col_pcb, 
                 col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, 
                 col_planetario, col_polea, col_helice, col_texto, col_rotula, col_carcasa,
-                col_muelle, col_acme, col_codo, col_naca
+                col_muelle, col_acme, col_codo, col_naca, 
+                col_multicaja, col_perfil, col_revolucion # NUEVOS FASE 7 y 8
             ]
             for p in paneles: p.visible = False
             
@@ -640,6 +716,9 @@ def main(page: ft.Page):
             elif v == "acme": col_acme.visible = True
             elif v == "codo": col_codo.visible = True
             elif v == "naca": col_naca.visible = True
+            elif v == "multicaja": col_multicaja.visible = True
+            elif v == "perfil": col_perfil.visible = True
+            elif v == "revolucion": col_revolucion.visible = True
             
             generate_param_code()
             page.update()
@@ -656,25 +735,30 @@ def main(page: ft.Page):
             )
 
         cat_especial = ft.Row([thumbnail("🧠", "Mi Código", "custom", "#000000"), thumbnail("🔠", "Texto 3D", "texto", "#880E4F")], scroll="auto")
+        cat_multicuerpo = ft.Row([thumbnail("📦", "Caja+Tapa", "multicaja", "#33691E")], scroll="auto")
+        cat_perfiles = ft.Row([thumbnail("⭐", "Estrella 2D", "perfil", "#F57F17"), thumbnail("🏺", "Revolución", "revolucion", "#6A1B9A")], scroll="auto")
         cat_aero = ft.Row([thumbnail("✈️", "Perfil NACA", "naca", "#01579B"), thumbnail("🚁", "Hélice", "helice", "#006064"), thumbnail("🚰", "Tubo Curvo", "codo", "#004D40")], scroll="auto")
         cat_mecanismos = ft.Row([thumbnail("🌀", "Muelle", "muelle", "#3E2723"), thumbnail("🦾", "Rótula", "rotula", "#BF360C"), thumbnail("⚙️", "Planetario", "planetario", "#E65100"), thumbnail("🛼", "Polea", "polea", "#0277BD"), thumbnail("🛞", "Rodamiento", "rodamiento", "#4E342E")], scroll="auto")
         cat_ingenieria = ft.Row([thumbnail("🚧", "Eje ACME", "acme", "#212121"), thumbnail("🗃️", "Carcasa", "carcasa", "#1B5E20"), thumbnail("🔩", "Tornillos", "fijacion", "#B71C1C"), thumbnail("🗜️", "Abrazadera", "abrazadera", "#0D47A1"), thumbnail("🔌", "Caja PCB", "pcb", "#004D40"), thumbnail("🚪", "Bisagra", "bisagra", "#311B92"), thumbnail("🏗️", "V-Slot", "vslot", "#1A237E")], scroll="auto")
         cat_basico = ft.Row([thumbnail("📦", "Caja", "cubo", "#263238"), thumbnail("🛢️", "Cilindro", "cilindro", "#263238"), thumbnail("📐", "Escuadra", "escuadra", "#D84315"), thumbnail("⚙️", "Piñón", "engranaje", "#FF6F00")], scroll="auto")
 
         view_constructor = ft.Column([
-            panel_tolerancia, # EL NUEVO PANEL DE FASE 5
+            panel_tolerancia, 
             ft.Text("💡 Especiales y Branding:", size=12, color="#8B949E"), cat_especial,
+            ft.Text("🧱 Ensamblajes Multi-Cuerpo (Fase 7):", size=12, color="#7CB342"), cat_multicuerpo,
+            ft.Text("📐 Perfiles y Revolución 2D->3D (Fase 8):", size=12, color="#AB47BC"), cat_perfiles,
             ft.Text("🛸 Aero y Orgánico:", size=12, color="#00E5FF"), cat_aero,
             ft.Text("⚙️ Cinemática y Mecanismos:", size=12, color="#FFAB00"), cat_mecanismos,
             ft.Text("🛠️ Ingeniería:", size=12, color="#FF9100"), cat_ingenieria,
             ft.Text("📦 Geometría Básica:", size=12, color="#8B949E"), cat_basico,
             ft.Divider(color="#30363D"),
             
-            # LAS 21 COLUMNAS
+            # LAS 24 HERRAMIENTAS INYECTADAS
             col_custom, col_texto, col_naca, col_helice, col_codo,
             col_muelle, col_rotula, col_planetario, col_polea, col_rodamiento, 
             col_acme, col_carcasa, col_fijacion, col_abrazadera, col_pcb, col_bisagra, 
             col_vslot, col_cubo, col_cilindro, col_escuadra, col_engranaje,
+            col_multicaja, col_perfil, col_revolucion,
             
             ft.Container(height=10),
             ft.ElevatedButton("▶ RENDERIZAR MALLA (3D)", on_click=lambda _: run_render(), color="black", bgcolor="#00E676", height=60, width=float('inf'))
@@ -695,7 +779,7 @@ def main(page: ft.Page):
             ft.Text("Motor 3D Renderizado", text_align="center", color="#00E5FF", weight="bold"),
             ft.Row([btn_visor], alignment=ft.MainAxisAlignment.CENTER),
             ft.Container(height=20),
-            ft.Text("📦 Exportación STL disponible en el visor web.", color="#8B949E", text_align="center", size=12)
+            ft.Text("📦 Usa la función del visor web para separar STLs en ensamblajes.", color="#8B949E", text_align="center", size=12)
         ], expand=True)
         
         file_list = ft.ListView(expand=True, spacing=10)

@@ -53,7 +53,7 @@ def get_sys_info():
                 load = float(f.read().split()[0])
             cpu_p = min((load / cores) * 100.0, 100.0)
         except:
-            pass # Si falla (ej. en Windows sin psutil) devuelve 0
+            pass # Si falla (ej. en Android nuevo) devuelve 0
     return cpu_p, ram_p, cores
 
 # =========================================================
@@ -133,12 +133,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v18.0 PRO"
+        page.title = "NEXUS CAD v18.1 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v18.0 PRO | Texto Avanzado & HW Mon", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v18.1 PRO | Motor Texto y Telemetría", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var GW = 50; var GL = 50; var GH = 20; var GT = 2;\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -235,13 +235,19 @@ def main(page: ft.Page):
         def inst(texto): return ft.Text("ℹ️ " + texto, color="#FFD54F", size=11, italic=True)
 
         # =========================================================
-        # MEJORA: MOTOR DE TEXTO AVANZADO
+        # MEJORA: MOTOR DE TEXTO AVANZADO (FIX BUG FLET)
         # =========================================================
-        tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=15, bgcolor="#161B22", on_change=update_code_wrapper)
-        dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel Fino"), ft.dropdown.Option("Voxel Grueso"), ft.dropdown.Option("Braille")], value="Voxel Grueso", expand=True, bgcolor="#161B22", on_change=update_code_wrapper)
-        dd_txt_base = ft.Dropdown(options=[ft.dropdown.Option("Solo Texto"), ft.dropdown.Option("Llavero (Anilla)"), ft.dropdown.Option("Placa Atornillable"), ft.dropdown.Option("Soporte de Mesa"), ft.dropdown.Option("Colgante Militar"), ft.dropdown.Option("Placa Ovalada")], value="Colgante Militar", expand=True, bgcolor="#161B22", on_change=update_code_wrapper)
-        sw_txt_grabado = ft.Switch(label="Texto Grabado (Hueco)", value=False, active_color="#00E5FF", on_change=update_code_wrapper)
+        tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=15, bgcolor="#161B22")
+        dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel Fino"), ft.dropdown.Option("Voxel Grueso"), ft.dropdown.Option("Braille")], value="Voxel Grueso", expand=True, bgcolor="#161B22")
+        dd_txt_base = ft.Dropdown(options=[ft.dropdown.Option("Solo Texto"), ft.dropdown.Option("Llavero (Anilla)"), ft.dropdown.Option("Placa Atornillable"), ft.dropdown.Option("Soporte de Mesa"), ft.dropdown.Option("Colgante Militar"), ft.dropdown.Option("Placa Ovalada")], value="Colgante Militar", expand=True, bgcolor="#161B22")
+        sw_txt_grabado = ft.Switch(label="Texto Grabado (Hueco)", value=False, active_color="#00E5FF")
         
+        # FIX: Enlazar los eventos DESPUÉS de la creación del objeto para evitar errores de compatibilidad
+        tf_texto.on_change = update_code_wrapper
+        dd_txt_estilo.on_change = update_code_wrapper
+        dd_txt_base.on_change = update_code_wrapper
+        sw_txt_grabado.on_change = update_code_wrapper
+
         col_texto = ft.Column([
             ft.Text("Tipografía y Placas (V2)", color="#880E4F", weight="bold"), 
             inst("GH define el grosor de la placa. 'Grabado' hunde las letras en el material."), 
@@ -252,7 +258,7 @@ def main(page: ft.Page):
             ]), bgcolor="#161B22", padding=10, border_radius=8)
         ], visible=False)
 
-        # OTRAS HERRAMIENTAS (Resumidas para ahorrar espacio en este bloque, mantienen tu código exacto)
+        # OTRAS HERRAMIENTAS
         sl_las_x, r_las_x = create_slider("Ancho Objeto", 10, 200, 50, False)
         sl_las_y, r_las_y = create_slider("Largo Objeto", 10, 200, 50, False)
         sl_las_z, r_las_z = create_slider("Altura Z Corte", 0, 100, 5, False)

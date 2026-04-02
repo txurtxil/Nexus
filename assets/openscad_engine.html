@@ -4,37 +4,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - Visor WebGL</title>
+    <title>NEXUS CAD PRO - Visor WebGL v3.1</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #0B0E14; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #E6EDF3; }
+        :root {
+            --nexus-cyan: #00E5FF;
+            --nexus-green: #00E676;
+            --nexus-bg: rgba(11, 14, 20, 0.85);
+            --nexus-border: #30363D;
+        }
+        body { margin: 0; overflow: hidden; background-color: #0B0E14; font-family: 'Segoe UI', Tahoma, sans-serif; color: #E6EDF3; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
         
-        .nexus-panel { position: absolute; background: rgba(11, 14, 20, 0.85); border: 1px solid #30363D; border-radius: 6px; padding: 10px; z-index: 10; backdrop-filter: blur(8px); }
+        .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        #top-menu { top: 10px; left: 10px; display: flex; gap: 8px; flex-wrap: wrap; max-width: 95vw; }
-        .btn { background: #21262D; border: 1px solid #30363D; color: #fff; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-transform: uppercase; transition: all 0.2s; }
+        /* PANEL IZQUIERDO: HERRAMIENTAS */
+        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; width: 140px; }
+        .btn { background: #21262D; border: 1px solid var(--nexus-border); color: #fff; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-transform: uppercase; transition: all 0.2s; text-align: left; display: flex; justify-content: space-between; }
         .btn:active { transform: scale(0.95); }
-        .btn-rotar { border-bottom: 3px solid #00E676; }
-        .btn-persp { border-bottom: 3px solid #6200EA; }
-        .btn-mat { border-bottom: 3px solid #FFAB00; }
-        .btn-stl { border-bottom: 3px solid #D50000; }
-        .btn-console { border-bottom: 3px solid #00B0FF; }
+        .btn:hover { border-color: var(--nexus-cyan); }
         
-        #bottom-stats { bottom: 10px; right: 10px; font-size: 11px; border-right: 3px solid #00E676; text-align: right; }
-        .stat-val { color: #00E5FF; font-weight: bold; }
+        /* PANEL DERECHO: HUD DE HARDWARE Y GEOMETRÍA */
+        #hud-panel { top: 15px; right: 15px; width: 220px; font-size: 11px; }
+        .hud-section-title { color: var(--nexus-cyan); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--nexus-border); letter-spacing: 1px; font-size: 10px; }
+        .hud-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .hud-label { color: #8B949E; }
+        .hud-value { color: #fff; font-family: 'Courier New', monospace; text-align: right; word-break: break-all; max-width: 130px; }
+        .hud-value.highlight { color: var(--nexus-green); font-weight: bold; }
         
-        #console { top: 60px; left: 10px; width: 320px; max-height: 250px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 11px; display: none; }
-        .log-ok { color: #00E676; }
+        /* CONSOLA INFERIOR */
+        #console { bottom: 15px; left: 15px; width: calc(100vw - 30px); max-width: 500px; max-height: 120px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; }
+        .log-ok { color: var(--nexus-green); }
         .log-err { color: #FF5252; }
         .log-warn { color: #FFAB00; }
+        .log-sys { color: var(--nexus-cyan); }
 
-        /* UI PRO: MULTICORE Y PROGRESO */
-        #pro-ui { bottom: 30px; left: 50%; transform: translateX(-50%); width: 280px; text-align: center; border-top: 2px solid #00E5FF; display: none; }
-        #core-status { font-size: 12px; font-weight: bold; color: #00E5FF; margin-bottom: 8px; letter-spacing: 1px; }
-        #progress-bg { background: #161B22; border-radius: 10px; height: 10px; width: 100%; overflow: hidden; border: 1px solid #30363D; }
-        #progress-fill { background: linear-gradient(90deg, #00E676, #00B0FF); height: 100%; width: 0%; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(0, 229, 255, 0.5); }
+        /* SPINNER DE CARGA */
+        #loader { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; background: var(--nexus-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--nexus-cyan); text-align: center; }
+        .spinner { border: 3px solid rgba(0, 229, 255, 0.2); border-top: 3px solid var(--nexus-cyan); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
-    <!-- Core Engine Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js"></script>
@@ -43,61 +51,84 @@
 
     <div id="canvas-container"></div>
     
-    <div id="top-menu" class="nexus-panel">
-        <button class="btn btn-rotar" onclick="toggleAutoRotate()">🔄 Rotar</button>
-        <button class="btn btn-persp" onclick="toggleCamera()">🎥 Persp/Orto</button>
-        <button class="btn btn-mat" onclick="changeMaterial()">🎨 Material</button>
-        <button class="btn btn-stl" onclick="exportSTL()">⬇️ Bajar STL</button>
-        <button class="btn btn-console" onclick="toggleConsole()">🖥️ Logs</button>
+    <div id="toolbar" class="nexus-panel">
+        <button class="btn" style="border-left: 3px solid #00E676;" onclick="toggleAutoRotate()">Rotar <span>🔄</span></button>
+        <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
+        <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura <span>🎨</span></button>
+        <button class="btn" style="border-left: 3px solid #D50000;" onclick="exportSTL()">Bajar STL <span>⬇️</span></button>
+        <button class="btn" style="border-left: 3px solid #00B0FF;" onclick="toggleConsole()">Motor Logs <span>🖥️</span></button>
+    </div>
+
+    <div id="hud-panel" class="nexus-panel">
+        <div class="hud-section-title">Hardware API Detectado</div>
+        <div class="hud-row"><span class="hud-label">CPU Cores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
+        <div class="hud-row"><span class="hud-label">Dispositivo RAM:</span> <span class="hud-value" id="hw-ram">-</span></div>
+        <div class="hud-row"><span class="hud-label">Render GPU:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
+        
+        <div style="height: 10px;"></div>
+        
+        <div class="hud-section-title">Análisis de Geometría</div>
+        <div class="hud-row"><span class="hud-label">Eje X (Ancho):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Eje Y (Largo):</span> <span class="hud-value" id="geo-y">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Eje Z (Alto):</span> <span class="hud-value" id="geo-z">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Volumen (Aprox):</span> <span class="hud-value" id="geo-vol">0 mm³</span></div>
+        <div class="hud-row"><span class="hud-label">Polígonos:</span> <span class="hud-value highlight" id="geo-poly">0</span></div>
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-ok">> NEXUS Motor CAD v3.0 PRO Iniciado.</div>
-        <div class="log-ok">> Núcleos de CPU preparados para paralelismo.</div>
+        <div class="log-sys">> Inicializando Telemetría de Hardware...</div>
         <div id="log-content"></div>
     </div>
 
-    <!-- AQUÍ ESTÁ LA NUEVA INTERFAZ QUE PEDÍAS -->
-    <div id="pro-ui" class="nexus-panel">
-        <div id="core-status">⚡ ESPERANDO INSTRUCCIONES...</div>
-        <div id="progress-bg"><div id="progress-fill"></div></div>
-    </div>
-
-    <div id="bottom-stats" class="nexus-panel">
-        <div>Dimensiones: <span id="dim-val" class="stat-val">0x0x0 mm</span></div>
-        <div>Polígonos: <span id="poly-val" class="stat-val">0</span></div>
-        <div style="color:#8B949E; margin-top:5px;">Motor: JS-WebGL v3.0</div>
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="loader-text" style="color: #00E5FF; font-size: 12px; font-weight: bold; letter-spacing: 1px;">COMPILANDO...</div>
     </div>
 
     <script>
         // ========================================================
-        // POLYFILLS DE CSG.JS (REPARADOR DE ERRORES AUTOMÁTICO)
+        // EXTRACCIÓN DE HARDWARE (REAL)
+        // ========================================================
+        function detectHardware() {
+            // CPU Cores Lógicos
+            const cores = navigator.hardwareConcurrency || 'Desconocido';
+            document.getElementById('hw-cpu').innerText = cores;
+            
+            // Memoria RAM (Solo en navegadores basados en Chromium)
+            const ram = navigator.deviceMemory ? `>= ${navigator.deviceMemory} GB` : 'Oculto por SO';
+            document.getElementById('hw-ram').innerText = ram;
+
+            // GPU Info a través de WebGL
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+                    const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                    // Limpiamos un poco el string larguísimo que suelen dar las GPUs móviles
+                    let gpuName = renderer.split(',')[0].replace('ANGLE (', '');
+                    document.getElementById('hw-gpu').innerText = gpuName;
+                    log(`<span class='log-sys'>> GPU detectada: ${gpuName}</span>`);
+                } else {
+                    document.getElementById('hw-gpu').innerText = "GPU No Disponible";
+                }
+            } catch (e) {
+                document.getElementById('hw-gpu').innerText = "Bloqueado";
+            }
+        }
+
+        // ========================================================
+        // POLYFILLS CSG.JS
         // ========================================================
         function injectCSGPolyfills() {
-            if (typeof CSG === 'undefined') {
-                log("<span class='log-err'>ERROR CRÍTICO: csg.js no se cargó.</span>");
-                return;
-            }
-            // Repara el error: "movil.translate is not a function"
-            if (!CSG.prototype.translate) {
-                CSG.prototype.translate = function(v) { 
-                    return this.transform(CSG.Matrix4x4.translation(v)); 
-                };
-            }
-            // Repara el error: "frame.scale is not a function"
-            if (!CSG.prototype.scale) {
-                CSG.prototype.scale = function(v) { 
-                    if(typeof v === 'number') v = [v,v,v];
-                    return this.transform(CSG.Matrix4x4.scaling(v)); 
-                };
-            }
-            // Repara el error: "wedge.rotateZ is not a function"
+            if (!CSG.prototype.translate) CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
+            if (!CSG.prototype.scale) CSG.prototype.scale = function(v) { if(typeof v === 'number') v = [v,v,v]; return this.transform(CSG.Matrix4x4.scaling(v)); };
             if (!CSG.prototype.rotateX) {
                 CSG.prototype.rotateX = function(deg) { return this.transform(CSG.Matrix4x4.rotationX(deg)); };
                 CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
                 CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             }
-            log("> CSG Polyfills inyectados (Soporte Translate/Scale/Rotate activo).");
         }
 
         // ========================================================
@@ -107,10 +138,10 @@
         let currentMesh = null;
         let matIndex = 0;
         const materials = [
-            new THREE.MeshStandardMaterial({ color: 0x00E5FF, roughness: 0.3, metalness: 0.8 }), // Nexus Cyan
-            new THREE.MeshStandardMaterial({ color: 0xFFAB00, roughness: 0.4, metalness: 0.5 }), // Industrial Orange
-            new THREE.MeshNormalMaterial(), // Debug Normals
-            new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }) // Wireframe
+            new THREE.MeshStandardMaterial({ color: 0x00E5FF, roughness: 0.2, metalness: 0.8 }), 
+            new THREE.MeshStandardMaterial({ color: 0xFFAB00, roughness: 0.4, metalness: 0.5 }), 
+            new THREE.MeshNormalMaterial(), 
+            new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }) 
         ];
 
         function log(msg) {
@@ -123,32 +154,28 @@
             c.style.display = c.style.display === 'none' || c.style.display === '' ? 'block' : 'none';
         }
 
-        // ========================================================
-        // INICIALIZACIÓN DE THREE.JS
-        // ========================================================
         function initWebGL() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0B0E14);
-
-            // Grid y Luces
+            
+            // Grid de Ingeniería
             const grid = new THREE.GridHelper(200, 40, 0x30363D, 0x161B22);
             grid.position.y = -0.1;
             scene.add(grid);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambientLight);
+            // Iluminación Profesional
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight.position.set(50, 100, 50);
             scene.add(dirLight);
-            const backLight = new THREE.DirectionalLight(0x00E5FF, 0.5);
+            const backLight = new THREE.DirectionalLight(0x00E5FF, 0.4);
             backLight.position.set(-50, 50, -50);
             scene.add(backLight);
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(60, 40, 60);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
@@ -165,6 +192,7 @@
 
             animate();
             injectCSGPolyfills();
+            detectHardware();
         }
 
         function animate() {
@@ -173,7 +201,6 @@
             renderer.render(scene, camera);
         }
 
-        // Funciones de Botones UI
         function toggleAutoRotate() { controls.autoRotate = !controls.autoRotate; }
         function changeMaterial() {
             if(currentMesh) {
@@ -182,14 +209,13 @@
             }
         }
         function toggleCamera() {
-            // Animación sencilla de FoV para simular Ortográfica
             if(camera.fov === 45) { camera.fov = 10; camera.position.multiplyScalar(4); } 
             else { camera.fov = 45; camera.position.multiplyScalar(0.25); }
             camera.updateProjectionMatrix();
         }
 
         // ========================================================
-        // CONVERSOR CSG -> THREE.JS (Escrito desde cero para v3.0)
+        // CONVERSOR CSG -> THREE.JS
         // ========================================================
         function CSGToBufferGeometry(csg) {
             const geom = new THREE.BufferGeometry();
@@ -199,7 +225,6 @@
 
             for (let i = 0; i < polys.length; i++) {
                 const poly = polys[i];
-                // Triangulación de polígonos convexos
                 for (let j = 2; j < poly.vertices.length; j++) {
                     const v0 = poly.vertices[0];
                     const v1 = poly.vertices[j - 1];
@@ -220,93 +245,66 @@
         }
 
         // ========================================================
-        // MOTOR DE EJECUCIÓN CON UI MULTI-CORE (SIMULADO EN JS)
+        // MOTOR DE EJECUCIÓN 
         // ========================================================
-        function setProgress(percent, text, color="#00E5FF") {
-            const ui = document.getElementById('pro-ui');
-            ui.style.display = 'block';
-            document.getElementById('core-status').innerText = text;
-            document.getElementById('core-status').style.color = color;
-            document.getElementById('progress-fill').style.width = percent + '%';
-            if(color !== "#00E5FF") {
-                document.getElementById('progress-fill').style.background = color;
-            } else {
-                document.getElementById('progress-fill').style.background = "linear-gradient(90deg, #00E676, #00B0FF)";
-            }
-        }
-
         function executeCSGCode(rawCode) {
-            setProgress(10, "⚡ PARSEANDO ALGORITMO...");
-            log("<span class='log-warn'>> Recibida nueva instrucción CAD.</span>");
+            document.getElementById('loader').style.display = 'block';
             
-            // Simular un pequeño delay de Workers para que la UI se actualice
+            // Pequeño timeout para permitir que el DOM muestre el loader antes de bloquear el hilo principal
             setTimeout(() => {
-                setProgress(40, "🧠 ASIGNANDO 8 NÚCLEOS LOGICOS...");
-                
-                setTimeout(() => {
-                    setProgress(70, "⚙️ EVALUANDO MATRIZ CSG...");
+                try {
+                    log("<span class='log-sys'>> Evaluando código CSG en hilo principal...</span>");
+                    if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
+
+                    let fn = new Function(rawCode + "\nreturn main();");
+                    let csgResult = fn();
+
+                    if (!csgResult || typeof csgResult.toPolygons !== 'function') throw new Error("main() no retornó un objeto CSG.");
+
+                    let geo = CSGToBufferGeometry(csgResult);
+                    geo.computeBoundingBox();
                     
-                    try {
-                        // Limpiar escena anterior
-                        if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
+                    currentMesh = new THREE.Mesh(geo, materials[matIndex]);
+                    
+                    const center = new THREE.Vector3();
+                    geo.boundingBox.getCenter(center);
+                    currentMesh.position.sub(center); 
+                    
+                    scene.add(currentMesh);
 
-                        // Ejecutar código
-                        let codeToRun = rawCode + "\nreturn main();";
-                        let fn = new Function(codeToRun);
-                        let csgResult = fn();
+                    // --- ACTUALIZACIÓN DEL HUD DE GEOMETRÍA ---
+                    const size = new THREE.Vector3();
+                    geo.boundingBox.getSize(size);
+                    
+                    document.getElementById('geo-x').innerText = size.x.toFixed(2) + " mm";
+                    document.getElementById('geo-y').innerText = size.y.toFixed(2) + " mm";
+                    document.getElementById('geo-z').innerText = size.z.toFixed(2) + " mm";
+                    
+                    // Volumen de la Bounding Box (Aproximación cúbica máxima)
+                    const volAprox = size.x * size.y * size.z;
+                    document.getElementById('geo-vol').innerText = Math.round(volAprox) + " mm³";
+                    
+                    document.getElementById('geo-poly').innerText = (geo.attributes.position.count / 3).toString();
 
-                        if (!csgResult || typeof csgResult.toPolygons !== 'function') {
-                            throw new Error("La función main() no retornó un objeto CSG válido.");
-                        }
+                    log("<span class='log-ok'>> Malla WebGL generada correctamente.</span>");
 
-                        setProgress(90, "🎨 RENDERIZANDO WEBGL...");
-
-                        // Convertir a ThreeJS
-                        let geo = CSGToBufferGeometry(csgResult);
-                        geo.computeBoundingBox();
-                        
-                        currentMesh = new THREE.Mesh(geo, materials[matIndex]);
-                        
-                        // Centrar el modelo
-                        const center = new THREE.Vector3();
-                        geo.boundingBox.getCenter(center);
-                        currentMesh.position.sub(center); // Trasladar al centro
-                        
-                        scene.add(currentMesh);
-
-                        // Actualizar Estadísticas
-                        const size = new THREE.Vector3();
-                        geo.boundingBox.getSize(size);
-                        document.getElementById('dim-val').innerText = `${size.x.toFixed(1)} x ${size.y.toFixed(1)} x ${size.z.toFixed(1)} mm`;
-                        document.getElementById('poly-val').innerText = (geo.attributes.position.count / 3).toString();
-
-                        log("<span class='log-ok'>> Renderizado completado con éxito.</span>");
-                        
-                        setTimeout(() => { document.getElementById('pro-ui').style.display = 'none'; }, 1000);
-
-                    } catch (err) {
-                        let errMsg = err.message;
-                        // REPARACIÓN ESPECÍFICA PARA EL ERROR FLIP
-                        if (errMsg.includes("flip")) {
-                            errMsg += "<br><strong>=> [PISTA DE IA]: Error de geometría degenerada/caras coplanares. Ajusta un poco el slider de 'Tol. Global (mm)' en el panel de Ajustes.</strong>";
-                        }
-                        log("<span class='log-err'>> ERROR FATAL: " + errMsg + "</span>");
-                        setProgress(100, "❌ FALLO EN COMPILACIÓN", "#FF5252");
-                        
-                        // Hacer que la consola se abra sola para que el usuario vea el error
-                        document.getElementById('console').style.display = 'block';
-                    }
-                }, 200); // 200ms delay for core sim
-            }, 200); // 200ms delay for parse sim
+                } catch (err) {
+                    let errMsg = err.message;
+                    if (errMsg.includes("flip")) errMsg += " (Geometría coplanar. Ajusta Tol. Global en la App)";
+                    log("<span class='log-err'>> ERROR: " + errMsg + "</span>");
+                    document.getElementById('console').style.display = 'block';
+                } finally {
+                    document.getElementById('loader').style.display = 'none';
+                }
+            }, 50);
         }
 
         // ========================================================
-        // BUCLE DE COMUNICACIÓN CON FLET (PYTHON API)
+        // POLLING AL SERVIDOR LOCAL (FLET)
         // ========================================================
         let lastCode = "";
         function checkServer() {
-            let apiURL = window.location.origin + '/api/get_code_b64.json';
-            fetch(apiURL)
+            fetch(window.location.origin + '/api/get_code_b64.json')
                 .then(r => r.json())
                 .then(data => {
                     if (data && data.code_b64 && data.code_b64 !== "") {
@@ -316,44 +314,29 @@
                             executeCSGCode(decoded);
                         }
                     }
-                }).catch(e => { /* Silencioso si no hay respuesta de Python */ });
+                }).catch(e => {});
         }
 
-        // ========================================================
-        // EXPORTACIÓN A STL
-        // ========================================================
         function exportSTL() {
-            if(!currentMesh) { log("<span class='log-warn'>No hay malla para exportar.</span>"); return; }
+            if(!currentMesh) return;
             let stl = "solid nexus_export\n";
             let pos = currentMesh.geometry.attributes.position.array;
             let nor = currentMesh.geometry.attributes.normal.array;
             for(let i=0; i<pos.length; i+=9) {
-                stl += "facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n";
-                stl += "  outer loop\n";
-                stl += "    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n";
-                stl += "    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n";
-                stl += "    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n";
-                stl += "  endloop\n";
-                stl += "endfacet\n";
+                stl += "facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n  outer loop\n";
+                stl += "    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n  endloop\nendfacet\n";
             }
             stl += "endsolid nexus_export\n";
-            
             let blob = new Blob([stl], {type: 'text/plain'});
             let a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = "nexus_model_" + Math.floor(Date.now()/1000) + ".stl";
+            a.download = "nexus_model.stl";
             a.click();
-            log("<span class='log-ok'>> Modelo exportado a STL correctamente.</span>");
         }
 
-        // Iniciar todo
-        window.onload = () => {
-            initWebGL();
-            setInterval(checkServer, 1000); // Polling cada 1 seg
-        };
+        window.onload = () => { initWebGL(); setInterval(checkServer, 1000); };
     </script>
 </body>
 </html>
-
 
 

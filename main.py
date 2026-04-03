@@ -141,9 +141,9 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS Uploader</title></head>
             <body style="background:#0B0E14; color:#E6EDF3; font-family:sans-serif; text-align:center; padding:20px; margin:0;">
                 <h2 style="color:#00E5FF;">🚀 Subir Archivo a NEXUS</h2>
-                <p style="color:#8B949E; font-size:14px;">Bypass de Almacenamiento Android 11+</p>
+                <p style="color:#8B949E; font-size:14px;">Inyección Directa de Archivos 3D</p>
                 <div style="background:#161B22; padding:20px; border-radius:8px; border:1px solid #30363D; display:inline-block; max-width:400px; width:90%; box-sizing:border-box;">
-                    <input type="file" id="fileInput" style="margin-bottom:20px; width:100%; font-size:16px;">
+                    <input type="file" id="fileInput" style="margin-bottom:20px; width:100%; font-size:16px; color:white;">
                     <button onclick="upload()" style="background:#00E676; color:black; padding:15px; font-size:16px; border:none; border-radius:8px; font-weight:bold; width:100%; cursor:pointer;">INYECCIÓN DIRECTA (SUBIR)</button>
                     <p id="status" style="margin-top:20px; font-weight:bold; font-size:15px;"></p>
                 </div>
@@ -209,12 +209,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v21.2 PRO"
+        page.title = "NEXUS CAD v21.3 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v21.2 PRO | Web Upload Injection Activo", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v21.3 PRO | STL Avanzado", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -465,7 +465,9 @@ def main(page: ft.Page):
             
             elif h == "stl":
                 sc = sl_stl_sc.value / 100.0
-                code += f"  // BYPASS HÍBRIDO AVANZADO - Motor Protegido Multi-Body\n"
+                code += f"  // ================================================\n"
+                code += f"  // DRON / STL IMPORTADO - BYPASS MULTI-BODY\n"
+                code += f"  // ================================================\n"
                 code += f"  var sc = {sc}; var tx = {sl_stl_x.value}; var ty = {sl_stl_y.value}; var tz = {sl_stl_z.value};\n"
                 code += f"  var stlParts = Array.isArray(IMPORTED_STL) ? IMPORTED_STL : [IMPORTED_STL];\n"
                 code += f"  var finalPolys = [];\n"
@@ -482,14 +484,27 @@ def main(page: ft.Page):
                 code += f"          finalPolys.push(new CSG.Polygon(newVerts, p.shared));\n"
                 code += f"      }});\n"
                 code += f"  }});\n"
-                code += f"  var importado = CSG.fromPolygons(finalPolys);\n\n"
-                code += f"  // Perforador paramétrico usando GW y GH\n"
-                code += f"  var punch = CSG.cylinder({{start:[0,0,-150], end:[0,0,150], radius: GW/2, slices:32}});\n\n"
-                code += f"  if(importado.polygons && importado.polygons.length > 0) {{\n"
-                code += f"      // Descomenta la siguiente línea para taladrar la pieza con el cilindro de GW\n"
-                code += f"      // return importado.subtract(punch);\n"
-                code += f"      return importado;\n"
-                code += f"  }}\n  return importado;\n}}"
+                code += f"  var dron = CSG.fromPolygons(finalPolys);\n\n"
+                
+                code += f"  // =========================================================\n"
+                code += f"  // QUÉ PUEDES HACER CON EL DRON (Borra las barras // para probar)\n"
+                code += f"  // =========================================================\n\n"
+
+                code += f"  // 1. CORTARLO A LA MITAD (Para imprimirlo más fácil en 2 partes)\n"
+                code += f"  // var cajaCorte = CSG.cube({{center: [0, 0, -100], radius: [200, 200, 100]}});\n"
+                code += f"  // dron = dron.subtract(cajaCorte);\n\n"
+
+                code += f"  // 2. HACERLE UN AGUJERO PASANTE (Para el eje de un motor o cable)\n"
+                code += f"  // var taladro = CSG.cylinder({{start: [0,0,-150], end: [0,0,150], radius: GW/2, slices: 32}});\n"
+                code += f"  // dron = dron.subtract(taladro);\n\n"
+
+                code += f"  // 3. AÑADIRLE UN SOPORTE (Ej. Montura cuadrada para cámara usando GH)\n"
+                code += f"  // var baseCamara = CSG.cube({{center: [0, 30, GH/2], radius: [10, 10, GH/2]}});\n"
+                code += f"  // dron = dron.union(baseCamara);\n\n"
+
+                code += f"  if(dron.polygons && dron.polygons.length > 0) {{\n"
+                code += f"      return dron;\n"
+                code += f"  }}\n  return dron;\n}}"
 
             elif h == "texto":
                 txt_input = tf_texto.value.upper()[:15]; estilo = dd_txt_estilo.value; base = dd_txt_base.value; grabado = sw_txt_grabado.value
@@ -1096,8 +1111,30 @@ def main(page: ft.Page):
             page.update()
 
         def launch_uploader(e):
-            # Se abre el cargador en una pestaña del navegador
-            page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/upload_ui")
+            url = f"http://127.0.0.1:{LOCAL_PORT}/upload_ui"
+            # Si el navegador/Android bloquea la ventana emergente, abrimos un Dialog explícito:
+            dlg = ft.AlertDialog(
+                title=ft.Text("🚀 Modo Subida Web Segura", color="#00E5FF"),
+                content=ft.Column([
+                    ft.Text("Debido a las políticas de seguridad de Android/Termux, las pestañas emergentes pueden bloquearse.", size=12, color="#8B949E"),
+                    ft.Text("Abre este enlace manualmente en tu navegador (Chrome) para subir archivos libremente:", size=13, weight="bold"),
+                    ft.TextField(value=url, read_only=True, bgcolor="#161B22", color="#00E676", text_size=14, text_align="center"),
+                    ft.ElevatedButton("COPIAR ENLACE", on_click=lambda _: page.set_clipboard(url), bgcolor="#00E676", color="black", width=float('inf'))
+                ], height=180),
+                actions=[ft.TextButton("Cerrar", on_click=lambda _: close_dlg())]
+            )
+            
+            def close_dlg():
+                dlg.open = False
+                page.update()
+                
+            page.dialog = dlg
+            dlg.open = True
+            page.update()
+            
+            # Intentamos abrirlo de todos modos por si no estaba bloqueado
+            try: page.launch_url(url)
+            except: pass
 
         btn_native_picker = ft.ElevatedButton(
             "🚀 SUBIR ARCHIVO DESDE NAVEGADOR WEB",
@@ -1168,7 +1205,7 @@ def main(page: ft.Page):
 
         view_archivos = ft.Column([
             btn_native_picker,
-            ft.Text("💡 Esto abrirá el navegador para que uses el selector nativo de Android. Luego, vuelve aquí y pulsa '📁 Nexus DB'.", color="#8B949E", size=10, italic=True),
+            ft.Text("💡 Si el botón no abre el navegador, te dará la URL para que la pongas tú a mano.", color="#8B949E", size=10, italic=True),
             ft.Divider(color="#30363D"),
             row_quick_paths,
             ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]),

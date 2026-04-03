@@ -118,12 +118,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v22.1 TITAN"
+        page.title = "NEXUS CAD v22.2 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v22.1 TITAN | Selector Nativo Optimizado", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v22.2 TITAN | Selector Nativo Optimizado", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -229,12 +229,12 @@ def main(page: ft.Page):
         col_custom = ft.Column([ft.Text("Modo Código Libre", color="#00E676")], visible=True)
 
         # =========================================================
-        # FILE PICKER NATIVO (SOLUCIÓN A LOS CRASHES)
+        # FILE PICKER NATIVO (CORREGIDO SIN EVENT TYPE)
         # =========================================================
-        # Lo declaramos limpio sin argumentos que provoquen errores en init
         file_picker = ft.FilePicker()
         
-        def on_file_picked(e: ft.FilePickerResultEvent):
+        # Le quitamos el ": ft.FilePickerResultEvent" a la 'e' para que Flet antiguo no crashee
+        def on_file_picked(e):
             if e.files and len(e.files) > 0:
                 filepath = e.files[0].path
                 ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
@@ -262,7 +262,6 @@ def main(page: ft.Page):
                     status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"
             page.update()
 
-        # Asignamos el evento DESPUÉS de instanciar para evitar el TypeError
         file_picker.on_result = on_file_picked
         page.overlay.append(file_picker)
 
@@ -291,9 +290,9 @@ def main(page: ft.Page):
         sl_stlf_z, r_stlf_z = create_slider("Corte Inferior (Z)", 0, 50, 1, False)
         col_stl_flatten = ft.Column([ft.Text("📏 Aplanar Base", color="#00E676", weight="bold"), inst("Elimina los primeros milímetros de abajo para asegurar una base perfectamente plana para la cama de impresión."), ft.Container(content=ft.Column([r_stlf_z]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 2. Split (Corregido Dropdown TypeError)
+        # 2. Split
         dd_stls_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100)
-        dd_stls_axis.on_change = update_code_wrapper # Evento asignado fuera
+        dd_stls_axis.on_change = update_code_wrapper 
         
         sl_stls_pos, r_stls_pos = create_slider("Posición Corte", -150, 150, 0, False)
         sw_stls_inv = ft.Switch(label="Invertir Lado", value=False, active_color="#FFAB00")
@@ -307,7 +306,7 @@ def main(page: ft.Page):
         sl_stlc_sz, r_stlc_sz = create_slider("Tamaño Caja Z", 10, 300, 50, False)
         col_stl_crop = ft.Column([ft.Text("✂️ Recorte de Aislamiento (Crop Box)", color="#00E676", weight="bold"), inst("Todo lo que quede FUERA de esta caja será eliminado. Usa los controles 'Mover' arriba para posicionar el dron dentro de la caja."), ft.Container(content=ft.Column([r_stlc_sx, r_stlc_sy, r_stlc_sz]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 4. Drill 3D (Corregido Dropdown TypeError)
+        # 4. Drill 3D
         dd_stld_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100)
         dd_stld_axis.on_change = update_code_wrapper
         
@@ -341,7 +340,7 @@ def main(page: ft.Page):
         col_stl_guard = ft.Column([ft.Text("🛡️ Añadir Protector de Hélice", color="#00E676", weight="bold"), inst("Genera y fusiona un protector circular al brazo del dron."), ft.Container(content=ft.Column([r_stlg_x, r_stlg_y, r_stlg_r, r_stlg_h]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
         # =========================================================
-        # OTRAS HERRAMIENTAS (Dropdowns Corregidos)
+        # OTRAS HERRAMIENTAS
         # =========================================================
         tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=15, bgcolor="#161B22")
         dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel Fino"), ft.dropdown.Option("Voxel Grueso"), ft.dropdown.Option("Braille")], value="Voxel Grueso", expand=True, bgcolor="#161B22")

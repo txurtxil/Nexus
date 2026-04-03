@@ -20,7 +20,6 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
-# Intentar detectar la ruta raíz de Android
 def get_android_root():
     paths = ["/storage/emulated/0", os.path.expanduser("~/storage/shared"), BASE_DIR]
     for p in paths:
@@ -152,12 +151,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.6 PRO"
+        page.title = "NEXUS CAD v20.7 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.6 PRO | Explorador Android Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.7 PRO | Explorador Android Estable", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -408,7 +407,7 @@ def main(page: ft.Page):
             
             elif h == "stl":
                 sc = sl_stl_sc.value / 100.0
-                code += f"  // BYPASS HÍBRIDO AVANZADO (V20.6) - Soporte Multi-Body\n"
+                code += f"  // BYPASS HÍBRIDO AVANZADO (V20.7) - Soporte Multi-Body\n"
                 code += f"  var sc = {sc}; var tx = {sl_stl_x.value}; var ty = {sl_stl_y.value}; var tz = {sl_stl_z.value};\n"
                 code += f"  var stlParts = Array.isArray(IMPORTED_STL) ? IMPORTED_STL : [IMPORTED_STL];\n"
                 code += f"  var finalPolys = [];\n"
@@ -1008,7 +1007,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # PESTAÑA FILES: EXPLORADOR ANDROID NATIVO
+        # PESTAÑA FILES: EXPLORADOR ANDROID NATIVO (MODO EMOJI SEGURO)
         # =========================================================
         current_android_dir = ANDROID_ROOT
         tf_path = ft.TextField(value=current_android_dir, expand=True, bgcolor="#161B22", height=40, text_size=12)
@@ -1046,21 +1045,32 @@ def main(page: ft.Page):
                 files = [f for f in items if os.path.isfile(os.path.join(path, f))]
                 dirs.sort(); files.sort()
                 
+                # Usamos Text("⬆️") en vez de ft.Icon(ft.icons.ARROW_UPWARD) para evitar el crash de Flet en Termux
                 if path != "/" and path != "/storage" and path != "/storage/emulated":
-                    list_android.controls.append(ft.ListTile(leading=ft.Icon(ft.icons.ARROW_UPWARD, color="white"), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path))))
+                    list_android.controls.append(
+                        ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path)))
+                    )
                     
                 for d in dirs:
                     if d.startswith('.'): continue
-                    list_android.controls.append(ft.ListTile(leading=ft.Icon(ft.icons.FOLDER, color="#FFD54F"), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p)))
+                    list_android.controls.append(
+                        ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p))
+                    )
+                    
                 for f in files:
                     ext = f.lower().split('.')[-1] if '.' in f else ''
-                    icon = ft.icons.INSERT_DRIVE_FILE; color = "#8B949E"
-                    if ext == "stl": icon = ft.icons.VIEW_IN_AR; color = "#00E676"
-                    elif ext == "jscad": icon = ft.icons.CODE; color = "#00E5FF"
+                    icon = "📄"; color = "#8B949E"
+                    if ext == "stl": icon = "🧊"; color = "#00E676"
+                    elif ext == "jscad": icon = "🧩"; color = "#00E5FF"
                     
-                    list_android.controls.append(ft.ListTile(leading=ft.Icon(icon, color=color), title=ft.Text(f, color="#E6EDF3"), subtitle=ft.Text(f"{os.path.getsize(os.path.join(path, f)) // 1024} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p)))
+                    list_android.controls.append(
+                        ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{os.path.getsize(os.path.join(path, f)) // 1024} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p))
+                    )
+            except PermissionError:
+                list_android.controls.append(ft.Text("❌ Permiso Denegado por Android. Ve a Termux y escribe 'termux-setup-storage' y dale permisos.", color="red", weight="bold"))
             except Exception as ex:
-                list_android.controls.append(ft.Text(f"Acceso denegado o error: {ex}", color="red"))
+                list_android.controls.append(ft.Text(f"Error accediendo a carpeta: {ex}", color="red"))
+                
             tf_path.value = path
             page.update()
 

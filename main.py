@@ -8,7 +8,6 @@ except ImportError:
     HAS_PSUTIL = False
 
 from urllib.parse import urlparse
-import urllib.request
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
@@ -151,12 +150,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.8 PRO"
+        page.title = "NEXUS CAD v21.0 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.8 PRO | Explorador Escaneo Profundo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v21.0 PRO | Motor Web Nativo Integrado", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -277,7 +276,7 @@ def main(page: ft.Page):
             ft.Text("Híbrido STL + Perforador Paramétrico", color="#00E676", weight="bold"),
             inst("IMPORTANTE: Usa STLs Low-Poly (ideal <5k caras). Multi-body soportado."),
             ft.Container(content=ft.Column([
-                ft.ElevatedButton("📂 BUSCAR STL EN ANDROID", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf')),
+                ft.ElevatedButton("📂 BUSCAR ARCHIVO (MENÚ FILES)", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf')),
                 lbl_stl_status, r_stl_sc, r_stl_x, r_stl_y, r_stl_z
             ]), bgcolor="#161B22", padding=10, border_radius=8)
         ], visible=False)
@@ -407,7 +406,7 @@ def main(page: ft.Page):
             
             elif h == "stl":
                 sc = sl_stl_sc.value / 100.0
-                code += f"  // BYPASS HÍBRIDO AVANZADO (V20.8) - Soporte Multi-Body\n"
+                code += f"  // BYPASS HÍBRIDO AVANZADO - Motor Protegido Multi-Body\n"
                 code += f"  var sc = {sc}; var tx = {sl_stl_x.value}; var ty = {sl_stl_y.value}; var tz = {sl_stl_z.value};\n"
                 code += f"  var stlParts = Array.isArray(IMPORTED_STL) ? IMPORTED_STL : [IMPORTED_STL];\n"
                 code += f"  var finalPolys = [];\n"
@@ -415,7 +414,7 @@ def main(page: ft.Page):
                 code += f"      var polys = part.polygons || (part.toPolygons ? part.toPolygons() : []);\n"
                 code += f"      polys.forEach(function(p) {{\n"
                 code += f"          var newVerts = p.vertices.map(function(v) {{\n"
-                code += f"              var VecClass = typeof CSG.Vector !== 'undefined' ? CSG.Vector : CSG.Vector3D;\n"
+                code += f"              var VecClass = (typeof CSG.Vector3D !== 'undefined') ? CSG.Vector3D : ((typeof CSG.Vector !== 'undefined') ? CSG.Vector : null);\n"
                 code += f"              return new CSG.Vertex(\n"
                 code += f"                  new VecClass(v.pos.x * sc + tx, v.pos.y * sc + ty, v.pos.z * sc + tz),\n"
                 code += f"                  new VecClass(v.normal.x, v.normal.y, v.normal.z)\n"
@@ -1007,37 +1006,19 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # PESTAÑA FILES: EXPLORADOR ANDROID NATIVO (MODO PROFUNDO)
+        # PESTAÑA FILES: SOLUCIÓN NATIVA WEB + EXPLORADOR BÁSICO
         # =========================================================
         current_android_dir = ANDROID_ROOT
         tf_path = ft.TextField(value=current_android_dir, expand=True, bgcolor="#161B22", height=40, text_size=12)
         list_android = ft.ListView(expand=True, spacing=5)
-
-        # ⚠️ SOLUCIÓN ANDROID 11+ (Muestra un panel informativo si oculta los archivos)
-        banner_permisos = ft.ExpansionTile(
-            title=ft.Text("⚠️ ¿No ves tus archivos .stl? (Solución)", color="#FF5252", weight="bold", size=12),
-            icon_color="#FF5252", collapsed_text_color="#FF5252", text_color="#FF5252",
-            controls=[
-                ft.Container(
-                    content=ft.Column([
-                        ft.Text("Android 11+ oculta los archivos 3D a Termux por defecto. Para hacerlos visibles y que funcione tu Explorador:", color="#E6EDF3", size=11),
-                        ft.Text("1. Ve a los Ajustes de Android > Aplicaciones > Termux.", color="#FFD54F", size=11),
-                        ft.Text("2. Toca en 'Permisos' > 'Archivos y contenido multimedia'.", color="#FFD54F", size=11),
-                        ft.Text("3. Marca 'Permitir administrar todos los archivos'.", color="#FFD54F", size=11),
-                        ft.Text("Al hacerlo, tus .stl aparecerán instantáneamente abajo.", color="#00E676", size=11, weight="bold"),
-                    ]),
-                    padding=10, bgcolor="#2A1B1C", border_radius=8
-                )
-            ]
-        )
 
         def file_action(filepath):
             ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
             if ext == "stl":
                 dest = os.path.join(EXPORT_DIR, "imported.stl")
                 try:
-                    shutil.copy(filepath, dest)
-                    lbl_stl_status.value = f"✓ STL Android: {os.path.basename(filepath)}"
+                    if filepath != dest: shutil.copy(filepath, dest)
+                    lbl_stl_status.value = f"✓ STL Listo: {os.path.basename(filepath)}"
                     lbl_stl_status.color = "#00E676"
                     select_tool("stl")
                     set_tab(1)
@@ -1052,55 +1033,67 @@ def main(page: ft.Page):
                 except Exception as e:
                     status.value = f"❌ Error leyendo JSCAD: {e}"; status.color = "red"
             else:
-                status.value = f"⚠️ Formato .{ext} no soportado para importación directa."; status.color = "#FFAB00"
+                status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"
             page.update()
+
+        # --- NATIVE FILE PICKER (BYPASS TERMUX FUSE) ---
+        def on_upload_progress(e: ft.FilePickerUploadEvent):
+            if e.progress == 1.0:
+                filepath = os.path.join(EXPORT_DIR, e.file_name)
+                status.value = f"✓ Subido vía Web: {e.file_name}"
+                status.color = "#00E676"
+                page.update()
+                file_action(filepath)
+
+        def on_file_picked(e: ft.FilePickerResultEvent):
+            if e.files:
+                status.value = "Inyectando archivo en NEXUS..."
+                status.color = "#FFAB00"
+                page.update()
+                # El navegador enviará el archivo al EXPORT_DIR configurado en ft.app
+                file_picker.upload([
+                    ft.FilePickerUploadFile(f.name, upload_url=page.get_upload_url(f.name, 600))
+                    for f in e.files
+                ])
+
+        file_picker = ft.FilePicker(on_result=on_file_picked, on_upload=on_upload_progress)
+        page.overlay.append(file_picker)
+
+        btn_native_picker = ft.ElevatedButton(
+            "🚀 SELECCIONAR ARCHIVO NATIVO",
+            on_click=lambda _: file_picker.pick_files(allow_multiple=False),
+            bgcolor="#FFAB00", color="black", width=float('inf'), height=60,
+            style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
+        )
 
         def refresh_explorer(path):
             list_android.controls.clear()
             try:
                 items = os.listdir(path)
-                dirs = []
-                files = []
-                # Bypass agresivo de os.path.isfile para evadir bloqueos silenciosos de Android
+                dirs, files = [], []
                 for item in items:
-                    p = os.path.join(path, item)
-                    if os.path.isdir(p):
-                        dirs.append(item)
-                    else:
-                        files.append(item)
+                    if os.path.isdir(os.path.join(path, item)): dirs.append(item)
+                    else: files.append(item)
                         
-                dirs.sort()
-                files.sort()
+                dirs.sort(); files.sort()
                 
                 if path != "/" and path != "/storage" and path != "/storage/emulated":
-                    list_android.controls.append(
-                        ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path)))
-                    )
+                    list_android.controls.append(ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path))))
                     
                 for d in dirs:
                     if d.startswith('.'): continue
-                    list_android.controls.append(
-                        ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p))
-                    )
+                    list_android.controls.append(ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p)))
                     
                 for f in files:
                     ext = f.lower().split('.')[-1] if '.' in f else ''
                     icon = "📄"; color = "#8B949E"
                     if ext == "stl": icon = "🧊"; color = "#00E676"
                     elif ext == "jscad": icon = "🧩"; color = "#00E5FF"
-                    
-                    try:
-                        sz = os.path.getsize(os.path.join(path, f)) // 1024
-                    except:
-                        sz = 0
-                        
-                    list_android.controls.append(
-                        ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{sz} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p))
-                    )
-            except PermissionError:
-                list_android.controls.append(ft.Text("❌ Permiso Denegado. Mira las instrucciones arriba.", color="red", weight="bold"))
+                    try: sz = os.path.getsize(os.path.join(path, f)) // 1024
+                    except: sz = 0
+                    list_android.controls.append(ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{sz} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p)))
             except Exception as ex:
-                list_android.controls.append(ft.Text(f"Error accediendo a carpeta: {ex}", color="red"))
+                list_android.controls.append(ft.Text(f"Restringido por Android. Usa el botón NATIVO arriba.", color="red"))
                 
             tf_path.value = path
             page.update()
@@ -1134,8 +1127,10 @@ def main(page: ft.Page):
         ], scroll="auto")
 
         view_archivos = ft.Column([
-            ft.Text("Explorador de Dispositivo (Android Native)", color="#00E5FF", weight="bold"),
-            banner_permisos,
+            btn_native_picker,
+            ft.Text("💡 Este botón puentea Android/Termux abriendo tu gestor de archivos directamente desde el navegador.", color="#8B949E", size=10, italic=True),
+            ft.Divider(color="#30363D"),
+            ft.Text("Explorador Clásico (Carpetas locales)", color="#00E5FF", weight="bold"),
             row_quick_paths,
             ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]),
             ft.ElevatedButton("💾 GUARDAR CÓDIGO EN ESTA CARPETA", on_click=save_to_android, bgcolor="#00E676", color="black", width=float('inf')),
@@ -1166,5 +1161,8 @@ def main(page: ft.Page):
         page.clean(); page.add(ft.Container(ft.Text("CRASH FATAL:\n" + traceback.format_exc(), color="red"), padding=50)); page.update()
 
 if __name__ == "__main__":
-    if "TERMUX_VERSION" in os.environ: ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
-    else: ft.app(target=main)
+    # La clave para que la inyección web funcione es el parámetro upload_dir
+    if "TERMUX_VERSION" in os.environ:
+        ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER, upload_dir=EXPORT_DIR)
+    else:
+        ft.app(target=main, upload_dir=EXPORT_DIR)

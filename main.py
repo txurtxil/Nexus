@@ -1,5 +1,5 @@
 import flet as ft
-import os, base64, json, threading, http.server, socket, time, warnings, tempfile, traceback, shutil
+import os, base64, json, threading, http.server, socket, time, warnings, traceback, shutil
 
 try:
     import psutil
@@ -13,17 +13,14 @@ import urllib.request
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
-# RUTAS DE ALMACENAMIENTO PERMANENTE
+# RUTAS DE ALMACENAMIENTO PERMANENTE FORZADAS (TERMUX FIX)
 # =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 
-try:
-    EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
-    os.makedirs(EXPORT_DIR, exist_ok=True)
-except:
-    EXPORT_DIR = os.path.join(tempfile.gettempdir(), "nexus_proyectos")
-    os.makedirs(EXPORT_DIR, exist_ok=True)
+# Forzamos la creación de la carpeta en el mismo directorio que main.py
+os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
 # TELEMETRÍA Y RED LOCAL
@@ -147,12 +144,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.2 PRO"
+        page.title = "NEXUS CAD v20.3 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.2 PRO | Modificador Híbrido Activo", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v20.3 PRO | Modificador Híbrido Activo", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -278,29 +275,37 @@ def main(page: ft.Page):
         def inst(texto): return ft.Text("ℹ️ " + texto, color="#FFD54F", size=11, italic=True)
 
         # =========================================================
-        # HERRAMIENTA ESPECIAL: IMPORTACIÓN DE STL (HÍBRIDO)
-        # ELIMINADO FILEPICKER TOTALMENTE PARA EVITAR RED SCREEN
+        # HERRAMIENTA ESPECIAL: EXPLORADOR STL INTERNO
         # =========================================================
-        lbl_stl_status = ft.Text("No hay STL cargado. Escribe el nombre 📂", color="#8B949E", size=11)
-        
-        # Sistema Fallback Manual Exclusivo
-        tf_stl_manual = ft.TextField(label="Nombre archivo en DB (ej: figura.stl)", expand=True, bgcolor="#0B0E14", text_size=12)
-        
+        lbl_stl_status = ft.Text("Selecciona un archivo 📂", color="#8B949E", size=11)
+        dd_stl_files = ft.Dropdown(label="Archivos STL disponibles", expand=True, bgcolor="#0B0E14")
+
+        def update_stl_dropdown():
+            dd_stl_files.options.clear()
+            if os.path.exists(EXPORT_DIR):
+                for f in sorted(os.listdir(EXPORT_DIR)):
+                    if f.lower().endswith(".stl") and f != "imported.stl":
+                        dd_stl_files.options.append(ft.dropdown.Option(f))
+            if not dd_stl_files.options:
+                dd_stl_files.options.append(ft.dropdown.Option("Vacío - Sube STLs a nexus_proyectos"))
+            if dd_stl_files.options:
+                dd_stl_files.value = dd_stl_files.options[0].key
+
         def manual_stl_load(e):
-            fname = tf_stl_manual.value.strip()
-            if fname:
+            fname = dd_stl_files.value
+            if fname and fname != "Vacío - Sube STLs a nexus_proyectos":
                 src_path = os.path.join(EXPORT_DIR, fname)
                 dest_path = os.path.join(EXPORT_DIR, "imported.stl")
                 if os.path.exists(src_path):
                     try:
                         shutil.copy(src_path, dest_path)
-                        lbl_stl_status.value = f"STL cargado desde DB: {fname}"
+                        lbl_stl_status.value = f"✓ STL cargado y listo: {fname}"
                         lbl_stl_status.color = "#00E676"
                         update_code_wrapper()
                     except Exception as ex:
                         lbl_stl_status.value = f"Error al cargar: {ex}"; lbl_stl_status.color = "red"
                 else:
-                    lbl_stl_status.value = f"Archivo '{fname}' no existe en la carpeta local."; lbl_stl_status.color = "#FF5252"
+                    lbl_stl_status.value = f"No se pudo encontrar '{fname}'."; lbl_stl_status.color = "#FF5252"
             page.update()
 
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
@@ -311,9 +316,12 @@ def main(page: ft.Page):
         col_stl = ft.Column([
             ft.Text("Híbrido STL + Perforador Paramétrico", color="#00E676", weight="bold"),
             inst("IMPORTANTE: Usa STLs Low-Poly (ideal <5k caras)."),
-            ft.Text("Sube o mueve tu archivo a la app y escribe su nombre exacto:", size=11, color="#E6EDF3"),
             ft.Container(content=ft.Column([
-                ft.Row([tf_stl_manual, ft.ElevatedButton("📥 CARGAR", on_click=manual_stl_load, bgcolor="#00E5FF", color="black")]),
+                ft.Row([
+                    dd_stl_files, 
+                    ft.ElevatedButton("🔄", on_click=lambda _: (update_stl_dropdown(), page.update()), bgcolor="#21262D", color="white"),
+                    ft.ElevatedButton("📥 CARGAR", on_click=manual_stl_load, bgcolor="#00E5FF", color="black")
+                ]),
                 lbl_stl_status,
                 r_stl_sc, r_stl_x, r_stl_y, r_stl_z
             ]), bgcolor="#161B22", padding=10, border_radius=8)
@@ -976,7 +984,9 @@ def main(page: ft.Page):
             for p in paneles: p.visible = False
             
             if nombre_herramienta == "custom": col_custom.visible = True
-            elif nombre_herramienta == "stl": col_stl.visible = True
+            elif nombre_herramienta == "stl": 
+                update_stl_dropdown()
+                col_stl.visible = True
             elif nombre_herramienta == "texto": col_texto.visible = True
             elif nombre_herramienta == "cubo": col_cubo.visible = True
             elif nombre_herramienta == "cilindro": col_cilindro.visible = True

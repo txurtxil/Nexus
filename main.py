@@ -13,13 +13,12 @@ import urllib.request
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
-# RUTAS DE ALMACENAMIENTO PERMANENTE FORZADAS (TERMUX FIX)
+# RUTAS DE ALMACENAMIENTO PERMANENTE FORZADAS
 # =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 
-# Forzamos la creación de la carpeta en el mismo directorio que main.py
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
@@ -144,12 +143,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.3 PRO"
+        page.title = "NEXUS CAD v20.4 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.3 PRO | Modificador Híbrido Activo", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v20.4 PRO | Worker Optimizado", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -194,8 +193,15 @@ def main(page: ft.Page):
         sl_g_tol, r_g_tol = create_slider("Tol. Global (G_TOL)", 0.0, 2.0, 0.2, False)
 
         def prepare_js_payload():
-            header = f"var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value}; var G_TOL = {sl_g_tol.value};\n\n"
-            return header + txt_code.value
+            # Inyección IN-FUNCTION: Los workers extraen function main() ignorando lo de fuera.
+            # Metemos las variables paramétricas justo al inicio de la función main para evitar el "GW is not defined"
+            header = f"  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value}; var G_TOL = {sl_g_tol.value};\n"
+            c = txt_code.value
+            if "function main() {" in c:
+                c = c.replace("function main() {", "function main() {\n" + header, 1)
+            else:
+                c = header + "\n" + c
+            return c
 
         def run_render():
             global LATEST_CODE_B64
@@ -208,9 +214,7 @@ def main(page: ft.Page):
             controls=[
                 ft.Container(padding=10, bgcolor="#161B22", border_radius=8, content=ft.Column([
                     ft.Text("📝 REGLAS DEL MOTOR:", weight="bold", color="#8B949E", size=11),
-                    ft.Text("1. Tu función principal siempre debe ser 'function main() { ... }'.\n2. Para devolver la pieza final, usa 'return objeto;'.\n3. Operaciones booleanas: pieza.union(b), pieza.subtract(b), pieza.intersect(b).\n4. Globals automáticos: GW (ancho), GL (largo), GH (alto), GT (grosor), G_TOL (tolerancia).", size=11, color="#E6EDF3"),
-                    ft.Text("🤖 PLANTILLA PARA PEGAR EN IA (ChatGPT):", weight="bold", color="#FFAB00", size=11),
-                    ft.TextField(value="Actúa como experto en JS-CSG. Crea una 'function main()' que construya [PIEZA]. Usa GW, GL, GH, GT y G_TOL. Usa CSG.cube, CSG.cylinder. Retorna el objeto. Asegura añadir polyfills de .translate() si lo usas. No texturas.", read_only=True, multiline=True, text_size=10, bgcolor="#0B0E14", color="#8B949E")
+                    ft.Text("1. Tu función principal siempre debe ser 'function main() { ... }'.\n2. Para devolver la pieza final, usa 'return objeto;'.\n3. Operaciones booleanas: pieza.union(b), pieza.subtract(b), pieza.intersect(b).\n4. Globals automáticos: GW (ancho), GL (largo), GH (alto), GT (grosor), G_TOL (tolerancia).", size=11, color="#E6EDF3")
                 ]))
             ]
         )
@@ -514,7 +518,6 @@ def main(page: ft.Page):
         sl_naca_e, r_naca_e = create_slider("Envergadura Z", 10, 300, 100, False)
         col_naca = ft.Column([ft.Text("Perfil Alar NACA", color="#00E5FF"), ft.Container(content=ft.Column([r_naca_c, r_naca_g, r_naca_e]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # NUEVAS HERRAMIENTAS (VR Y ACCESORIOS PRÁCTICOS)
         sl_st_ang, r_st_ang = create_slider("Inclinación º", 5, 45, 15, False)
         sl_st_w, r_st_w = create_slider("Ancho Base", 40, 120, 70, False)
         sl_st_t, r_st_t = create_slider("Grosor Dispo.", 6, 20, 12, False)
@@ -537,8 +540,19 @@ def main(page: ft.Page):
             
             elif h == "stl":
                 sc = sl_stl_sc.value / 100.0
-                code += f"  // Importación desde Memoria a variable IMPORTED_STL\n"
-                code += f"  var importado = IMPORTED_STL.scale([{sc}, {sc}, {sc}]).translate([{sl_stl_x.value}, {sl_stl_y.value}, {sl_stl_z.value}]);\n\n"
+                code += f"  // BYPASS HÍBRIDO (Elude el bug nativo de Matrix.scaling del JS Engine)\n"
+                code += f"  var sc = {sc}; var tx = {sl_stl_x.value}; var ty = {sl_stl_y.value}; var tz = {sl_stl_z.value};\n"
+                code += f"  var polys = IMPORTED_STL.polygons || IMPORTED_STL.toPolygons();\n"
+                code += f"  var newPolys = polys.map(function(p) {{\n"
+                code += f"      var newVerts = p.vertices.map(function(v) {{\n"
+                code += f"          return new CSG.Vertex(\n"
+                code += f"              new CSG.Vector3D(v.pos.x * sc + tx, v.pos.y * sc + ty, v.pos.z * sc + tz),\n"
+                code += f"              new CSG.Vector3D(v.normal.x, v.normal.y, v.normal.z)\n"
+                code += f"          );\n"
+                code += f"      }});\n"
+                code += f"      return new CSG.Polygon(newVerts, p.shared);\n"
+                code += f"  }});\n"
+                code += f"  var importado = CSG.fromPolygons(newPolys);\n\n"
                 code += f"  // Ej: Perforador Cilíndrico Central\n"
                 code += f"  var punch = CSG.cylinder({{start:[0,0,-150], end:[0,0,150], radius: GW/2, slices:32}});\n\n"
                 code += f"  if(importado.polygons && importado.polygons.length > 0) {{\n"

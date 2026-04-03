@@ -1,7 +1,6 @@
 import flet as ft
-import os, base64, json, threading, http.server, socket, time, warnings, tempfile, traceback
+import os, base64, json, threading, http.server, socket, time, warnings, tempfile, traceback, shutil
 
-# Intentar usar psutil si existe, si no, usar lecturas nativas de Android/Linux
 try:
     import psutil
     HAS_PSUTIL = True
@@ -27,7 +26,7 @@ except:
     os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
-# TELEMETRÍA Y RED LOCAL (PREPARACIÓN PARA VR HEADSETS)
+# TELEMETRÍA Y RED LOCAL
 # =========================================================
 def get_sys_info():
     cores = os.cpu_count() or 1
@@ -64,7 +63,7 @@ def get_lan_ip():
         return "127.0.0.1"
 
 # =========================================================
-# SERVIDOR LOCAL WEBGL (BIND EN 0.0.0.0 PARA ACCESO VR/LAN)
+# SERVIDOR LOCAL WEBGL
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -75,6 +74,12 @@ except:
 
 LAN_IP = get_lan_ip()
 LATEST_CODE_B64 = ""
+
+def get_stl_hash():
+    path = os.path.join(EXPORT_DIR, "imported.stl")
+    if os.path.exists(path):
+        return str(os.path.getmtime(path))
+    return ""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
@@ -106,7 +111,8 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64}).encode())
+            payload = json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": get_stl_hash()})
+            self.wfile.write(payload.encode())
             LATEST_CODE_B64 = "" 
             
         elif parsed.path.startswith('/exports/'):
@@ -141,12 +147,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v19.1 PRO"
+        page.title = "NEXUS CAD v20.0 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v19.1 PRO | Motor VR y Red Local Activos", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v20.0 PRO | Modificador Híbrido (STL) Activo", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -270,6 +276,44 @@ def main(page: ft.Page):
 
         col_custom = ft.Column([ft.Text("Modo Código Libre (Edita en la pestaña CODE)", color="#00E676")], visible=True)
         def inst(texto): return ft.Text("ℹ️ " + texto, color="#FFD54F", size=11, italic=True)
+
+        # =========================================================
+        # HERRAMIENTA ESPECIAL: IMPORTACIÓN DE STL (HÍBRIDO)
+        # =========================================================
+        lbl_stl_status = ft.Text("No hay STL cargado. Selecciona un archivo 📂", color="#8B949E", size=11)
+        
+        def on_file_picked(e: ft.FilePickerResultEvent):
+            if e.files and len(e.files) > 0:
+                try:
+                    src_path = e.files[0].path
+                    dest_path = os.path.join(EXPORT_DIR, "imported.stl")
+                    shutil.copy(src_path, dest_path)
+                    lbl_stl_status.value = f"STL Híbrido en memoria: {e.files[0].name}"
+                    lbl_stl_status.color = "#00E676"
+                    update_code_wrapper() 
+                except Exception as ex:
+                    lbl_stl_status.value = f"Error de copia local: {ex}"
+                    lbl_stl_status.color = "red"
+            page.update()
+
+        file_picker = ft.FilePicker(on_result=on_file_picked)
+        page.overlay.append(file_picker)
+
+        sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
+        sl_stl_x, r_stl_x = create_slider("Mover X", -150, 150, 0, False)
+        sl_stl_y, r_stl_y = create_slider("Mover Y", -150, 150, 0, False)
+        sl_stl_z, r_stl_z = create_slider("Mover Z", -150, 150, 0, False)
+
+        col_stl = ft.Column([
+            ft.Text("Híbrido STL + Perforador Paramétrico", color="#00E676", weight="bold"),
+            inst("IMPORTANTE: Usa STLs Low-Poly (ideal <5k caras). Modelos complejos (>20k caras) pueden colgar el motor del navegador al hacer booleanas."),
+            ft.Container(content=ft.Column([
+                ft.ElevatedButton("📁 BUSCAR ARCHIVO .STL EN EL DISPOSITIVO", on_click=lambda _: file_picker.pick_files(allowed_extensions=["stl"]), bgcolor="#B388FF", color="black", width=float('inf')),
+                lbl_stl_status,
+                r_stl_sc, r_stl_x, r_stl_y, r_stl_z
+            ]), bgcolor="#161B22", padding=10, border_radius=8)
+        ], visible=False)
+
 
         # =========================================================
         # HERRAMIENTAS Y PANELES
@@ -476,9 +520,18 @@ def main(page: ft.Page):
             h = herramienta_actual
             code = "function main() {\n"
             
-            if h == "custom":
-                pass
-                
+            if h == "custom": pass
+            
+            elif h == "stl":
+                sc = sl_stl_sc.value / 100.0
+                code += f"  // Importación desde Memoria a variable IMPORTED_STL\n"
+                code += f"  var importado = IMPORTED_STL.scale([{sc}, {sc}, {sc}]).translate([{sl_stl_x.value}, {sl_stl_y.value}, {sl_stl_z.value}]);\n\n"
+                code += f"  // Ej: Perforador Cilíndrico Central\n"
+                code += f"  var punch = CSG.cylinder({{start:[0,0,-150], end:[0,0,150], radius: GW/2, slices:32}});\n\n"
+                code += f"  if(importado.polygons && importado.polygons.length > 0) {{\n"
+                code += f"      return importado.subtract(punch);\n"
+                code += f"  }}\n  return importado;\n}}"
+
             elif h == "texto":
                 txt_input = tf_texto.value.upper()[:15]; estilo = dd_txt_estilo.value; base = dd_txt_base.value; grabado = sw_txt_grabado.value
                 if not txt_input: txt_input = " "
@@ -914,10 +967,11 @@ def main(page: ft.Page):
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
             herramienta_actual = nombre_herramienta
-            paneles = [col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca, col_stand_movil, col_clip_cable, col_vr_pedestal]
+            paneles = [col_custom, col_stl, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca, col_stand_movil, col_clip_cable, col_vr_pedestal]
             for p in paneles: p.visible = False
             
             if nombre_herramienta == "custom": col_custom.visible = True
+            elif nombre_herramienta == "stl": col_stl.visible = True
             elif nombre_herramienta == "texto": col_texto.visible = True
             elif nombre_herramienta == "cubo": col_cubo.visible = True
             elif nombre_herramienta == "cilindro": col_cilindro.visible = True
@@ -957,7 +1011,7 @@ def main(page: ft.Page):
 
         def thumbnail(icon, title, tool_id, color): return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: select_tool(tool_id), ink=True, border=ft.border.all(1, "#30363D"))
 
-        cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000"), thumbnail("🔠", "Placas Texto", "texto", "#880E4F"), thumbnail("🥽", "Pedestal VR", "vr_pedestal", "#B388FF")], scroll="auto")
+        cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000"), thumbnail("🧊", "Híbrido STL", "stl", "#00C853"), thumbnail("🔠", "Placas Texto", "texto", "#880E4F"), thumbnail("🥽", "Pedestal VR", "vr_pedestal", "#B388FF")], scroll="auto")
         cat_accesorios = ft.Row([thumbnail("📱", "Stand Móvil", "stand_movil", "#00C853"), thumbnail("🔌", "Clip Cables", "clip_cable", "#00C853")], scroll="auto")
         cat_produccion = ft.Row([thumbnail("🔪", "Perfil Láser", "laser", "#D50000"), thumbnail("🔲", "Matriz Grid", "array_lin", "#0091EA"), thumbnail("🎡", "Matriz Polar", "array_pol", "#00B0FF")], scroll="auto")
         cat_lofting = ft.Row([thumbnail("🌪️", "Adap. Loft", "loft", "#D50000")], scroll="auto")
@@ -972,7 +1026,7 @@ def main(page: ft.Page):
 
         view_constructor = ft.Column([
             panel_globales, 
-            ft.Text("💡 Especiales, Letras y VR:", size=12, color="#8B949E"), cat_especial,
+            ft.Text("💡 Especiales, Híbrido y VR:", size=12, color="#8B949E"), cat_especial,
             ft.Text("🔋 Accesorios Prácticos:", size=12, color="#00E676"), cat_accesorios,
             ft.Text("🏭 Producción y Láser:", size=12, color="#00B0FF"), cat_produccion,
             ft.Text("🌪️ Transición de Formas:", size=12, color="#D50000"), cat_lofting,
@@ -986,7 +1040,7 @@ def main(page: ft.Page):
             ft.Text("📦 Geometría Básica:", size=12, color="#8B949E"), cat_basico,
             ft.Divider(color="#30363D"),
             
-            col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca, col_stand_movil, col_clip_cable, col_vr_pedestal,
+            col_custom, col_stl, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca, col_stand_movil, col_clip_cable, col_vr_pedestal,
             
             ft.Container(height=10),
             ft.ElevatedButton("▶ ENVIAR AL WORKER (RENDER 3D)", on_click=lambda _: run_render(), color="black", bgcolor="#00E676", height=60, width=float('inf'))
@@ -1018,12 +1072,15 @@ def main(page: ft.Page):
         )
 
         vr_url = f"http://{LAN_IP}:{LOCAL_PORT}/"
+        is_mobile_network = LAN_IP.startswith("10.") and not (LAN_IP.startswith("10.0.") or LAN_IP.startswith("10.1."))
+        warning_msg = ft.Text("⚠️ NOTA: Parece que usas datos móviles (4G/5G). Las gafas VR u otros PCs no podrán acceder a esta IP al menos que estés en un Wi-Fi doméstico.", color="#FF5252", size=10, italic=True) if is_mobile_network else ft.Container()
+
         panel_vr = ft.Container(
             content=ft.Column([
                 ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11),
                 ft.Text("Abre esta dirección exacta en el navegador de tus gafas (Meta Quest, Pico) o tu PC para ver el render en grande:", size=10, color="#8B949E"),
-                # Eliminado el parámetro weight="bold" para evitar el TypeError en el TextField de Flet
-                ft.TextField(value=vr_url, read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")
+                ft.TextField(value=vr_url, read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676"),
+                warning_msg
             ], spacing=5),
             bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")
         )
@@ -1047,7 +1104,6 @@ def main(page: ft.Page):
         view_visor = ft.Column([
             ft.Container(height=5), hw_panel, ft.Container(height=5), panel_vr, ft.Container(height=5),
             ft.Text("Motor Web Worker / Multi-Hilo", text_align="center", color="#00E5FF", weight="bold"),
-            # Botón local (abre en el navegador del dispositivo actual a través de localhost)
             ft.Row([ft.ElevatedButton("🔄 ABRIR VISOR 3D (LOCAL)", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/", color="black", bgcolor="#00E676", height=60, expand=True)], alignment=ft.MainAxisAlignment.CENTER)
         ], expand=True, scroll="auto")
         
@@ -1088,7 +1144,7 @@ def main(page: ft.Page):
             file_list.controls.clear()
             if not os.path.exists(EXPORT_DIR): return
             for f in reversed(sorted(os.listdir(EXPORT_DIR))):
-                if f == "nexus_config.json": continue
+                if f == "nexus_config.json" or f == "imported.stl": continue
                 
                 def make_del(name): return lambda _: (os.remove(os.path.join(EXPORT_DIR, name)), update_files())
                 def make_ren(name): return lambda _: open_rename(name)

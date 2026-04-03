@@ -134,7 +134,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
     def log_message(self, *args): pass
 
-# Servidor multihilo escuchando en toda la red local para las gafas VR
 threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
@@ -142,12 +141,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v19.0 PRO"
+        page.title = "NEXUS CAD v19.1 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v19.0 PRO | Motor VR y Red Local Activos", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v19.1 PRO | Motor VR y Red Local Activos", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -191,9 +190,6 @@ def main(page: ft.Page):
         sl_g_t, r_g_t = create_slider("Grosor (GT)", 0.5, 20, 2, False)
         sl_g_tol, r_g_tol = create_slider("Tol. Global (G_TOL)", 0.0, 2.0, 0.2, False)
 
-        # =========================================================
-        # INYECTOR GLOBAL
-        # =========================================================
         def prepare_js_payload():
             header = f"var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value}; var G_TOL = {sl_g_tol.value};\n\n"
             return header + txt_code.value
@@ -1026,7 +1022,8 @@ def main(page: ft.Page):
             content=ft.Column([
                 ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11),
                 ft.Text("Abre esta dirección exacta en el navegador de tus gafas (Meta Quest, Pico) o tu PC para ver el render en grande:", size=10, color="#8B949E"),
-                ft.TextField(value=vr_url, read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676", weight="bold")
+                # Eliminado el parámetro weight="bold" para evitar el TypeError en el TextField de Flet
+                ft.TextField(value=vr_url, read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")
             ], spacing=5),
             bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")
         )

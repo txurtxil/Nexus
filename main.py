@@ -147,12 +147,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.1 PRO"
+        page.title = "NEXUS CAD v20.2 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.1 PRO | Modificador Híbrido Activo", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v20.2 PRO | Modificador Híbrido Activo", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -279,40 +279,11 @@ def main(page: ft.Page):
 
         # =========================================================
         # HERRAMIENTA ESPECIAL: IMPORTACIÓN DE STL (HÍBRIDO)
+        # ELIMINADO FILEPICKER TOTALMENTE PARA EVITAR RED SCREEN
         # =========================================================
-        lbl_stl_status = ft.Text("No hay STL cargado. Selecciona un archivo 📂", color="#8B949E", size=11)
+        lbl_stl_status = ft.Text("No hay STL cargado. Escribe el nombre 📂", color="#8B949E", size=11)
         
-        # Corrección FilePicker Flet Mobile
-        def on_file_picked(e):
-            if hasattr(e, 'files') and e.files and len(e.files) > 0:
-                try:
-                    src_path = e.files[0].path
-                    dest_path = os.path.join(EXPORT_DIR, "imported.stl")
-                    shutil.copy(src_path, dest_path)
-                    lbl_stl_status.value = f"STL Híbrido en memoria: {e.files[0].name}"
-                    lbl_stl_status.color = "#00E676"
-                    update_code_wrapper() 
-                except Exception as ex:
-                    lbl_stl_status.value = f"Error de copia local: {ex}"
-                    lbl_stl_status.color = "red"
-            page.update()
-
-        # Inicialización sin kwargs para compatibilidad universal
-        file_picker = ft.FilePicker()
-        try:
-            file_picker.on_result = on_file_picked
-            page.overlay.append(file_picker)
-        except: pass
-
-        def trigger_picker(e):
-            try:
-                file_picker.pick_files(allowed_extensions=["stl"])
-            except Exception:
-                lbl_stl_status.value = "⚠️ Explorador bloqueado. Usa la Carga Manual."
-                lbl_stl_status.color = "#FFAB00"
-                page.update()
-
-        # Sistema Fallback Manual
+        # Sistema Fallback Manual Exclusivo
         tf_stl_manual = ft.TextField(label="Nombre archivo en DB (ej: figura.stl)", expand=True, bgcolor="#0B0E14", text_size=12)
         
         def manual_stl_load(e):
@@ -329,7 +300,7 @@ def main(page: ft.Page):
                     except Exception as ex:
                         lbl_stl_status.value = f"Error al cargar: {ex}"; lbl_stl_status.color = "red"
                 else:
-                    lbl_stl_status.value = f"Archivo '{fname}' no existe en pestaña DB."; lbl_stl_status.color = "#FF5252"
+                    lbl_stl_status.value = f"Archivo '{fname}' no existe en la carpeta local."; lbl_stl_status.color = "#FF5252"
             page.update()
 
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
@@ -340,8 +311,8 @@ def main(page: ft.Page):
         col_stl = ft.Column([
             ft.Text("Híbrido STL + Perforador Paramétrico", color="#00E676", weight="bold"),
             inst("IMPORTANTE: Usa STLs Low-Poly (ideal <5k caras)."),
+            ft.Text("Sube o mueve tu archivo a la app y escribe su nombre exacto:", size=11, color="#E6EDF3"),
             ft.Container(content=ft.Column([
-                ft.ElevatedButton("📁 BUSCAR EN EL DISPOSITIVO", on_click=trigger_picker, bgcolor="#B388FF", color="black", width=float('inf')),
                 ft.Row([tf_stl_manual, ft.ElevatedButton("📥 CARGAR", on_click=manual_stl_load, bgcolor="#00E5FF", color="black")]),
                 lbl_stl_status,
                 r_stl_sc, r_stl_x, r_stl_y, r_stl_z

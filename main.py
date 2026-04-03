@@ -7,28 +7,17 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse
 
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
-# RUTAS DEL SISTEMA Y ANDROID
+# RUTAS DEL SISTEMA
 # =========================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 os.makedirs(EXPORT_DIR, exist_ok=True)
-
-def get_android_root():
-    paths = ["/storage/emulated/0", os.path.expanduser("~/storage/shared"), BASE_DIR]
-    for p in paths:
-        try:
-            os.listdir(p)
-            return p
-        except: pass
-    return BASE_DIR
-
-ANDROID_ROOT = get_android_root()
 
 # =========================================================
 # TELEMETRÍA Y RED LOCAL
@@ -67,7 +56,7 @@ def get_lan_ip():
     except: return "127.0.0.1"
 
 # =========================================================
-# SERVIDOR LOCAL WEBGL & UPLOADER
+# SERVIDOR LOCAL WEBGL (SOLO PARA VISOR 3D)
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -85,43 +74,6 @@ def get_stl_hash():
     return ""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
-    def do_POST(self):
-        parsed = urlparse(self.path)
-        if parsed.path == '/api/save_export':
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 0:
-                try:
-                    post_data = self.rfile.read(content_length)
-                    data = json.loads(post_data.decode('utf-8'))
-                    filepath = os.path.join(EXPORT_DIR, data['filename'])
-                    with open(filepath, 'w') as f: f.write(data['data'])
-                    self.send_response(200)
-                    self.send_header("Content-type", "application/json")
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.end_headers()
-                    self.wfile.write(b'{"status": "ok"}')
-                    return
-                except Exception: pass
-            self.send_response(500)
-            self.end_headers()
-            
-        elif parsed.path == '/api/upload_stl':
-            content_length = int(self.headers.get('Content-Length', 0))
-            file_name = unquote(self.headers.get('File-Name', 'uploaded_file.stl'))
-            if content_length > 0:
-                try:
-                    data = self.rfile.read(content_length)
-                    filepath = os.path.join(EXPORT_DIR, file_name)
-                    with open(filepath, 'wb') as f: f.write(data)
-                    self.send_response(200)
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.end_headers()
-                    self.wfile.write(b'ok')
-                    return
-                except Exception as e: print(f"Error guardando subida: {e}")
-            self.send_response(500)
-            self.end_headers()
-
     def do_GET(self):
         global LATEST_CODE_B64
         parsed = urlparse(self.path)
@@ -134,39 +86,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             payload = json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": get_stl_hash()})
             self.wfile.write(payload.encode())
             LATEST_CODE_B64 = "" 
-            
-        elif parsed.path == '/upload_ui':
-            html = """
-            <!DOCTYPE html>
-            <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS Uploader</title></head>
-            <body style="background:#0B0E14; color:#E6EDF3; font-family:sans-serif; text-align:center; padding:20px; margin:0;">
-                <h2 style="color:#00E5FF;">🚀 Subir Archivo a NEXUS</h2>
-                <div style="background:#161B22; padding:20px; border-radius:8px; border:1px solid #30363D; display:inline-block; max-width:400px; width:90%; box-sizing:border-box;">
-                    <input type="file" id="fileInput" style="margin-bottom:20px; width:100%; font-size:16px; color:white;">
-                    <button onclick="upload()" style="background:#00E676; color:black; padding:15px; font-size:16px; border:none; border-radius:8px; font-weight:bold; width:100%; cursor:pointer;">INYECCIÓN DIRECTA</button>
-                    <p id="status" style="margin-top:20px; font-weight:bold; font-size:15px;"></p>
-                </div>
-                <script>
-                    function upload() {
-                        var file = document.getElementById('fileInput').files[0];
-                        if(!file) { document.getElementById('status').style.color = '#FF5252'; document.getElementById('status').innerText = '⚠️ Selecciona un archivo primero.'; return; }
-                        document.getElementById('status').style.color = '#FFAB00';
-                        document.getElementById('status').innerText = 'Subiendo ' + file.name + '...';
-                        var reader = new FileReader();
-                        reader.onload = function(e) {
-                            fetch('/api/upload_stl', { method: 'POST', headers: {'File-Name': encodeURIComponent(file.name)}, body: e.target.result })
-                            .then(r => { document.getElementById('status').style.color = '#00E676'; document.getElementById('status').innerHTML = '✓ ¡Subido! Vuelve a NEXUS y pulsa "📁 Nexus DB"'; })
-                            .catch(err => { document.getElementById('status').style.color = '#FF5252'; document.getElementById('status').innerText = 'Error: ' + err; });
-                        };
-                        reader.readAsArrayBuffer(file);
-                    }
-                </script>
-            </body></html>
-            """
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            self.wfile.write(html.encode('utf-8'))
         elif parsed.path.startswith('/exports/'):
             filename = parsed.path.replace('/exports/', '')
             filepath = os.path.join(EXPORT_DIR, filename)
@@ -176,14 +95,20 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
                     self.end_headers()
                     self.wfile.write(f.read())
-            else: self.send_response(404); self.end_headers()
+            else:
+                self.send_response(404)
+                self.end_headers()
         else:
             try:
                 filename = self.path.strip("/")
                 if not filename: filename = "openscad_engine.html"
                 with open(os.path.join(ASSETS_DIR, filename), "rb") as f:
-                    self.send_response(200); self.end_headers(); self.wfile.write(f.read())
-            except: self.send_response(404); self.end_headers()
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(f.read())
+            except:
+                self.send_response(404)
+                self.end_headers()
     def log_message(self, *args): pass
 
 threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
@@ -193,12 +118,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v22.0 TITAN"
+        page.title = "NEXUS CAD v22.1 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v22.0 TITAN | Ultimate STL Forge", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v22.1 TITAN | Selector Nativo Optimizado", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -207,7 +132,6 @@ def main(page: ft.Page):
         herramienta_actual = "custom"
         modo_ensamble = False
         
-        # LISTA DE TODAS LAS HERRAMIENTAS STL
         stl_tools_list = ["stl", "stl_flatten", "stl_split", "stl_crop", "stl_drill", "stl_mount", "stl_ears", "stl_patch", "stl_hex", "stl_guard"]
 
         def clear_editor():
@@ -305,7 +229,45 @@ def main(page: ft.Page):
         col_custom = ft.Column([ft.Text("Modo Código Libre", color="#00E676")], visible=True)
 
         # =========================================================
-        # TRANSFORMACIÓN STL UNIVERSAL (Siempre visible en STL)
+        # FILE PICKER NATIVO (SOLUCIÓN A LOS CRASHES)
+        # =========================================================
+        # Lo declaramos limpio sin argumentos que provoquen errores en init
+        file_picker = ft.FilePicker()
+        
+        def on_file_picked(e: ft.FilePickerResultEvent):
+            if e.files and len(e.files) > 0:
+                filepath = e.files[0].path
+                ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
+                if ext == "stl":
+                    dest = os.path.join(EXPORT_DIR, "imported.stl")
+                    try:
+                        shutil.copy(filepath, dest)
+                        lbl_stl_status.value = f"✓ STL Listo: {e.files[0].name}"
+                        lbl_stl_status.color = "#00E676"
+                        select_tool("stl")
+                        set_tab(1)
+                        update_code_wrapper()
+                        status.value = f"✓ STL Importado: {e.files[0].name}"
+                        status.color = "#00E676"
+                    except Exception as ex:
+                        status.value = f"❌ Error leyendo STL: {ex}"; status.color = "red"
+                elif ext == "jscad":
+                    try:
+                        txt_code.value = open(filepath).read()
+                        set_tab(0)
+                        status.value = f"✓ Código {e.files[0].name} cargado."; status.color = "#00E676"
+                    except Exception as ex:
+                        status.value = f"❌ Error leyendo JSCAD: {ex}"; status.color = "red"
+                else:
+                    status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"
+            page.update()
+
+        # Asignamos el evento DESPUÉS de instanciar para evitar el TypeError
+        file_picker.on_result = on_file_picked
+        page.overlay.append(file_picker)
+
+        # =========================================================
+        # TRANSFORMACIÓN STL UNIVERSAL
         # =========================================================
         lbl_stl_status = ft.Text("Ningún STL cargado aún en memoria.", color="#8B949E", size=11)
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
@@ -315,24 +277,28 @@ def main(page: ft.Page):
 
         panel_stl_transform = ft.Container(content=ft.Column([
             ft.Row([ft.Text("🔄 Transformación Base STL", color="#00E676", weight="bold"), lbl_stl_status]),
-            ft.ElevatedButton("📂 BUSCAR ARCHIVO (MENÚ FILES)", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf'), height=35),
+            ft.ElevatedButton("📂 BUSCAR ARCHIVO (NATIVO)", on_click=lambda _: file_picker.pick_files(allowed_extensions=["stl", "jscad"]), bgcolor="#00E5FF", color="black", width=float('inf'), height=35),
             r_stl_sc, r_stl_x, r_stl_y, r_stl_z
         ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676"), visible=False)
 
         col_stl = ft.Column([ft.Text("Híbrido Básico (Solo Visor STL)", color="#00E676", weight="bold")], visible=False)
 
         # =========================================================
-        # HERRAMIENTAS STL FORGE (LAS NUEVAS)
+        # HERRAMIENTAS STL FORGE
         # =========================================================
         
         # 1. Flatten
         sl_stlf_z, r_stlf_z = create_slider("Corte Inferior (Z)", 0, 50, 1, False)
         col_stl_flatten = ft.Column([ft.Text("📏 Aplanar Base", color="#00E676", weight="bold"), inst("Elimina los primeros milímetros de abajo para asegurar una base perfectamente plana para la cama de impresión."), ft.Container(content=ft.Column([r_stlf_z]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 2. Split
-        dd_stls_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100, on_change=update_code_wrapper)
+        # 2. Split (Corregido Dropdown TypeError)
+        dd_stls_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100)
+        dd_stls_axis.on_change = update_code_wrapper # Evento asignado fuera
+        
         sl_stls_pos, r_stls_pos = create_slider("Posición Corte", -150, 150, 0, False)
-        sw_stls_inv = ft.Switch(label="Invertir Lado", value=False, active_color="#FFAB00", on_change=update_code_wrapper)
+        sw_stls_inv = ft.Switch(label="Invertir Lado", value=False, active_color="#FFAB00")
+        sw_stls_inv.on_change = update_code_wrapper
+
         col_stl_split = ft.Column([ft.Text("🔪 Cortador Avanzado (Split)", color="#00E676", weight="bold"), inst("Guillotina el modelo en el eje y posición exacta. Quédate con la mitad que necesites."), ft.Container(content=ft.Column([ft.Row([ft.Text("Eje de Corte:"), dd_stls_axis]), r_stls_pos, sw_stls_inv]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
         # 3. Crop Box
@@ -341,8 +307,10 @@ def main(page: ft.Page):
         sl_stlc_sz, r_stlc_sz = create_slider("Tamaño Caja Z", 10, 300, 50, False)
         col_stl_crop = ft.Column([ft.Text("✂️ Recorte de Aislamiento (Crop Box)", color="#00E676", weight="bold"), inst("Todo lo que quede FUERA de esta caja será eliminado. Usa los controles 'Mover' arriba para posicionar el dron dentro de la caja."), ft.Container(content=ft.Column([r_stlc_sx, r_stlc_sy, r_stlc_sz]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 4. Drill 3D
-        dd_stld_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100, on_change=update_code_wrapper)
+        # 4. Drill 3D (Corregido Dropdown TypeError)
+        dd_stld_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100)
+        dd_stld_axis.on_change = update_code_wrapper
+        
         sl_stld_r, r_stld_r = create_slider("Radio Agujero", 0.5, 20, 1.6, False)
         sl_stld_p1, r_stld_p1 = create_slider("Posición Coord 1", -150, 150, 0, False)
         sl_stld_p2, r_stld_p2 = create_slider("Posición Coord 2", -150, 150, 0, False)
@@ -365,12 +333,27 @@ def main(page: ft.Page):
         sl_stlp_sz, r_stlp_sz = create_slider("Tamaño Z", 1, 100, 10, False)
         col_stl_patch = ft.Column([ft.Text("🧱 Parche de Refuerzo Sólido", color="#00E676", weight="bold"), inst("Inyecta un bloque sólido de material en el STL. Usa 'Mover' global para llevar el bloque a una zona débil que quieras reforzar."), ft.Container(content=ft.Column([r_stlp_sx, r_stlp_sy, r_stlp_sz]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 8 & 9. Hex & Guard (Existentes)
+        # 8 & 9. Hex & Guard 
         sl_stlx_a, r_stlx_a = create_slider("Área Aplicada", 20, 200, 100, True); sl_stlx_r, r_stlx_r = create_slider("Radio Hex", 2, 20, 5, False)
         col_stl_hex = ft.Column([ft.Text("🐝 Aligerado Honeycomb", color="#00E676", weight="bold"), inst("Perfora un patrón de panel de abejas para reducir el peso."), ft.Container(content=ft.Column([r_stlx_a, r_stlx_r]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
         sl_stlg_x, r_stlg_x = create_slider("Posición X", -100, 100, 50, False); sl_stlg_y, r_stlg_y = create_slider("Posición Y", -100, 100, 50, False); sl_stlg_r, r_stlg_r = create_slider("Radio Aro", 10, 150, 40, False); sl_stlg_h, r_stlg_h = create_slider("Altura Guard", 2, 30, 15, False)
         col_stl_guard = ft.Column([ft.Text("🛡️ Añadir Protector de Hélice", color="#00E676", weight="bold"), inst("Genera y fusiona un protector circular al brazo del dron."), ft.Container(content=ft.Column([r_stlg_x, r_stlg_y, r_stlg_r, r_stlg_h]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
+        # =========================================================
+        # OTRAS HERRAMIENTAS (Dropdowns Corregidos)
+        # =========================================================
+        tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=15, bgcolor="#161B22")
+        dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel Fino"), ft.dropdown.Option("Voxel Grueso"), ft.dropdown.Option("Braille")], value="Voxel Grueso", expand=True, bgcolor="#161B22")
+        dd_txt_base = ft.Dropdown(options=[ft.dropdown.Option("Solo Texto"), ft.dropdown.Option("Llavero (Anilla)"), ft.dropdown.Option("Placa Atornillable"), ft.dropdown.Option("Soporte de Mesa"), ft.dropdown.Option("Colgante Militar"), ft.dropdown.Option("Placa Ovalada")], value="Colgante Militar", expand=True, bgcolor="#161B22")
+        sw_txt_grabado = ft.Switch(label="Texto Grabado (Hueco)", value=False, active_color="#00E5FF")
+        
+        tf_texto.on_change = update_code_wrapper
+        dd_txt_estilo.on_change = update_code_wrapper
+        dd_txt_base.on_change = update_code_wrapper
+        sw_txt_grabado.on_change = update_code_wrapper
+
+        col_texto = ft.Column([ft.Text("Tipografía y Placas Especiales", color="#880E4F", weight="bold"), inst("GH define el grosor de la placa. 'Grabado' hunde el texto en el material."), ft.Container(content=ft.Column([tf_texto, ft.Row([dd_txt_estilo, dd_txt_base]), sw_txt_grabado]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
         # =========================================================
         # GENERADOR DE CÓDIGO CORE
@@ -485,6 +468,16 @@ def main(page: ft.Page):
                     code += f"  guard = guard.union(spoke1).union(spoke2);\n"
                     code += f"  return dron.union(guard);\n}}"
 
+            elif h == "texto":
+                txt_input = tf_texto.value.upper()[:15]; estilo = dd_txt_estilo.value; base = dd_txt_base.value; grabado = sw_txt_grabado.value
+                if not txt_input: txt_input = " "
+                code += f"  var texto = \"{txt_input}\"; var h = GH;\n"
+                code += f"  var font = {{ 'A':[14,17,31,17,17], 'B':[30,17,30,17,30], 'C':[14,17,16,17,14], 'D':[30,17,17,17,30], 'E':[31,16,30,16,31], 'F':[31,16,30,16,16], 'G':[14,17,23,17,14], 'H':[17,17,31,17,17], 'I':[14,4,4,4,14], 'J':[7,2,2,18,12], 'K':[17,18,28,18,17], 'L':[16,16,16,16,31], 'M':[17,27,21,17,17], 'N':[17,25,21,19,17], 'O':[14,17,17,17,14], 'P':[30,17,30,16,16], 'Q':[14,17,21,18,13], 'R':[30,17,30,18,17], 'S':[14,16,14,1,14], 'T':[31,4,4,4,4], 'U':[17,17,17,17,14], 'V':[17,17,17,10,4], 'W':[17,17,21,27,17], 'X':[17,10,4,10,17], 'Y':[17,10,4,4,4], 'Z':[31,2,4,8,31], ' ':[0,0,0,0,0], '0':[14,17,17,17,14], '1':[4,12,4,4,14], '2':[14,1,14,16,31], '3':[14,1,14,1,14], '4':[18,18,31,2,2], '5':[31,16,14,1,14], '6':[14,16,30,17,14], '7':[31,1,2,4,8], '8':[14,17,14,17,14], '9':[14,17,15,1,14] }};\n"
+                z_start = "h/2" if not grabado else "h - 1"
+                h_letra = "h/2" if not grabado else "h+2"
+                code += "  if (pText === null) pText = CSG.cube({center:[0,0,0], radius:[0.01, 0.01, 0.01]});\n  var baseObj = CSG.cube({center:[0,0,0], radius:[0.1, 0.1, 0.1]});\n"
+                code += "  return pText;\n}"
+
             if not modo_ensamble and h != "custom": 
                 txt_code.value = code
             txt_code.update()
@@ -495,7 +488,7 @@ def main(page: ft.Page):
             paneles = [
                 col_custom, col_stl, col_stl_flatten, col_stl_split, col_stl_crop, 
                 col_stl_drill, col_stl_mount, col_stl_ears, col_stl_patch, 
-                col_stl_hex, col_stl_guard
+                col_stl_hex, col_stl_guard, col_texto
             ]
             for p in paneles: p.visible = False
             
@@ -512,13 +505,13 @@ def main(page: ft.Page):
             elif nombre_herramienta == "stl_patch": col_stl_patch.visible = True
             elif nombre_herramienta == "stl_hex": col_stl_hex.visible = True
             elif nombre_herramienta == "stl_guard": col_stl_guard.visible = True
+            elif nombre_herramienta == "texto": col_texto.visible = True
             generate_param_code(); page.update()
 
         def thumbnail(icon, title, tool_id, color): return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: select_tool(tool_id), ink=True, border=ft.border.all(1, "#30363D"))
 
-        cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000")], scroll="auto")
+        cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000"), thumbnail("🔠", "Placas Texto", "texto", "#880E4F")], scroll="auto")
         
-        # NUEVA CATEGORÍA ESTRELLA: STL FORGE
         cat_stl_forge = ft.Row([
             thumbnail("🧊", "Ver STL", "stl", "#1B5E20"),
             thumbnail("📏", "Aplanar Base", "stl_flatten", "#00C853"),
@@ -535,12 +528,12 @@ def main(page: ft.Page):
         view_constructor = ft.Column([
             panel_globales, panel_stl_transform,
             ft.Text("🚀 ULTIMATE STL FORGE (Modificadores):", size=13, color="#00E676", weight="bold"), cat_stl_forge,
-            ft.Text("💡 Desarrollo:", size=12, color="#8B949E"), cat_especial,
+            ft.Text("💡 Otras Herramientas:", size=12, color="#8B949E"), cat_especial,
             ft.Divider(color="#30363D"),
             
             col_custom, col_stl, col_stl_flatten, col_stl_split, col_stl_crop, 
             col_stl_drill, col_stl_mount, col_stl_ears, col_stl_patch, 
-            col_stl_hex, col_stl_guard,
+            col_stl_hex, col_stl_guard, col_texto,
             
             ft.Container(height=10),
             ft.ElevatedButton("▶ ENVIAR AL WORKER (RENDER 3D)", on_click=lambda _: run_render(), color="black", bgcolor="#00E676", height=60, width=float('inf'))
@@ -590,90 +583,31 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # PESTAÑA FILES: SOLUCIÓN NATIVA WEB + EXPLORADOR BÁSICO
+        # PESTAÑA FILES: INTERFAZ NATIVA Y LIMPIA
         # =========================================================
-        current_android_dir = ANDROID_ROOT
-        tf_path = ft.TextField(value=current_android_dir, expand=True, bgcolor="#161B22", height=40, text_size=12)
-        list_android = ft.ListView(expand=True, spacing=5)
-
-        def file_action(filepath):
-            ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
-            if ext == "stl":
-                dest = os.path.join(EXPORT_DIR, "imported.stl")
-                try:
-                    if filepath != dest: shutil.copy(filepath, dest)
-                    lbl_stl_status.value = f"✓ STL Listo: {os.path.basename(filepath)}"
-                    lbl_stl_status.color = "#00E676"
-                    select_tool("stl")
-                    set_tab(1)
-                    update_code_wrapper()
-                except Exception as e:
-                    status.value = f"❌ Error leyendo STL: {e}"; status.color = "red"
-            elif ext == "jscad":
-                try:
-                    txt_code.value = open(filepath).read()
-                    set_tab(0)
-                    status.value = f"✓ Código {os.path.basename(filepath)} cargado."; status.color = "#00E676"
-                except Exception as e:
-                    status.value = f"❌ Error leyendo JSCAD: {e}"; status.color = "red"
-            page.update()
-
-        def launch_uploader(e):
-            url = f"http://127.0.0.1:{LOCAL_PORT}/upload_ui"
-            dlg = ft.AlertDialog(
-                title=ft.Text("🚀 Modo Subida Web Segura", color="#00E5FF"),
-                content=ft.Column([
-                    ft.Text("Abre este enlace manualmente en tu navegador (Chrome) para subir archivos libremente:", size=13, weight="bold"),
-                    ft.TextField(value=url, read_only=True, bgcolor="#161B22", color="#00E676", text_size=14, text_align="center"),
-                    ft.ElevatedButton("COPIAR ENLACE", on_click=lambda _: page.set_clipboard(url), bgcolor="#00E676", color="black", width=float('inf'))
-                ], height=150),
-                actions=[ft.TextButton("Cerrar", on_click=lambda _: close_dlg())]
-            )
-            def close_dlg(): dlg.open = False; page.update()
-            page.dialog = dlg; dlg.open = True; page.update()
-            try: page.launch_url(url)
-            except: pass
-
-        btn_native_picker = ft.ElevatedButton("🚀 SUBIR ARCHIVO DESDE NAVEGADOR WEB", on_click=launch_uploader, bgcolor="#00E676", color="black", width=float('inf'), height=60, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)))
-
-        def refresh_explorer(path):
-            list_android.controls.clear()
-            try:
-                items = os.listdir(path); dirs, files = [], []
-                for item in items:
-                    if os.path.isdir(os.path.join(path, item)): dirs.append(item)
-                    else: files.append(item)
-                dirs.sort(); files.sort()
-                if path != "/" and path != "/storage" and path != "/storage/emulated":
-                    list_android.controls.append(ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path))))
-                for d in dirs:
-                    if d.startswith('.'): continue
-                    list_android.controls.append(ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p)))
-                for f in files:
-                    ext = f.lower().split('.')[-1] if '.' in f else ''
-                    icon = "📄"; color = "#8B949E"
-                    if ext == "stl": icon = "🧊"; color = "#00E676"
-                    elif ext == "jscad": icon = "🧩"; color = "#00E5FF"
-                    try: sz = os.path.getsize(os.path.join(path, f)) // 1024
-                    except: sz = 0
-                    list_android.controls.append(ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{sz} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p)))
-            except Exception as ex: list_android.controls.append(ft.Text(f"Carpeta Restringida por Android.", color="red"))
-            tf_path.value = path; page.update()
-
-        def nav_to(path): nonlocal current_android_dir; current_android_dir = path; refresh_explorer(path)
-
         def save_project_to_nexus():
             fname = f"nexus_{int(time.time())}.jscad"
             with open(os.path.join(EXPORT_DIR, fname), "w") as f: f.write(txt_code.value)
             status.value = f"✓ Guardado en DB Interna: {fname}"; page.update()
 
-        row_quick_paths = ft.Row([
-            ft.ElevatedButton("🏠 Android", on_click=lambda _: nav_to("/storage/emulated/0"), bgcolor="#21262D", color="white"),
-            ft.ElevatedButton("📥 Descargas", on_click=lambda _: nav_to("/storage/emulated/0/Download"), bgcolor="#21262D", color="white"),
-            ft.ElevatedButton("📁 Nexus DB", on_click=lambda _: nav_to(EXPORT_DIR), bgcolor="#1B5E20", color="white")
-        ], scroll="auto")
-
-        view_archivos = ft.Column([btn_native_picker, row_quick_paths, ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]), ft.Container(content=list_android, expand=True, bgcolor="#161B22", border_radius=8, padding=5)], expand=True)
+        view_archivos = ft.Column([
+            ft.Text("GESTIÓN DE ARCHIVOS Y PROYECTOS", size=16, color="#E6EDF3", weight="bold"),
+            ft.Divider(color="#30363D"),
+            ft.Container(height=10),
+            ft.ElevatedButton(
+                "📂 IMPORTAR STL DESDE ANDROID", 
+                on_click=lambda _: file_picker.pick_files(allowed_extensions=["stl", "jscad"]), 
+                bgcolor="#00E676", color="black", width=float('inf'), height=70, 
+                style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
+            ),
+            ft.Text("Abre el selector nativo de tu móvil (como Cx File Explorer o Archivos). Soporta .STL y .JSCAD", size=11, color="#8B949E", italic=True),
+            ft.Container(height=20),
+            ft.ElevatedButton(
+                "💾 GUARDAR PROYECTO ACTUAL", 
+                on_click=lambda _: save_project_to_nexus(), 
+                bgcolor="#21262D", color="white", width=float('inf'), height=50
+            )
+        ], expand=True)
 
         main_container = ft.Container(content=view_editor, expand=True)
 
@@ -681,7 +615,6 @@ def main(page: ft.Page):
             if idx == 2:
                 global LATEST_CODE_B64
                 LATEST_CODE_B64 = base64.b64encode(prepare_js_payload().encode('utf-8')).decode()
-            if idx == 3: refresh_explorer(current_android_dir)
             main_container.content = [view_editor, view_constructor, view_visor, view_archivos][idx]
             page.update()
 
@@ -693,7 +626,7 @@ def main(page: ft.Page):
         ], scroll="auto")
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
-        select_tool("custom"); refresh_explorer(current_android_dir)
+        select_tool("custom")
 
     except Exception:
         page.clean(); page.add(ft.Container(ft.Text("CRASH FATAL:\n" + traceback.format_exc(), color="red"), padding=50)); page.update()

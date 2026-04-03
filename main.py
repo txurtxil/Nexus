@@ -19,6 +19,17 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 EXPORT_DIR = os.path.join(BASE_DIR, "nexus_proyectos")
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
+def get_android_root():
+    paths = ["/storage/emulated/0", os.path.expanduser("~/storage/shared"), BASE_DIR]
+    for p in paths:
+        try:
+            os.listdir(p)
+            return p
+        except: pass
+    return BASE_DIR
+
+ANDROID_ROOT = get_android_root()
+
 # =========================================================
 # TELEMETRÍA Y RED LOCAL
 # =========================================================
@@ -56,7 +67,7 @@ def get_lan_ip():
     except: return "127.0.0.1"
 
 # =========================================================
-# SERVIDOR LOCAL WEBGL (SOLO PARA VISOR 3D)
+# SERVIDOR LOCAL WEBGL
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -118,12 +129,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v22.2 TITAN"
+        page.title = "NEXUS CAD v22.3 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v22.2 TITAN | Selector Nativo Optimizado", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v22.3 TITAN | Explorador Seguro Activo", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -229,44 +240,7 @@ def main(page: ft.Page):
         col_custom = ft.Column([ft.Text("Modo Código Libre", color="#00E676")], visible=True)
 
         # =========================================================
-        # FILE PICKER NATIVO (CORREGIDO SIN EVENT TYPE)
-        # =========================================================
-        file_picker = ft.FilePicker()
-        
-        # Le quitamos el ": ft.FilePickerResultEvent" a la 'e' para que Flet antiguo no crashee
-        def on_file_picked(e):
-            if e.files and len(e.files) > 0:
-                filepath = e.files[0].path
-                ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
-                if ext == "stl":
-                    dest = os.path.join(EXPORT_DIR, "imported.stl")
-                    try:
-                        shutil.copy(filepath, dest)
-                        lbl_stl_status.value = f"✓ STL Listo: {e.files[0].name}"
-                        lbl_stl_status.color = "#00E676"
-                        select_tool("stl")
-                        set_tab(1)
-                        update_code_wrapper()
-                        status.value = f"✓ STL Importado: {e.files[0].name}"
-                        status.color = "#00E676"
-                    except Exception as ex:
-                        status.value = f"❌ Error leyendo STL: {ex}"; status.color = "red"
-                elif ext == "jscad":
-                    try:
-                        txt_code.value = open(filepath).read()
-                        set_tab(0)
-                        status.value = f"✓ Código {e.files[0].name} cargado."; status.color = "#00E676"
-                    except Exception as ex:
-                        status.value = f"❌ Error leyendo JSCAD: {ex}"; status.color = "red"
-                else:
-                    status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"
-            page.update()
-
-        file_picker.on_result = on_file_picked
-        page.overlay.append(file_picker)
-
-        # =========================================================
-        # TRANSFORMACIÓN STL UNIVERSAL
+        # TRANSFORMACIÓN STL UNIVERSAL (SIN NINGÚN ft.FilePicker)
         # =========================================================
         lbl_stl_status = ft.Text("Ningún STL cargado aún en memoria.", color="#8B949E", size=11)
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
@@ -276,21 +250,21 @@ def main(page: ft.Page):
 
         panel_stl_transform = ft.Container(content=ft.Column([
             ft.Row([ft.Text("🔄 Transformación Base STL", color="#00E676", weight="bold"), lbl_stl_status]),
-            ft.ElevatedButton("📂 BUSCAR ARCHIVO (NATIVO)", on_click=lambda _: file_picker.pick_files(allowed_extensions=["stl", "jscad"]), bgcolor="#00E5FF", color="black", width=float('inf'), height=35),
+            ft.ElevatedButton("📂 ABRIR EXPLORADOR DE ARCHIVOS", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf'), height=40),
             r_stl_sc, r_stl_x, r_stl_y, r_stl_z
         ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676"), visible=False)
 
         col_stl = ft.Column([ft.Text("Híbrido Básico (Solo Visor STL)", color="#00E676", weight="bold")], visible=False)
 
         # =========================================================
-        # HERRAMIENTAS STL FORGE
+        # HERRAMIENTAS STL FORGE (CON DROPDOWNS SEGUROS)
         # =========================================================
         
         # 1. Flatten
         sl_stlf_z, r_stlf_z = create_slider("Corte Inferior (Z)", 0, 50, 1, False)
         col_stl_flatten = ft.Column([ft.Text("📏 Aplanar Base", color="#00E676", weight="bold"), inst("Elimina los primeros milímetros de abajo para asegurar una base perfectamente plana para la cama de impresión."), ft.Container(content=ft.Column([r_stlf_z]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 2. Split
+        # 2. Split 
         dd_stls_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100)
         dd_stls_axis.on_change = update_code_wrapper 
         
@@ -306,7 +280,7 @@ def main(page: ft.Page):
         sl_stlc_sz, r_stlc_sz = create_slider("Tamaño Caja Z", 10, 300, 50, False)
         col_stl_crop = ft.Column([ft.Text("✂️ Recorte de Aislamiento (Crop Box)", color="#00E676", weight="bold"), inst("Todo lo que quede FUERA de esta caja será eliminado. Usa los controles 'Mover' arriba para posicionar el dron dentro de la caja."), ft.Container(content=ft.Column([r_stlc_sx, r_stlc_sy, r_stlc_sz]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        # 4. Drill 3D
+        # 4. Drill 3D 
         dd_stld_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#161B22", width=100)
         dd_stld_axis.on_change = update_code_wrapper
         
@@ -582,30 +556,89 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # PESTAÑA FILES: INTERFAZ NATIVA Y LIMPIA
+        # PESTAÑA FILES: EXPLORADOR INTERNO DIRECTO
         # =========================================================
+        current_android_dir = ANDROID_ROOT
+        tf_path = ft.TextField(value=current_android_dir, expand=True, bgcolor="#161B22", height=40, text_size=12)
+        list_android = ft.ListView(expand=True, spacing=5)
+
+        def file_action(filepath):
+            ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
+            if ext == "stl":
+                dest = os.path.join(EXPORT_DIR, "imported.stl")
+                try:
+                    if filepath != dest: shutil.copy(filepath, dest)
+                    lbl_stl_status.value = f"✓ STL Listo: {os.path.basename(filepath)}"
+                    lbl_stl_status.color = "#00E676"
+                    select_tool("stl")
+                    set_tab(1) # Volver a la pestaña de Parámetros automáticamente
+                    update_code_wrapper()
+                except Exception as e:
+                    status.value = f"❌ Error leyendo STL: {e}"; status.color = "red"
+            elif ext == "jscad":
+                try:
+                    txt_code.value = open(filepath).read()
+                    set_tab(0)
+                    status.value = f"✓ Código {os.path.basename(filepath)} cargado."; status.color = "#00E676"
+                except Exception as e:
+                    status.value = f"❌ Error leyendo JSCAD: {e}"; status.color = "red"
+            else:
+                status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"
+            page.update()
+
+        def refresh_explorer(path):
+            list_android.controls.clear()
+            try:
+                items = os.listdir(path); dirs, files = [], []
+                for item in items:
+                    if os.path.isdir(os.path.join(path, item)): dirs.append(item)
+                    else: files.append(item)
+                dirs.sort(); files.sort()
+                
+                if path != "/" and path != "/storage" and path != "/storage/emulated":
+                    list_android.controls.append(ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir de nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path))))
+                
+                for d in dirs:
+                    if d.startswith('.'): continue
+                    list_android.controls.append(ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p)))
+                
+                for f in files:
+                    ext = f.lower().split('.')[-1] if '.' in f else ''
+                    icon = "📄"; color = "#8B949E"
+                    if ext == "stl": icon = "🧊"; color = "#00E676"
+                    elif ext == "jscad": icon = "🧩"; color = "#00E5FF"
+                    try: sz = os.path.getsize(os.path.join(path, f)) // 1024
+                    except: sz = 0
+                    list_android.controls.append(ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{sz} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p)))
+            except Exception as ex: 
+                list_android.controls.append(ft.Text(f"Carpeta Restringida o Vacía.", color="red"))
+            tf_path.value = path; page.update()
+
+        def nav_to(path):
+            nonlocal current_android_dir
+            current_android_dir = path
+            refresh_explorer(path)
+
         def save_project_to_nexus():
             fname = f"nexus_{int(time.time())}.jscad"
             with open(os.path.join(EXPORT_DIR, fname), "w") as f: f.write(txt_code.value)
             status.value = f"✓ Guardado en DB Interna: {fname}"; page.update()
 
+        row_quick_paths = ft.Row([
+            ft.ElevatedButton("🏠 Android", on_click=lambda _: nav_to("/storage/emulated/0"), bgcolor="#21262D", color="white"),
+            ft.ElevatedButton("📥 Descargas", on_click=lambda _: nav_to("/storage/emulated/0/Download"), bgcolor="#21262D", color="white"),
+            ft.ElevatedButton("📁 Nexus DB", on_click=lambda _: nav_to(EXPORT_DIR), bgcolor="#1B5E20", color="white")
+        ], scroll="auto")
+
         view_archivos = ft.Column([
-            ft.Text("GESTIÓN DE ARCHIVOS Y PROYECTOS", size=16, color="#E6EDF3", weight="bold"),
-            ft.Divider(color="#30363D"),
-            ft.Container(height=10),
-            ft.ElevatedButton(
-                "📂 IMPORTAR STL DESDE ANDROID", 
-                on_click=lambda _: file_picker.pick_files(allowed_extensions=["stl", "jscad"]), 
-                bgcolor="#00E676", color="black", width=float('inf'), height=70, 
-                style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("👇 TOCA UN ARCHIVO .STL PARA CARGARLO", color="black", weight="bold", text_align="center")
+                ]), bgcolor="#00E676", padding=10, border_radius=8, width=float('inf')
             ),
-            ft.Text("Abre el selector nativo de tu móvil (como Cx File Explorer o Archivos). Soporta .STL y .JSCAD", size=11, color="#8B949E", italic=True),
-            ft.Container(height=20),
-            ft.ElevatedButton(
-                "💾 GUARDAR PROYECTO ACTUAL", 
-                on_click=lambda _: save_project_to_nexus(), 
-                bgcolor="#21262D", color="white", width=float('inf'), height=50
-            )
+            row_quick_paths,
+            ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]),
+            ft.Container(content=list_android, expand=True, bgcolor="#161B22", border_radius=8, padding=5)
         ], expand=True)
 
         main_container = ft.Container(content=view_editor, expand=True)
@@ -614,6 +647,7 @@ def main(page: ft.Page):
             if idx == 2:
                 global LATEST_CODE_B64
                 LATEST_CODE_B64 = base64.b64encode(prepare_js_payload().encode('utf-8')).decode()
+            if idx == 3: refresh_explorer(current_android_dir)
             main_container.content = [view_editor, view_constructor, view_visor, view_archivos][idx]
             page.update()
 
@@ -625,7 +659,7 @@ def main(page: ft.Page):
         ], scroll="auto")
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
-        select_tool("custom")
+        select_tool("custom"); refresh_explorer(current_android_dir)
 
     except Exception:
         page.clean(); page.add(ft.Container(ft.Text("CRASH FATAL:\n" + traceback.format_exc(), color="red"), padding=50)); page.update()

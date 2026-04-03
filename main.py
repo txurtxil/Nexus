@@ -27,7 +27,7 @@ except:
     os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # =========================================================
-# LECTOR DE HARDWARE (ANDROID / LINUX NATIVO)
+# TELEMETRÍA Y RED LOCAL (PREPARACIÓN PARA VR HEADSETS)
 # =========================================================
 def get_sys_info():
     cores = os.cpu_count() or 1
@@ -53,16 +53,27 @@ def get_sys_info():
         except: pass
     return cpu_p, ram_p, cores
 
+def get_lan_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
 # =========================================================
-# SERVIDOR LOCAL WEBGL & DATA HANDLER
+# SERVIDOR LOCAL WEBGL (BIND EN 0.0.0.0 PARA ACCESO VR/LAN)
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('127.0.0.1', 0))
+        s.bind(('0.0.0.0', 0))
         LOCAL_PORT = s.getsockname()[1]
 except:
     LOCAL_PORT = 8556
 
+LAN_IP = get_lan_ip()
 LATEST_CODE_B64 = ""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
@@ -123,19 +134,20 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
     def log_message(self, *args): pass
 
-threading.Thread(target=lambda: http.server.HTTPServer(("127.0.0.1", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
+# Servidor multihilo escuchando en toda la red local para las gafas VR
+threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
 # APP FLET MAIN
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v18.5 PRO"
+        page.title = "NEXUS CAD v19.0 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v18.5 PRO | Motor Pulido y Estable", color="#00E5FF", weight="bold")
+        status = ft.Text("NEXUS v19.0 PRO | Motor VR y Red Local Activos", color="#00E5FF", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -180,11 +192,9 @@ def main(page: ft.Page):
         sl_g_tol, r_g_tol = create_slider("Tol. Global (G_TOL)", 0.0, 2.0, 0.2, False)
 
         # =========================================================
-        # INYECTOR GLOBAL (SOLUCIÓN AL BUG "GW IS NOT DEFINED")
+        # INYECTOR GLOBAL
         # =========================================================
         def prepare_js_payload():
-            # Inyectamos variables a nivel GLOBAL fuera del main(). 
-            # Así cualquier código pegado por el usuario funcionará siempre.
             header = f"var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value}; var G_TOL = {sl_g_tol.value};\n\n"
             return header + txt_code.value
 
@@ -223,7 +233,7 @@ def main(page: ft.Page):
             code_lines = txt_code.value.split('\n')
             var_name = f"obj_{len(ensamble_stack)}"
             body = []
-            for line in code_lines[1:-1]: # Evitamos duplicar function main
+            for line in code_lines[1:-1]:
                 if line.strip().startswith("return "):
                     ret_val = line.replace("return", "").replace(";", "").strip()
                     body.append(f"  var {var_name} = {ret_val};")
@@ -266,7 +276,7 @@ def main(page: ft.Page):
         def inst(texto): return ft.Text("ℹ️ " + texto, color="#FFD54F", size=11, italic=True)
 
         # =========================================================
-        # HERRAMIENTAS Y PANELES (CON FIX DE COMPATIBILIDAD)
+        # HERRAMIENTAS Y PANELES
         # =========================================================
         tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=15, bgcolor="#161B22")
         dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel Fino"), ft.dropdown.Option("Voxel Grueso"), ft.dropdown.Option("Braille")], value="Voxel Grueso", expand=True, bgcolor="#161B22")
@@ -451,6 +461,19 @@ def main(page: ft.Page):
         sl_naca_e, r_naca_e = create_slider("Envergadura Z", 10, 300, 100, False)
         col_naca = ft.Column([ft.Text("Perfil Alar NACA", color="#00E5FF"), ft.Container(content=ft.Column([r_naca_c, r_naca_g, r_naca_e]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
+        # NUEVAS HERRAMIENTAS (VR Y ACCESORIOS PRÁCTICOS)
+        sl_st_ang, r_st_ang = create_slider("Inclinación º", 5, 45, 15, False)
+        sl_st_w, r_st_w = create_slider("Ancho Base", 40, 120, 70, False)
+        sl_st_t, r_st_t = create_slider("Grosor Dispo.", 6, 20, 12, False)
+        col_stand_movil = ft.Column([ft.Text("Soporte para Móvil/Tablet", color="#00E676"), inst("Soporte de escritorio rígido con labio de sujeción frontal."), ft.Container(content=ft.Column([r_st_ang, r_st_w, r_st_t]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
+        sl_clip_d, r_clip_d = create_slider("Ø Cable", 3, 15, 6, False)
+        sl_clip_w, r_clip_w = create_slider("Ancho Adhesivo", 10, 40, 20, False)
+        col_clip_cable = ft.Column([ft.Text("Clip de Cables (Desk)", color="#00E676"), inst("Organizador de cables. Imprime boca abajo. Añade cinta de doble cara en la base plana."), ft.Container(content=ft.Column([r_clip_d, r_clip_w]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
+        sl_vr_s, r_vr_s = create_slider("Tamaño Base", 50, 500, 200, False)
+        col_vr_pedestal = ft.Column([ft.Text("Pedestal de Exhibición (Modo VR)", color="#B388FF"), inst("Usa esto como base en el Ensamblador antes de colocar tu modelo encima para verlo en Realidad Virtual."), ft.Container(content=ft.Column([r_vr_s]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
+
 
         # === GENERADOR DE CÓDIGO JS ===
         def generate_param_code():
@@ -500,10 +523,7 @@ def main(page: ft.Page):
   }}
   var totalL = Math.max(texto.length * charWidth, 10);
 """
-                # FIX ANTI-CRASH: Si el usuario escribe puros espacios, pText es null. Añadimos un cubo minúsculo invisible para evitar fallos matemáticos.
-                code += "  if (pText === null) pText = CSG.cube({center:[0,0,0], radius:[0.01, 0.01, 0.01]});\n"
-                
-                code += "  var baseObj = null;\n"
+                code += "  if (pText === null) pText = CSG.cube({center:[0,0,0], radius:[0.01, 0.01, 0.01]});\n  var baseObj = null;\n"
                 if base == "Llavero (Anilla)": 
                     code += "  var bc = CSG.cube({center:[(totalL/2)-3, 3, h/4], radius:[(totalL/2)+2, 8, h/4]});\n  var anclaje = CSG.cylinder({start:[totalL, 3, 0], end:[totalL, 3, h/2], radius:6, slices:32}).subtract(CSG.cylinder({start:[totalL, 3, -1], end:[totalL, 3, h/2+1], radius:3, slices:16}));\n  baseObj = bc.union(anclaje);\n"
                 elif base == "Placa Atornillable": 
@@ -540,8 +560,6 @@ def main(page: ft.Page):
                 code += f"  return pieza;\n}}"
 
             elif h == "laser":
-                # FIX: .scale() no siempre existe en geometrías 2D complejas o produce error.
-                # Se genera un bloque intersectado con grosor físico 1mm para su exportación.
                 code += f"  var w = {sl_las_x.value}; var l = {sl_las_y.value}; var z_cut = {sl_las_z.value};\n"
                 code += f"  var base_obj = CSG.cube({{center:[0,0,10], radius:[w/2, l/2, 10]}}).subtract(CSG.cylinder({{start:[0,0,-1], end:[0,0,21], radius:5, slices:16}}));\n"
                 code += f"  var cut_plane = CSG.cube({{center:[0,0,z_cut], radius:[w, l, 0.5]}});\n  return base_obj.intersect(cut_plane);\n}}"
@@ -869,6 +887,30 @@ def main(page: ft.Page):
                 code += f"      var cyl = CSG.cylinder({{start:[x_real, 0, 0], end:[x_real, 0, envergadura], radius: yt_real, slices: 16}});\n"
                 code += f"      if(ala === null) ala = cyl; else ala = ala.union(cyl);\n  }}\n  return ala;\n}}"
 
+            elif h == "stand_movil":
+                code += f"  var ang = {sl_st_ang.value} * Math.PI / 180; var w = {sl_st_w.value}; var t = {sl_st_t.value};\n"
+                code += f"  var base = CSG.cube({{center:[0, -20, t/2], radius:[w/2, 40, t/2]}});\n"
+                code += f"  var h_back = 80; var dx = Math.sin(ang)*h_back; var dy = Math.cos(ang)*h_back;\n"
+                code += f"  var back = CSG.cube({{center:[0, dy/2, dx/2], radius:[w/2, dy/2, dx/2]}});\n"
+                code += f"  var lip = CSG.cube({{center:[0, -50, t + 5], radius:[w/2, t/2, 5]}});\n"
+                code += f"  return base.union(back).union(lip);\n}}"
+
+            elif h == "clip_cable":
+                code += f"  var d = {sl_clip_d.value}; var w = {sl_clip_w.value}; var t = 3;\n"
+                code += f"  var base = CSG.cube({{center:[0, 0, t/2], radius:[w/2, w/2, t/2]}});\n"
+                code += f"  var anillo = CSG.cylinder({{start:[0,0,t], end:[0,0,t+w], radius:(d/2)+t, slices:32}});\n"
+                code += f"  var hueco = CSG.cylinder({{start:[0,0,t-1], end:[0,0,t+w+1], radius:(d/2), slices:32}});\n"
+                code += f"  var slot = CSG.cube({{center:[0, d, t+(w/2)], radius:[(d/2)-0.5, d, w/2+1]}});\n"
+                code += f"  return base.union(anillo).subtract(hueco).subtract(slot);\n}}"
+
+            elif h == "vr_pedestal":
+                code += f"  var s = {sl_vr_s.value};\n"
+                code += f"  var base1 = CSG.cube({{center:[0, 0, 10], radius:[s/2, s/2, 10]}});\n"
+                code += f"  var base2 = CSG.cube({{center:[0, 0, 30], radius:[(s/2)-20, (s/2)-20, 10]}});\n"
+                code += f"  var pillar = CSG.cylinder({{start:[0,0,40], end:[0,0,150], radius: s/4, slices:32}});\n"
+                code += f"  var top = CSG.cylinder({{start:[0,0,150], end:[0,0,160], radius: (s/4)+10, slices:32}});\n"
+                code += f"  return base1.union(base2).union(pillar).union(top);\n}}"
+
             if not modo_ensamble and h != "custom": 
                 txt_code.value = code
             txt_code.update()
@@ -876,7 +918,7 @@ def main(page: ft.Page):
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
             herramienta_actual = nombre_herramienta
-            paneles = [col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca]
+            paneles = [col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca, col_stand_movil, col_clip_cable, col_vr_pedestal]
             for p in paneles: p.visible = False
             
             if nombre_herramienta == "custom": col_custom.visible = True
@@ -912,11 +954,15 @@ def main(page: ft.Page):
             elif nombre_herramienta == "acme": col_acme.visible = True
             elif nombre_herramienta == "codo": col_codo.visible = True
             elif nombre_herramienta == "naca": col_naca.visible = True
+            elif nombre_herramienta == "stand_movil": col_stand_movil.visible = True
+            elif nombre_herramienta == "clip_cable": col_clip_cable.visible = True
+            elif nombre_herramienta == "vr_pedestal": col_vr_pedestal.visible = True
             generate_param_code(); page.update()
 
         def thumbnail(icon, title, tool_id, color): return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: select_tool(tool_id), ink=True, border=ft.border.all(1, "#30363D"))
 
-        cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000"), thumbnail("🔠", "Placas Texto", "texto", "#880E4F")], scroll="auto")
+        cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000"), thumbnail("🔠", "Placas Texto", "texto", "#880E4F"), thumbnail("🥽", "Pedestal VR", "vr_pedestal", "#B388FF")], scroll="auto")
+        cat_accesorios = ft.Row([thumbnail("📱", "Stand Móvil", "stand_movil", "#00C853"), thumbnail("🔌", "Clip Cables", "clip_cable", "#00C853")], scroll="auto")
         cat_produccion = ft.Row([thumbnail("🔪", "Perfil Láser", "laser", "#D50000"), thumbnail("🔲", "Matriz Grid", "array_lin", "#0091EA"), thumbnail("🎡", "Matriz Polar", "array_pol", "#00B0FF")], scroll="auto")
         cat_lofting = ft.Row([thumbnail("🌪️", "Adap. Loft", "loft", "#D50000")], scroll="auto")
         cat_topologia = ft.Row([thumbnail("🐝", "Panal Hex", "panal", "#F57F17"), thumbnail("🕸️", "Voronoi", "voronoi", "#6A1B9A")], scroll="auto")
@@ -930,7 +976,8 @@ def main(page: ft.Page):
 
         view_constructor = ft.Column([
             panel_globales, 
-            ft.Text("💡 Especiales y Letras:", size=12, color="#8B949E"), cat_especial,
+            ft.Text("💡 Especiales, Letras y VR:", size=12, color="#8B949E"), cat_especial,
+            ft.Text("🔋 Accesorios Prácticos:", size=12, color="#00E676"), cat_accesorios,
             ft.Text("🏭 Producción y Láser:", size=12, color="#00B0FF"), cat_produccion,
             ft.Text("🌪️ Transición de Formas:", size=12, color="#D50000"), cat_lofting,
             ft.Text("🧬 Topología y Voronoi:", size=12, color="#FBC02D"), cat_topologia,
@@ -943,7 +990,7 @@ def main(page: ft.Page):
             ft.Text("📦 Geometría Básica:", size=12, color="#8B949E"), cat_basico,
             ft.Divider(color="#30363D"),
             
-            col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca,
+            col_custom, col_texto, col_cubo, col_cilindro, col_laser, col_array_lin, col_array_pol, col_loft, col_panal, col_voronoi, col_evolvente, col_cremallera, col_conico, col_multicaja, col_perfil, col_revolucion, col_escuadra, col_engranaje, col_pcb, col_vslot, col_bisagra, col_abrazadera, col_fijacion, col_rodamiento, col_planetario, col_polea, col_helice, col_rotula, col_carcasa, col_muelle, col_acme, col_codo, col_naca, col_stand_movil, col_clip_cable, col_vr_pedestal,
             
             ft.Container(height=10),
             ft.ElevatedButton("▶ ENVIAR AL WORKER (RENDER 3D)", on_click=lambda _: run_render(), color="black", bgcolor="#00E676", height=60, width=float('inf'))
@@ -955,7 +1002,7 @@ def main(page: ft.Page):
         ], expand=True)
 
         # =========================================================
-        # SECCIÓN VISOR 3D + TELEMETRÍA GRÁFICA
+        # SECCIÓN VISOR 3D + TELEMETRÍA GRÁFICA + ENLACE VR
         # =========================================================
         pb_cpu = ft.ProgressBar(width=100, color="#FFAB00", bgcolor="#30363D", value=0, expand=True)
         txt_cpu_val = ft.Text("0.0%", size=11, color="#FFAB00", width=40, text_align="right")
@@ -967,11 +1014,21 @@ def main(page: ft.Page):
 
         hw_panel = ft.Container(
             content=ft.Column([
-                ft.Row([ft.Text("📊 TELEMETRÍA HARDWARE NATIVA", size=11, color="#E6EDF3", weight="bold"), txt_cores], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Row([ft.Text("📊 TELEMETRÍA HARDWARE", size=11, color="#E6EDF3", weight="bold"), txt_cores], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Row([ft.Text("CPU", size=11, color="#FFAB00", weight="bold", width=30), pb_cpu, txt_cpu_val]),
                 ft.Row([ft.Text("RAM", size=11, color="#00E5FF", weight="bold", width=30), pb_ram, txt_ram_val])
             ], spacing=5),
             bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333")
+        )
+
+        vr_url = f"http://{LAN_IP}:{LOCAL_PORT}/"
+        panel_vr = ft.Container(
+            content=ft.Column([
+                ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11),
+                ft.Text("Abre esta dirección exacta en el navegador de tus gafas (Meta Quest, Pico) o tu PC para ver el render en grande:", size=10, color="#8B949E"),
+                ft.TextField(value=vr_url, read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676", weight="bold")
+            ], spacing=5),
+            bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")
         )
 
         def hw_monitor_loop():
@@ -991,13 +1048,14 @@ def main(page: ft.Page):
         threading.Thread(target=hw_monitor_loop, daemon=True).start()
 
         view_visor = ft.Column([
-            ft.Container(height=5), hw_panel, ft.Container(height=10), 
+            ft.Container(height=5), hw_panel, ft.Container(height=5), panel_vr, ft.Container(height=5),
             ft.Text("Motor Web Worker / Multi-Hilo", text_align="center", color="#00E5FF", weight="bold"),
-            ft.Row([ft.ElevatedButton("🔄 RECARGAR VISOR 3D", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/", color="black", bgcolor="#00E676", height=60, width=300)], alignment=ft.MainAxisAlignment.CENTER)
-        ], expand=True)
+            # Botón local (abre en el navegador del dispositivo actual a través de localhost)
+            ft.Row([ft.ElevatedButton("🔄 ABRIR VISOR 3D (LOCAL)", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/", color="black", bgcolor="#00E676", height=60, expand=True)], alignment=ft.MainAxisAlignment.CENTER)
+        ], expand=True, scroll="auto")
         
         # =========================================================
-        # PESTAÑA DB: GESTOR DE ARCHIVOS Y RENOMBRADO INLINE
+        # PESTAÑA DB: GESTOR DE ARCHIVOS
         # =========================================================
         file_list = ft.ListView(expand=True, spacing=10)
         tf_fb_url = ft.TextField(label="URL Firebase Realtime DB", bgcolor="#161B22", text_size=12)

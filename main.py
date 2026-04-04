@@ -37,13 +37,25 @@ LAN_IP = get_lan_ip()
 LATEST_CODE_B64 = ""
 
 # =========================================================
-# SERVIDOR WEB (WEB INJECTION CORS FIX & STL FANTASMA)
+# SERVIDOR WEB (FIX PROGRESSEVENT: CONTENT-LENGTH AÑADIDO)
 # =========================================================
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
+
+    def send_file_response(self, content_type, data_bytes):
+        # FIX: Añadir Content-Length evita que Android Chrome lance [object ProgressEvent]
+        try:
+            self.send_response(200)
+            self.send_header("Content-type", content_type)
+            self.send_header("Content-Length", str(len(data_bytes)))
+            self._send_cors()
+            self.end_headers()
+            self.wfile.write(data_bytes)
+        except Exception as e:
+            print(f"Error serving HTTP: {e}")
 
     def do_OPTIONS(self):
         self.send_response(200); self._send_cors(); self.end_headers()
@@ -56,7 +68,8 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     with open(os.path.join(EXPORT_DIR, fn), 'wb') as f:
                         f.write(self.rfile.read(cl))
-                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok'); return
+                    self.send_file_response("text/plain", b'ok')
+                    return
                 except Exception as e: print(f"Error: {e}")
             self.send_response(500); self._send_cors(); self.end_headers()
 
@@ -65,21 +78,21 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         
         if parsed.path == '/api/get_code_b64.json':
-            self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
             stl_path = os.path.join(EXPORT_DIR, "imported.stl")
             stl_hash = str(os.path.getmtime(stl_path)) if os.path.exists(stl_path) else "0"
-            self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": stl_hash}).encode())
+            data = json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": stl_hash}).encode()
+            self.send_file_response("application/json", data)
             LATEST_CODE_B64 = "" 
 
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:
-                    self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                    self.send_file_response("application/sla", f.read())
             else: 
-                # FIX: STL Fantasma para evitar el error ProgressEvent en el Visor 3D
-                self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers()
-                self.wfile.write(b"solid dummy\nfacet normal 0 0 0\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid dummy\n")
+                # FIX: STL Fantasma para prevenir bloqueos de renderizado
+                dummy = b"solid dummy\nfacet normal 0 0 0\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid dummy\n"
+                self.send_file_response("application/sla", dummy)
 
         elif parsed.path == '/upload_ui':
             html = """<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta charset="UTF-8"></head>
@@ -95,20 +108,34 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 fetch('/api/upload', {method:'POST', headers:{'File-Name':encodeURIComponent(f.name)}, body:f})
                 .then(r => { if(r.ok){ document.getElementById('s').style.color='#00E676'; document.getElementById('s').innerText='✓ ¡ÉXITO! Vuelve a la App y pulsa REFRESCAR.'; } else { throw 'Error'; } })
                 .catch(e => { document.getElementById('s').style.color='red'; document.getElementById('s').innerText='❌ Error de red'; });}</script></body></html>"""
-            self.send_response(200); self.send_header("Content-type", "text/html"); self._send_cors(); self.end_headers(); self.wfile.write(html.encode('utf-8'))
+            self.send_file_response("text/html", html.encode('utf-8'))
             
         elif parsed.path.startswith('/descargar/'):
             filename = unquote(parsed.path.replace('/descargar/', ''))
             filepath = os.path.join(EXPORT_DIR, filename)
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:
-                    self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                    data = f.read()
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                    self.send_header("Content-Length", str(len(data)))
+                    self._send_cors()
+                    self.end_headers()
+                    self.wfile.write(data)
+                except: pass
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
         else:
             try:
                 fn = self.path.strip("/") or "openscad_engine.html"
-                with open(os.path.join(ASSETS_DIR, fn), "rb") as f: self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
+                    data = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(data)))
+                    self._send_cors()
+                    self.end_headers()
+                    self.wfile.write(data)
             except: self.send_response(404); self._send_cors(); self.end_headers()
     def log_message(self, *args): pass
 
@@ -119,12 +146,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v26.4 PRO"
+        page.title = "NEXUS CAD v26.5 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v26.4 PRO | Carrusel + Híbrido", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v26.5 PRO | Carrusel + Progress Fix", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -318,7 +345,7 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # SISTEMA CARRUSEL (BLINDADO CONTRA FALLOS DE TIPO KWARG)
+        # FIX DEFINITIVO DEL CARRUSEL Y DROPDOWN
         # =========================================================
         categorias = {
             "Ultimate STL Forge": [
@@ -338,12 +365,12 @@ def main(page: ft.Page):
             "Especiales": [("custom", "Código Libre RAW")]
         }
 
-        container_tool = ft.Container()
-        dd_tool = None # Variable global para el sub-combo
+        # Instanciamos el Dropdown UNICA vez para que Termux no lo bloquee
+        dd_tool = ft.Dropdown(width=170, bgcolor="#161B22")
 
         def on_tool_change(e):
             nonlocal herramienta_actual
-            if dd_tool and dd_tool.value:
+            if dd_tool.value:
                 herramienta_actual = dd_tool.value
                 for k, p in panels.items(): 
                     p.visible = (k == herramienta_actual)
@@ -352,36 +379,31 @@ def main(page: ft.Page):
                 generate_param_code()
                 page.update()
 
+        dd_tool.on_change = on_tool_change
+
         def on_cat_click(cat_name):
-            nonlocal dd_tool
-            # 1. Pintamos colores del carrusel para el feedback visual
+            # 1. Colores del carrusel para saber en qué categoría estamos
             for btn in cat_carousel.controls:
                 btn.bgcolor = "#00E676" if btn.data == cat_name else "#161B22"
                 btn.color = "black" if btn.data == cat_name else "white"
             
-            # 2. Re-creamos el Dropdown limpio, sin el parametro on_change dentro del init.
-            dd_tool = ft.Dropdown(
-                options=[ft.dropdown.Option(key=k, text=v) for k, v in categorias[cat_name]],
-                value=categorias[cat_name][0][0],
-                width=170,
-                bgcolor="#161B22"
-            )
-            # 3. Le asignamos la función de cambio DESPUÉS de crearlo (Esto salva el Crash).
-            dd_tool.on_change = on_tool_change
+            # 2. VACIAR LA LISTA COMPLETA en memoria (El Fix Definitivo)
+            dd_tool.options = []
+            for k, v in categorias[cat_name]:
+                # Usamos argumentos posicionales seguros (k=Key, v=Texto)
+                dd_tool.options.append(ft.dropdown.Option(k, v))
             
-            # 4. Lo inyectamos en el contenedor visual
-            container_tool.content = dd_tool
-            
-            # 5. Forzamos actualización UI
+            # 3. Seleccionar el primero y disparar la interfaz
+            dd_tool.value = categorias[cat_name][0][0]
             cat_carousel.update()
-            container_tool.update()
+            dd_tool.update()
             on_tool_change(None)
 
-        # CARRUSEL CON POSITIONAL ARGUMENTS (Salva el error unexpected keyword text)
+        # Carrusel Principal Horizontal
         cat_carousel = ft.Row(
             controls=[
                 ft.ElevatedButton(
-                    cat,  # El texto del botón SIEMPRE en primera posición, sin text=""
+                    cat, 
                     data=cat, 
                     on_click=lambda e, c=cat: on_cat_click(c),
                     bgcolor="#00E676" if cat == "Ultimate STL Forge" else "#161B22",
@@ -400,7 +422,7 @@ def main(page: ft.Page):
         # Interfaz de Construcción
         view_constructor = ft.Column([
             cat_carousel, 
-            ft.Row([ft.Text("⚙️ Tool:", color="#8B949E", size=12, weight="bold"), container_tool]),
+            ft.Row([ft.Text("⚙️ Tool:", color="#8B949E", size=12, weight="bold"), dd_tool]),
             ft.Divider(color="#30363D"),
             panel_globales, panel_stl_transform, 
             ft.Column(list(panels.values())), 
@@ -431,7 +453,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # ECOSISTEMA FILES (EMOJIS SEGUROS)
+        # ECOSISTEMA FILES (EMOJIS SEGUROS Y TEXTBUTTONS POSICIONALES)
         # =========================================================
         list_nexus_db = ft.ListView(expand=True, spacing=10)
 
@@ -466,9 +488,8 @@ def main(page: ft.Page):
                 
                 # Sincroniza visualmente y carga herramienta STL
                 on_cat_click("Ultimate STL Forge")
-                if dd_tool:
-                    dd_tool.value = "stl"
-                    on_tool_change(None)
+                dd_tool.value = "stl"
+                on_tool_change(None)
                 
                 set_tab(0); status.value = "✓ STL Listo en Forge"
             elif ext == "jscad":

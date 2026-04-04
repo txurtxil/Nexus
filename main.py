@@ -142,14 +142,15 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
+            # PARCHE CRÍTICO PARA EL DATA_VIEW: STL de 84 bytes binario puro
+            dummy_stl = b'\x00' * 84
             if os.path.exists(filepath):
                 try:
-                    if os.path.getsize(filepath) > 84:
+                    if os.path.getsize(filepath) >= 84:
                         with open(filepath, "rb") as f:
                             self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
                         return
                 except: pass
-            dummy_stl = b'solid dummy\nendsolid dummy\n'
             self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(dummy_stl)
 
         elif parsed.path == '/upload_ui':
@@ -180,12 +181,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.17 TITAN"
+        page.title = "NEXUS CAD v20.18 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.17 TITAN | Bulletproof UI Activa", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.18 TITAN | DataView & Worker Matrix Fix", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -230,7 +231,6 @@ def main(page: ft.Page):
         sl_g_tol, r_g_tol = create_slider("Tol. Global (G_TOL)", 0.0, 2.0, 0.2, False)
         sl_kine, r_kine = create_slider("Animación (º)", 0, 360, 0, True)
 
-        # NUEVO MENÚ MATERIALES
         dd_mat = ft.Dropdown(
             options=[
                 ft.dropdown.Option("PLA Gris Mate"),
@@ -258,8 +258,21 @@ def main(page: ft.Page):
             c_val = mat_colors.get(dd_mat.value, "[0.5, 0.5, 0.5, 1.0]")
             
             header = f"  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value}; var G_TOL = {sl_g_tol.value}; var KINE_T = {sl_kine.value}; var MAT_C = {c_val};\n"
-            utils_block = "  var UTILS = { rotZ: function(o, d) { try { return o.rotateZ(d); } catch(e) { try { return o.rotate([0,0,0],[0,0,1],d); } catch(e2) { return o; } } }, rotX: function(o, d) { try { return o.rotateX(d); } catch(e) { try { return o.rotate([0,0,0],[1,0,0],d); } catch(e2) { return o; } } }, rotY: function(o, d) { try { return o.rotateY(d); } catch(e) { try { return o.rotate([0,0,0],[0,1,0],d); } catch(e2) { return o; } } }, scale: function(o, v) { try { return o.scale(v); } catch(e) { return o; } }, mat: function(o) { try { if(typeof o.setColor === 'function') return o.setColor(MAT_C); } catch(e) {} return o; } };\n"
-            header += utils_block
+            
+            # POLIFILL EXTREMO: Resuelve el error de Matrix4x4 missing ('scaling' / 'translation' crash)
+            polyfill = "  if(typeof CSG !== 'undefined' && typeof CSG.Matrix4x4 === 'undefined' && typeof Matrix4x4 !== 'undefined') { CSG.Matrix4x4 = Matrix4x4; }\n"
+            
+            # UTILS ACTUALIZADO: Triplemente blindado contra errores en métodos del worker
+            utils_block = """  var UTILS = {
+    trans: function(o, v) { try { return o.translate(v); } catch(e) { try { if(typeof translate !== 'undefined') return translate(v, o); } catch(e2) {} } return o; },
+    scale: function(o, v) { try { return o.scale(v); } catch(e) { try { if(typeof scale !== 'undefined') return scale(v, o); } catch(e2) {} } return o; },
+    rotZ: function(o, d) { try { return o.rotateZ(d); } catch(e) { try { if(typeof rotate !== 'undefined') return rotate([0,0,d], o); } catch(e2) { try { return o.rotate([0,0,0],[0,0,1],d); } catch(e3) { return o; } } } },
+    rotX: function(o, d) { try { return o.rotateX(d); } catch(e) { try { if(typeof rotate !== 'undefined') return rotate([d,0,0], o); } catch(e2) { try { return o.rotate([0,0,0],[1,0,0],d); } catch(e3) { return o; } } } },
+    rotY: function(o, d) { try { return o.rotateY(d); } catch(e) { try { if(typeof rotate !== 'undefined') return rotate([0,d,0], o); } catch(e2) { try { return o.rotate([0,0,0],[0,1,0],d); } catch(e3) { return o; } } } },
+    mat: function(o) { try { if(typeof o.setColor === 'function') return o.setColor(MAT_C); } catch(e) {} return o; }
+  };
+"""
+            header += polyfill + utils_block
             
             param_def = "function getParameterDefinitions() { return [{name: 'KINE_T', type: 'slider', initial: 0, min: 0, max: 360, step: 1, caption: 'Cinemática (º)'}]; }\n"
             c = txt_code.value
@@ -278,9 +291,8 @@ def main(page: ft.Page):
             LATEST_NEEDS_STL = ("IMPORTED_STL" in js_payload) or herramienta_actual.startswith("stl")
             set_tab(2); page.update()
 
-        help_box = ft.ExpansionTile(title=ft.Text("💡 Ayuda Rápida y Plantilla para IA", color="#00E5FF", weight="bold", size=12), collapsed_text_color="#00E5FF", text_color="#00E5FF", icon_color="#00E5FF", controls=[ft.Container(padding=10, bgcolor="#161B22", border_radius=8, content=ft.Column([ft.Text("📝 REGLAS DEL MOTOR:", weight="bold", color="#8B949E", size=11), ft.Text("1. Función principal 'function main(params) { ... }'.\n2. Devolver pieza usando 'return UTILS.mat(objeto);'.\n3. Usar transformaciones seguras: UTILS.rotZ(obj, deg) o UTILS.scale(obj, [1,1,1]).", size=11, color="#E6EDF3")]))])
+        help_box = ft.ExpansionTile(title=ft.Text("💡 Ayuda Rápida y Plantilla para IA", color="#00E5FF", weight="bold", size=12), collapsed_text_color="#00E5FF", text_color="#00E5FF", icon_color="#00E5FF", controls=[ft.Container(padding=10, bgcolor="#161B22", border_radius=8, content=ft.Column([ft.Text("📝 REGLAS DEL MOTOR:", weight="bold", color="#8B949E", size=11), ft.Text("1. Función principal 'function main(params) { ... }'.\n2. Devolver pieza usando 'return UTILS.mat(objeto);'.\n3. Usar transformaciones seguras: UTILS.trans(obj, [x,y,z]) o UTILS.rotZ(obj, deg).", size=11, color="#E6EDF3")]))])
 
-        # FIX TOTAL DE LA UI: Usar content=ft.Text() en lugar de string literal text="xyz"
         row_snippets = ft.Row([
             ft.Text("Snippets:", color="#8B949E", size=12), 
             ft.ElevatedButton(content=ft.Text("+ Cubo", color="white"), on_click=lambda _: inject_snippet("  var cubo = CSG.cube({center:[0,0,0], radius:[GW/2, GL/2, GH/2]});"), bgcolor="#21262D"), 
@@ -425,7 +437,7 @@ def main(page: ft.Page):
   }}
   if(!dron || typeof dron.union !== 'function') {{ return CSG.cube({{radius:[0.01, 0.01, 0.01]}}); }}
   dron = UTILS.scale(dron, [sc, sc, sc]);
-  try {{ dron = dron.translate([tx, ty, tz]); }} catch(e) {{}}
+  try {{ dron = UTILS.trans(dron, [tx, ty, tz]); }} catch(e) {{}}
 """
 
         def generate_param_code():
@@ -634,7 +646,7 @@ def main(page: ft.Page):
                 code += f"  for(var i=0; i<dientes; i++) {{\n      var px = i * pitch + pitch/2;\n"
                 code += f"      var t1 = CSG.cube({{center:[px, w + m*0.2, h/2], radius:[t_w*0.4, m*0.3, h/2]}});\n"
                 code += f"      var t2 = CSG.cube({{center:[px, w + m*0.7, h/2], radius:[t_w*0.2, m*0.4, h/2]}});\n"
-                code += f"      rack = rack.union(t1).union(t2);\n  }}\n  return UTILS.mat(rack.translate([KINE_T/10, 0, 0]));\n}}"
+                code += f"      rack = rack.union(t1).union(t2);\n  }}\n  return UTILS.mat(UTILS.trans(rack, [KINE_T/10, 0, 0]));\n}}"
 
             elif h == "conico":
                 code += f"  var dientes = {int(sl_con_d.value)}; var rb = {sl_con_rb.value}; var rt = {sl_con_rt.value}; var h = {sl_con_h.value};\n"
@@ -720,7 +732,7 @@ def main(page: ft.Page):
                 code += f"  var pin = CSG.cylinder({{start:[0,0,l/3-d/4], end:[0,0,2*l/3+d/4], radius:(d/4)-G_TOL, slices:32}});\n"
                 code += f"  var cut_pin = CSG.cylinder({{start:[0,0,l/3-d/2], end:[0,0,2*l/3+d/2], radius:d/4, slices:32}});\n"
                 code += f"  var fijo = fix.union(fix2).subtract(cut_pin).union(pin);\n  var movil = move.subtract(cut_pin);\n"
-                code += f"  movil = movil.translate([0,0,-l/2]); movil = UTILS.rotX(movil, KINE_T); movil = movil.translate([0,0,l/2]);\n"
+                code += f"  movil = UTILS.trans(movil, [0,0,-l/2]); movil = UTILS.rotX(movil, KINE_T); movil = UTILS.trans(movil, [0,0,l/2]);\n"
                 code += f"  return UTILS.mat(fijo.union(movil));\n}}"
 
             elif h == "abrazadera":
@@ -785,7 +797,7 @@ def main(page: ft.Page):
                 code += f"      planeta = UTILS.rotZ(planeta, -planet_T);\n"
                 code += f"      var angulo_pos = ap + (carrier_T * Math.PI / 180);\n"
                 code += f"      var cx = Math.cos(angulo_pos) * dist_centros; var cy = Math.sin(angulo_pos) * dist_centros;\n"
-                code += f"      planeta = planeta.translate([cx, cy, 0]);\n"
+                code += f"      planeta = UTILS.trans(planeta, [cx, cy, 0]);\n"
                 code += f"      if(planetas === null) planetas = planeta; else planetas = planetas.union(planeta);\n  }}\n"
                 code += f"  var corona = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:r_anillo + 5, slices:64}}).subtract(CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius:r_anillo + G_TOL, slices:64}}));\n"
                 code += f"  var dientes_corona = Math.floor(r_anillo * 1.5); var anillo_dientes = null;\n"
@@ -1039,6 +1051,10 @@ def main(page: ft.Page):
         # =========================================================
         list_nexus_db = ft.ListView(height=130, spacing=5)
 
+        # FIX PARA FLET ANDROID BUTTONS BUG (IconButton Issue)
+        def custom_icon_btn(text, action, tooltip_txt):
+            return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
+
         def refresh_nexus_db():
             list_nexus_db.controls.clear()
             try:
@@ -1050,9 +1066,9 @@ def main(page: ft.Page):
                         ft.Container(content=ft.Row([
                             ft.Text("🧊" if ext=="stl" else "🧩", size=20),
                             ft.Text(f, color="white", weight="bold", expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
-                            ft.TextButton(content=ft.Text("▶️"), on_click=lambda e, fp=p: load_file(fp), tooltip="Cargar"),
-                            ft.TextButton(content=ft.Text("⬇️"), on_click=lambda e, fn=f: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/descargar/{fn}"), tooltip="Bajar"),
-                            ft.TextButton(content=ft.Text("🗑️"), on_click=lambda e, fp=p: [os.remove(fp), refresh_nexus_db()], tooltip="Borrar")
+                            custom_icon_btn("▶️", lambda e, fp=p: load_file(fp), "Cargar"),
+                            custom_icon_btn("⬇️", lambda e, fn=f: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/descargar/{fn}"), "Bajar"),
+                            custom_icon_btn("🗑️", lambda e, fp=p: [os.remove(fp), refresh_nexus_db()], "Borrar")
                         ]), bgcolor="#21262D", padding=5, border_radius=5)
                     )
             except Exception as e: list_nexus_db.controls.append(ft.Text(f"Error DB: {e}"))

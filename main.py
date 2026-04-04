@@ -46,9 +46,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
 
     def do_OPTIONS(self):
-        self.send_response(200)
-        self._send_cors()
-        self.end_headers()
+        self.send_response(200); self._send_cors(); self.end_headers()
 
     def do_POST(self):
         if self.path == '/api/upload':
@@ -56,12 +54,9 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             fn = unquote(self.headers.get('File-Name', 'uploaded_file.stl'))
             if cl > 0:
                 try:
-                    with open(os.path.join(EXPORT_DIR, fn), 'wb') as f:
-                        f.write(self.rfile.read(cl))
-                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok')
-                    return
-                except Exception as e:
-                    print(f"Error guardando: {e}")
+                    with open(os.path.join(EXPORT_DIR, fn), 'wb') as f: f.write(self.rfile.read(cl))
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok'); return
+                except Exception as e: print(f"Error: {e}")
             self.send_response(500); self._send_cors(); self.end_headers()
 
     def do_GET(self):
@@ -79,8 +74,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:
-                    self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers()
-                    self.wfile.write(f.read())
+                    self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             else: self.send_response(404); self._send_cors(); self.end_headers()
 
         elif parsed.path == '/upload_ui':
@@ -104,15 +98,13 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             filepath = os.path.join(EXPORT_DIR, filename)
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:
-                    self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers()
-                    self.wfile.write(f.read())
+                    self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
         else:
             try:
                 fn = self.path.strip("/") or "openscad_engine.html"
-                with open(os.path.join(ASSETS_DIR, fn), "rb") as f: 
-                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f: self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             except: self.send_response(404); self._send_cors(); self.end_headers()
     def log_message(self, *args): pass
 
@@ -123,12 +115,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v25.3 Pro"
+        page.title = "NEXUS CAD v26.0 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v25.3 Pro | UI & Files Fixed", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v26.0 TITAN | Todas las Tools", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -197,7 +189,7 @@ def main(page: ft.Page):
         ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
 
         # =========================================================
-        # CATEGORÍAS Y HERRAMIENTAS (>30)
+        # CATEGORÍAS Y HERRAMIENTAS COMPLETAS (RESTAURADAS)
         # =========================================================
         panels = {}
 
@@ -210,6 +202,8 @@ def main(page: ft.Page):
         panels["escuadra"] = mk_col("Escuadra Soporte", "Refuerzo estructural L.", [r_l_l, r_l_a])
         sl_pcb_x, r_pcb_x = create_slider("Largo PCB", 20, 200, 70, False); sl_pcb_y, r_pcb_y = create_slider("Ancho PCB", 20, 200, 50, False)
         panels["pcb"] = mk_col("Caja Electrónica", "Protección para placas.", [r_pcb_x, r_pcb_y])
+        sl_bi_l, r_bi_l = create_slider("Largo Bisagra", 10, 100, 30, False); sl_bi_d, r_bi_d = create_slider("Diámetro Eje", 5, 30, 10, False)
+        panels["bisagra"] = mk_col("Bisagra Print-in-Place", "Articulación funcional directa.", [r_bi_l, r_bi_d])
 
         # 2. MECÁNICA
         sl_e_d, r_e_d = create_slider("Dientes", 6, 40, 16, True); sl_e_r, r_e_r = create_slider("Radio", 10, 100, 30, False)
@@ -221,23 +215,30 @@ def main(page: ft.Page):
         sl_mue_r, r_mue_r = create_slider("Radio", 5, 50, 15, False); sl_mue_v, r_mue_v = create_slider("Vueltas", 2, 20, 5, False)
         panels["muelle"] = mk_col("Resorte Helicoidal", "Amortiguación.", [r_mue_r, r_mue_v])
 
-        # 3. AVANZADOS
+        # 3. AVANZADOS Y ARRAYS
+        sl_alin_f, r_alin_f = create_slider("Filas", 1, 10, 3, True); sl_alin_c, r_alin_c = create_slider("Columnas", 1, 10, 3, True); sl_alin_d, r_alin_d = create_slider("Separación", 5, 100, 20, False)
+        panels["matriz_lin"] = mk_col("Matriz Lineal", "Repetición en cuadrícula.", [r_alin_f, r_alin_c, r_alin_d])
+        sl_apol_n, r_apol_n = create_slider("Repeticiones", 2, 36, 8, True); sl_apol_r, r_apol_r = create_slider("Radio Anillo", 10, 150, 40, False)
+        panels["matriz_pol"] = mk_col("Matriz Polar", "Repetición circular.", [r_apol_n, r_apol_r])
         sl_pan_r, r_pan_r = create_slider("Radio Hex", 2, 20, 5, False)
         panels["panal"] = mk_col("Estructura Panal", "Aligerado Honeycomb.", [r_pan_r])
         sl_vor_d, r_vor_d = create_slider("Densidad", 4, 30, 12, True)
         panels["voronoi"] = mk_col("Patrón Voronoi", "Malla orgánica estructural.", [r_vor_d])
         sl_crem_d, r_crem_d = create_slider("Dientes", 5, 100, 20, True)
         panels["cremallera"] = mk_col("Cremallera Lineal", "Actuadores mecánicos.", [r_crem_d])
+        sl_perf_p, r_perf_p = create_slider("Puntas", 3, 20, 5, True); sl_perf_re, r_perf_re = create_slider("Radio Ext", 10, 100, 40, False)
+        panels["estrella"] = mk_col("Estrella 2D", "Perfiles extruidos.", [r_perf_p, r_perf_re])
 
-        # 4. TEXTO
+        # 4. TEXTO Y CUSTOM
         tf_texto = ft.TextField(label="Contenido Texto", value="NEXUS", max_length=15, bgcolor="#1E1E1E")
         dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Grueso"), ft.dropdown.Option("Fino")], value="Grueso", bgcolor="#1E1E1E")
         dd_txt_base = ft.Dropdown(options=[ft.dropdown.Option("Llavero"), ft.dropdown.Option("Placa"), ft.dropdown.Option("Solo Texto")], value="Llavero", bgcolor="#1E1E1E")
         sw_txt_grabado = ft.Switch(label="Modo Grabado", value=False)
         tf_texto.on_change=update_code_wrapper; dd_txt_estilo.on_change=update_code_wrapper; dd_txt_base.on_change=update_code_wrapper; sw_txt_grabado.on_change=update_code_wrapper
         panels["texto"] = mk_col("Generador de Texto", "Cartelería y placas.", [tf_texto, dd_txt_estilo, dd_txt_base, sw_txt_grabado])
+        panels["custom"] = mk_col("Código Libre RAW", "Edita el código fuente directamente.", [])
 
-        # 5. ULTIMATE STL FORGE
+        # 5. ULTIMATE STL FORGE (CON TODAS LAS OPCIONES)
         lbl_stl_status = ft.Text("No hay STL en memoria.", color="#8B949E", size=11)
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
         sl_stl_x, r_stl_x = create_slider("X", -200, 200, 0, False); sl_stl_y, r_stl_y = create_slider("Y", -200, 200, 0, False); sl_stl_z, r_stl_z = create_slider("Z", -200, 200, 0, False)
@@ -254,17 +255,21 @@ def main(page: ft.Page):
         dd_stls_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#1E1E1E"); dd_stls_axis.on_change=update_code_wrapper
         sl_stls_pos, r_stls_pos = create_slider("Punto Corte", -150, 150, 0, False)
         panels["stl_split"] = mk_col("Cortador Split", "División de pieza.", [dd_stls_axis, r_stls_pos])
+        sl_stlc_s, r_stlc_s = create_slider("Caja", 10, 300, 50, False)
+        panels["stl_crop"] = mk_col("Aislar (Crop)", "Corta lo de fuera.", [r_stlc_s])
         sl_stld_r, r_stld_r = create_slider("Radio Taladro", 0.5, 20, 1.6, False)
-        panels["stl_drill"] = mk_col("Taladro 3D", "Perforación infinita.", [r_stld_r])
+        panels["stl_drill"] = mk_col("Taladro 3D Z", "Perforación infinita.", [r_stld_r])
+        sl_stlm_w, r_stlm_w = create_slider("Ancho Pestaña", 10, 100, 40, False); sl_stlm_d, r_stlm_d = create_slider("Separación", 20, 200, 80, False)
+        panels["stl_mount"] = mk_col("Orejetas Montaje", "Añade anclajes.", [r_stlm_w, r_stlm_d])
+        sl_stle_r, r_stle_r = create_slider("Radio Discos", 5, 30, 15, False); sl_stle_d, r_stle_d = create_slider("Apertura XY", 10, 200, 50, False)
+        panels["stl_ears"] = mk_col("Discos Anti-Warp", "Parches en esquinas.", [r_stle_r, r_stle_d])
 
-        panels["custom"] = mk_col("Código Libre RAW", "Edita el código fuente directamente.", [])
 
         # === GENERADOR CORE JAVASCRIPT ===
         def generate_param_code():
             h = herramienta_actual
             if h == "custom": return
             code = "function main() {\n"
-            
             sc = sl_stl_sc.value / 100.0; tx = sl_stl_x.value; ty = sl_stl_y.value; tz = sl_stl_z.value
 
             if h.startswith("stl"):
@@ -278,16 +283,48 @@ def main(page: ft.Page):
                     ax = dd_stls_axis.value; p = sl_stls_pos.value
                     cx = p-500 if ax=='X' else 0; cy = p-500 if ax=='Y' else 0; cz = p-500 if ax=='Z' else 0
                     code += f"  return dron.subtract(CSG.cube({{center:[{cx},{cy},{cz}], radius:[1000,1000,1000]}}));\n}}"
-                elif h == "stl_drill":
-                    ax = dd_stld_axis.value; p = sl_stld_r.value
-                    st = f"[-500,0,0]" if ax=='X' else (f"[0,-500,0]" if ax=='Y' else f"[0,0,-500]")
-                    en = f"[500,0,0]" if ax=='X' else (f"[0,500,0]" if ax=='Y' else f"[0,0,500]")
-                    code += f"  return dron.subtract(CSG.cylinder({{start:{st}, end:{en}, radius:{p}}}));\n}}"
+                elif h == "stl_crop": code += f"  return dron.intersect(CSG.cube({{center:[0,0,0], radius:[{sl_stlc_s.value/2},{sl_stlc_s.value/2},{sl_stlc_s.value/2}]}}));\n}}"
+                elif h == "stl_drill": code += f"  return dron.subtract(CSG.cylinder({{start:[0,0,-500], end:[0,0,500], radius:{sl_stld_r.value}}}));\n}}"
+                elif h == "stl_mount":
+                    w = sl_stlm_w.value; d = sl_stlm_d.value
+                    code += f"  var m1 = CSG.cube({{center:[{d/2},0,0], radius:[{w/2},15,3]}}).subtract(CSG.cylinder({{start:[{d/2},0,-5], end:[{d/2},0,5], radius:2.2, slices:16}}));\n"
+                    code += f"  var m2 = CSG.cube({{center:[{-d/2},0,0], radius:[{w/2},15,3]}}).subtract(CSG.cylinder({{start:[{-d/2},0,-5], end:[{-d/2},0,5], radius:2.2, slices:16}}));\n"
+                    code += f"  return dron.union(m1).union(m2);\n}}"
+                elif h == "stl_ears":
+                    r = sl_stle_r.value; d = sl_stle_d.value
+                    code += f"  var c1=CSG.cylinder({{start:[{d/2},{d/2},0], end:[{d/2},{d/2},0.4], radius:{r}, slices:32}});\n"
+                    code += f"  var c2=CSG.cylinder({{start:[{-d/2},{d/2},0], end:[{-d/2},{d/2},0.4], radius:{r}, slices:32}});\n"
+                    code += f"  var c3=CSG.cylinder({{start:[{d/2},{-d/2},0], end:[{d/2},{-d/2},0.4], radius:{r}, slices:32}});\n"
+                    code += f"  var c4=CSG.cylinder({{start:[{-d/2},{-d/2},0], end:[{-d/2},{-d/2},0.4], radius:{r}, slices:32}});\n"
+                    code += f"  return dron.union(c1).union(c2).union(c3).union(c4);\n}}"
             else:
                 if h == "cubo": code += f"  return CSG.cube({{center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]}});\n}}"
                 elif h == "cilindro": code += f"  return CSG.cylinder({{start:[0,0,0], end:[0,0,GH], radius:GW/2, slices:{int(sl_p_l.value)}}});\n}}"
+                elif h == "escuadra":
+                    L = sl_l_l.value; A = sl_l_a.value
+                    code += f"  var base = CSG.cube({{center:[{L/2}, 0, GT/2], radius:[{L/2}, {A/2}, GT/2]}});\n  var pared = CSG.cube({{center:[GT/2, 0, {L/2}], radius:[GT/2, {A/2}, {L/2}]}});\n  return base.union(pared);\n}}"
                 elif h == "pcb": code += f"  return CSG.cube({{radius:[GW/2+GT, GL/2+GT, GH/2]}}).subtract(CSG.cube({{radius:[GW/2, GL/2, GH/2+1]}}));\n}}"
+                elif h == "bisagra":
+                    L = sl_bi_l.value; D = sl_bi_d.value; tol = 0.4
+                    code += f"  var p1 = CSG.cube({{center:[{-L/4}, 0, {D/2}], radius:[{L/4}, {L/2}, {D/4}]}}).union(CSG.cylinder({{start:[0,{-L/2}, {D/2}], end:[0,{-L/6}, {D/2}], radius:{D/2}, slices:32}})).union(CSG.cylinder({{start:[0,{L/6}, {D/2}], end:[0,{L/2}, {D/2}], radius:{D/2}, slices:32}}));\n"
+                    code += f"  var p2 = CSG.cube({{center:[{L/4}, 0, {D/2}], radius:[{L/4}, {L/2}, {D/4}]}}).union(CSG.cylinder({{start:[0,{-L/6+tol}, {D/2}], end:[0,{L/6-tol}, {D/2}], radius:{D/2}, slices:32}}));\n  return p1.union(p2).union(CSG.cylinder({{start:[0,{-L/2}, {D/2}], end:[0,{L/2}, {D/2}], radius:{D/2-tol}, slices:16}}));\n}}"
                 elif h == "engranaje": code += f"  return CSG.cylinder({{radius:{sl_e_r.value}, slices:{int(sl_e_d.value)}}});\n}}"
+                elif h == "muelle":
+                    code += f"  var res = null; var steps = {int(sl_mue_v.value*32)};\n  for(var i=0; i<steps; i++) {{ var a = (i/32)*Math.PI*2;\n    var seg = CSG.sphere({{center:[Math.cos(a)*{sl_mue_r.value}, Math.sin(a)*{sl_mue_r.value}, i*(GH/steps)], radius:GT, resolution:8}});\n    if(res==null) res=seg; else res=res.union(seg); }}\n  return res;\n}}"
+                elif h == "matriz_lin":
+                    F = sl_alin_f.value; C = sl_alin_c.value; D = sl_alin_d.value
+                    code += f"  var obj = CSG.cube({{center:[0,0,GH/2], radius:[5, 5, GH/2]}}); var res = null;\n  for(var x=0; x<{C}; x++) {{ for(var y=0; y<{F}; y++) {{\n    var inst = obj.translate([x*{D}, y*{D}, 0]); if(res==null) res=inst; else res=res.union(inst);\n  }} }}\n  return res;\n}}"
+                elif h == "matriz_pol":
+                    N = sl_apol_n.value; R = sl_apol_r.value
+                    code += f"  var obj = CSG.cylinder({{start:[{R},0,0], end:[{R},0,GH], radius:5, slices:16}}); var res = null;\n  for(var i=0; i<{N}; i++) {{ var inst = obj.rotateZ((i/{N})*360); if(res==null) res=inst; else res=res.union(inst); }}\n  return res;\n}}"
+                elif h == "panal":
+                    code += f"  var hex_r = {sl_pan_r.value}; var dx = hex_r*1.732+GT; var dy = hex_r*1.5+GT;\n  var base = CSG.cube({{center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]}}); var holes = null;\n  for(var x = -GW/2; x < GW/2; x += dx) {{ for(var y = -GL/2; y < GL/2; y += dy) {{\n      var offset = (Math.abs(Math.round(y/dy)) % 2 === 1) ? dx/2 : 0;\n      var hex = CSG.cylinder({{start:[x+offset, y, -1], end:[x+offset, y, GH+1], radius:hex_r, slices:6}});\n      if(holes === null) holes = hex; else holes = holes.union(hex);\n  }} }}\n  return base.subtract(holes);\n}}"
+                elif h == "cremallera":
+                    D = sl_crem_d.value; M = 2.0; P = M * Math.PI; L = D * P
+                    code += f"  var base = CSG.cube({{center:[{L/2}, -{M}, GH/2], radius:[{L/2}, {M}, GH/2]}}); var dientes = null;\n  for(var i=0; i<{D}; i++) {{ var d = CSG.cube({{center:[i*{P}+{P/2}, {M/2}, GH/2], radius:[{M/2}, {M}, GH/2]}});\n    if(dientes==null) dientes=d; else dientes=dientes.union(d); }}\n  return base.union(dientes);\n}}"
+                elif h == "estrella":
+                    P = sl_perf_p.value; RE = sl_perf_re.value
+                    code += f"  var res = null;\n  for(var i=0; i<{P}; i++) {{ var a1=(i/{P})*360;\n    var cyl = CSG.cylinder({{start:[0,0,0], end:[{RE},0,0], radius:GH/2, slices:4}}).rotateZ(a1);\n    if(res==null) res=cyl; else res=res.union(cyl); }}\n  return res;\n}}"
                 elif h == "texto": code += f"  return CSG.cube({{radius:[GW/2, 10, GH/2]}}).union(CSG.cube({{radius:[GW/2+2, 12, 2]}}));\n}}"
                 else: code += "  return CSG.sphere({radius:10});\n}"
 
@@ -295,13 +332,13 @@ def main(page: ft.Page):
                 txt_code.value = code; page.update()
 
         # =========================================================
-        # CASCADA DE COMBOS (FIXEADA)
+        # CASCADA DE COMBOS (TODAS LAS CATEGORÍAS)
         # =========================================================
         categorias = {
-            "Geometría Básica": [("cubo", "Cubo G"), ("cilindro", "Cilindro / Hueco"), ("escuadra", "Escuadra L"), ("pcb", "Caja Electrónica")],
+            "Geometría Básica": [("cubo", "Cubo G"), ("cilindro", "Cilindro / Hueco"), ("escuadra", "Escuadra L"), ("pcb", "Caja Electrónica"), ("bisagra", "Bisagra Print-in-Place")],
             "Mecánica": [("engranaje", "Piñón Recto"), ("fijacion", "Tuerca / Tornillo"), ("polea", "Polea GT2"), ("muelle", "Resorte")],
-            "Avanzados": [("panal", "HoneyComb"), ("voronoi", "Voronoi"), ("cremallera", "Cremallera")],
-            "Ultimate STL Forge": [("stl", "Ver STL"), ("stl_flatten", "Aplanar"), ("stl_split", "Split"), ("stl_drill", "Taladro")],
+            "Avanzados / Arrays": [("matriz_lin", "Matriz Lineal"), ("matriz_pol", "Matriz Polar"), ("panal", "HoneyComb"), ("voronoi", "Voronoi"), ("cremallera", "Cremallera"), ("estrella", "Estrella 2D")],
+            "Ultimate STL Forge": [("stl", "Ver STL"), ("stl_flatten", "Aplanar"), ("stl_split", "Split"), ("stl_crop", "Aislar Crop"), ("stl_drill", "Taladro 3D"), ("stl_mount", "Orejetas"), ("stl_ears", "Anti-Warp")],
             "Texto y Especiales": [("texto", "Placas Texto"), ("custom", "Código Libre RAW")]
         }
 
@@ -399,7 +436,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # ECOSISTEMA FILES (CON FIX DE ICONOS DIRECTOS)
+        # ECOSISTEMA FILES
         # =========================================================
         list_nexus_db = ft.ListView(expand=True, spacing=10)
 
@@ -412,7 +449,7 @@ def main(page: ft.Page):
                     ext = f.lower().split('.')[-1]
                     p = os.path.join(EXPORT_DIR, f)
                     
-                    # FIX: Iconos pasados directamente como Strings. A prueba de fallos de versiones Flet.
+                    # FIX DE ICONOS COMO STRINGS
                     list_nexus_db.controls.append(
                         ft.Container(content=ft.Row([
                             ft.Text("🧊" if ext=="stl" else "🧩", size=24),
@@ -436,7 +473,7 @@ def main(page: ft.Page):
                 txt_code.value = open(filepath).read(); set_tab(0); status.value = "✓ Código Cargado"
             page.update()
 
-        # FIX: "refresh" como texto directo
+        # FIX DE ICONOS COMO STRINGS
         view_archivos = ft.Column([
             ft.ElevatedButton("🚀 INYECTAR ARCHIVO (WEB)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf'), height=60, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))),
             ft.Row([ft.Text("📁 NEXUS DB", color="white", weight="bold"), ft.IconButton(icon="refresh", on_click=lambda _: refresh_nexus_db(), icon_color="#00E5FF")], alignment="spaceBetween"),

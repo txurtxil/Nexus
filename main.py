@@ -90,12 +90,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v24.1.1 MASTER"
+        page.title = "NEXUS CAD v24.2 MASTER"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v24.1 MASTER | All-in-One Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v24.2 MASTER | All-in-One Activo", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(label="Código JS-CSG (Editable en RAW)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -111,7 +111,8 @@ def main(page: ft.Page):
             if is_int: sl.divisions = int(max_v - min_v)
             def internal_change(e):
                 txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"
-                if txt_val.page: txt_val.update()
+                try: txt_val.update() # Fix crash
+                except: pass
                 if not modo_ensamble: update_code_wrapper()
             sl.on_change = internal_change
             return sl, ft.Row([ft.Text(label, width=90, size=11, color="#E6EDF3"), sl, txt_val])
@@ -145,7 +146,8 @@ def main(page: ft.Page):
                 if item["op"] == "base": fv = item["var"]
                 else: fc += f"  {fv} = {fv}.{item['op']}({item['var']});\n"
             txt_code.value = fc + f"  return {fv};\n}}"
-            if txt_code.page: txt_code.update()
+            try: txt_code.update() # Fix crash
+            except: pass
             page.update()
 
         def clear_editor():
@@ -154,7 +156,8 @@ def main(page: ft.Page):
             txt_code.value = "function main() {\n  return CSG.cube({radius:[0,0,0]});\n}"
             status.value = "✓ Código borrado."
             status.color = "#B71C1C"
-            if txt_code.page: txt_code.update()
+            try: txt_code.update() # Fix crash
+            except: pass
             page.update()
 
         panel_ensamble_ops = ft.Row([
@@ -175,13 +178,14 @@ def main(page: ft.Page):
 
         def run_render():
             global LATEST_CODE_B64; LATEST_CODE_B64 = base64.b64encode(prepare_js_payload().encode('utf-8')).decode()
-            set_tab(1) # Tab de visor 3D
+            set_tab(1)
 
         # === AYUDA IA ===
         def inject_snippet(code):
             c = txt_code.value; pos = c.rfind('return ')
             txt_code.value = (c[:pos] + code + "\n  " + c[pos:]) if pos != -1 else (c + "\n" + code)
-            if txt_code.page: txt_code.update()
+            try: txt_code.update() # Fix crash
+            except: pass
 
         help_box = ft.ExpansionTile(title=ft.Text("💡 Ayuda IA / Plantillas", color="#00E5FF", size=12, weight="bold"), collapsed_text_color="#00E5FF", controls=[
             ft.Container(padding=10, bgcolor="#161B22", border_radius=8, content=ft.Column([
@@ -388,11 +392,10 @@ def main(page: ft.Page):
                     code += f"  var baseObj = CSG.cube({{center:[0,0,GH/2], radius:[GW/2+5, 15, GH/2]}});\n"
                     code += f"  if({str(sw_txt_grabado.value).lower()}) return baseObj.subtract(pText.translate([0,0,-2]));\n  return baseObj.union(pText);\n}}"
 
-            # LA CLAVE DEL FIX: Solo actualizar si el control está montado en pantalla
             if not modo_ensamble:
                 txt_code.value = code
-                if txt_code.page: 
-                    txt_code.update()
+                try: txt_code.update() # Fix crash definitivo
+                except: pass
 
         # =========================================================
         # COMBOS Y CATEGORÍAS UI
@@ -456,7 +459,8 @@ def main(page: ft.Page):
                         cpu, ram, cores = get_sys_info()
                         pb_cpu.value = cpu / 100.0; txt_cpu_val.value = f"{cpu:.1f}%"
                         pb_ram.value = ram / 100.0; txt_ram_val.value = f"{ram:.1f}%"
-                        if hw_panel.page: hw_panel.update()
+                        try: hw_panel.update() # Fix crash
+                        except: pass
                 except: pass
         threading.Thread(target=hw_monitor_loop, daemon=True).start()
 

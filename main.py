@@ -115,12 +115,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v26.0 TITAN"
+        page.title = "NEXUS CAD v26.1 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v26.0 TITAN | Todas las Tools", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v26.1 TITAN | Full Tools + Dropdown Fix", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -189,7 +189,7 @@ def main(page: ft.Page):
         ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
 
         # =========================================================
-        # CATEGORÍAS Y HERRAMIENTAS COMPLETAS (RESTAURADAS)
+        # CATEGORÍAS Y HERRAMIENTAS COMPLETAS
         # =========================================================
         panels = {}
 
@@ -223,7 +223,7 @@ def main(page: ft.Page):
         sl_pan_r, r_pan_r = create_slider("Radio Hex", 2, 20, 5, False)
         panels["panal"] = mk_col("Estructura Panal", "Aligerado Honeycomb.", [r_pan_r])
         sl_vor_d, r_vor_d = create_slider("Densidad", 4, 30, 12, True)
-        panels["voronoi"] = mk_col("Patrón Voronoi", "Malla orgánica estructural.", [r_vor_d])
+        panels["voronoi"] = mk_col("Patrón Voronoi", "Malla orgánica.", [r_vor_d])
         sl_crem_d, r_crem_d = create_slider("Dientes", 5, 100, 20, True)
         panels["cremallera"] = mk_col("Cremallera Lineal", "Actuadores mecánicos.", [r_crem_d])
         sl_perf_p, r_perf_p = create_slider("Puntas", 3, 20, 5, True); sl_perf_re, r_perf_re = create_slider("Radio Ext", 10, 100, 40, False)
@@ -238,7 +238,7 @@ def main(page: ft.Page):
         panels["texto"] = mk_col("Generador de Texto", "Cartelería y placas.", [tf_texto, dd_txt_estilo, dd_txt_base, sw_txt_grabado])
         panels["custom"] = mk_col("Código Libre RAW", "Edita el código fuente directamente.", [])
 
-        # 5. ULTIMATE STL FORGE (CON TODAS LAS OPCIONES)
+        # 5. ULTIMATE STL FORGE
         lbl_stl_status = ft.Text("No hay STL en memoria.", color="#8B949E", size=11)
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
         sl_stl_x, r_stl_x = create_slider("X", -200, 200, 0, False); sl_stl_y, r_stl_y = create_slider("Y", -200, 200, 0, False); sl_stl_z, r_stl_z = create_slider("Z", -200, 200, 0, False)
@@ -251,7 +251,7 @@ def main(page: ft.Page):
 
         panels["stl"] = mk_col("Visor STL", "Muestra el archivo cargado.", [])
         sl_stlf_z, r_stlf_z = create_slider("Corte Base Z", 0, 50, 1, False)
-        panels["stl_flatten"] = mk_col("Aplanar Base", "Corte para adherencia a cama.", [r_stlf_z])
+        panels["stl_flatten"] = mk_col("Aplanar Base", "Corte para adherencia.", [r_stlf_z])
         dd_stls_axis = ft.Dropdown(options=[ft.dropdown.Option("X"), ft.dropdown.Option("Y"), ft.dropdown.Option("Z")], value="Z", bgcolor="#1E1E1E"); dd_stls_axis.on_change=update_code_wrapper
         sl_stls_pos, r_stls_pos = create_slider("Punto Corte", -150, 150, 0, False)
         panels["stl_split"] = mk_col("Cortador Split", "División de pieza.", [dd_stls_axis, r_stls_pos])
@@ -332,7 +332,7 @@ def main(page: ft.Page):
                 txt_code.value = code; page.update()
 
         # =========================================================
-        # CASCADA DE COMBOS (TODAS LAS CATEGORÍAS)
+        # CASCADA DE COMBOS (FIX MEMORIA)
         # =========================================================
         categorias = {
             "Geometría Básica": [("cubo", "Cubo G"), ("cilindro", "Cilindro / Hueco"), ("escuadra", "Escuadra L"), ("pcb", "Caja Electrónica"), ("bisagra", "Bisagra Print-in-Place")],
@@ -346,18 +346,35 @@ def main(page: ft.Page):
         dd_tool = ft.Dropdown(width=170, bgcolor="#161B22")
 
         def on_cat_change(e):
-            cat = dd_cat.value
-            dd_tool.options = [ft.dropdown.Option(key=k, text=v) for k, v in categorias[cat]]
-            dd_tool.value = categorias[cat][0][0]
-            page.update() 
-            on_tool_change(None)
+            try:
+                cat = dd_cat.value
+                # FIX: Vaciamos y rellenamos la lista existente para obligar a Flet a detectarlo
+                dd_tool.options.clear()
+                for k, v in categorias[cat]:
+                    dd_tool.options.append(ft.dropdown.Option(key=k, text=v))
+                dd_tool.value = categorias[cat][0][0]
+                
+                # Actualizamos forzosamente el control individual y luego disparamos el cambio
+                try: dd_tool.update()
+                except: pass
+                on_tool_change(None)
+            except Exception as ex:
+                print(f"Error combos: {ex}")
 
         def on_tool_change(e):
             nonlocal herramienta_actual; herramienta_actual = dd_tool.value
-            for k, p in panels.items(): p.visible = (k == herramienta_actual)
+            for k, p in panels.items(): 
+                p.visible = (k == herramienta_actual)
+                try: p.update()
+                except: pass
+            
             panel_stl_transform.visible = herramienta_actual.startswith("stl")
+            try: panel_stl_transform.update()
+            except: pass
+            
             generate_param_code()
-            page.update()
+            try: page.update()
+            except: pass
 
         dd_cat.on_change = on_cat_change; dd_tool.on_change = on_tool_change
         
@@ -449,7 +466,6 @@ def main(page: ft.Page):
                     ext = f.lower().split('.')[-1]
                     p = os.path.join(EXPORT_DIR, f)
                     
-                    # FIX DE ICONOS COMO STRINGS
                     list_nexus_db.controls.append(
                         ft.Container(content=ft.Row([
                             ft.Text("🧊" if ext=="stl" else "🧩", size=24),
@@ -467,13 +483,18 @@ def main(page: ft.Page):
             if ext == "stl":
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl"))
                 lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
-                dd_cat.value = "Ultimate STL Forge"; on_cat_change(None); dd_tool.value = "stl"; on_tool_change(None)
+                dd_cat.value = "Ultimate STL Forge"
+                
+                # Sincronizamos las opciones para evitar el error visual
+                dd_tool.options.clear()
+                for k, v in categorias[dd_cat.value]: dd_tool.options.append(ft.dropdown.Option(key=k, text=v))
+                
+                dd_tool.value = "stl"; on_tool_change(None)
                 set_tab(0); status.value = "✓ STL Listo en Forge"
             elif ext == "jscad":
                 txt_code.value = open(filepath).read(); set_tab(0); status.value = "✓ Código Cargado"
             page.update()
 
-        # FIX DE ICONOS COMO STRINGS
         view_archivos = ft.Column([
             ft.ElevatedButton("🚀 INYECTAR ARCHIVO (WEB)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf'), height=60, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))),
             ft.Row([ft.Text("📁 NEXUS DB", color="white", weight="bold"), ft.IconButton(icon="refresh", on_click=lambda _: refresh_nexus_db(), icon_color="#00E5FF")], alignment="spaceBetween"),
@@ -496,6 +517,7 @@ def main(page: ft.Page):
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
         
+        # Inicializamos asegurando que las listas están sincronizadas
         on_cat_change(None)
 
     except Exception:

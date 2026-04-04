@@ -46,7 +46,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
 
     def do_OPTIONS(self):
-        # Vital para que Chrome Android no bloquee la subida
         self.send_response(200)
         self._send_cors()
         self.end_headers()
@@ -124,12 +123,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v25.1 Pro"
+        page.title = "NEXUS CAD v25.2 Pro"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v25.1 Pro | Sistemas Online", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v25.2 Pro | Sistemas Online", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -282,7 +281,7 @@ def main(page: ft.Page):
                 elif h == "stl_drill":
                     ax = dd_stld_axis.value; p = sl_stld_r.value
                     st = f"[-500,0,0]" if ax=='X' else (f"[0,-500,0]" if ax=='Y' else f"[0,0,-500]")
-                    en = f"[500,0,0]" if ax=='X' else (f"[0,500,0]" if ax=='Y' else f"[0,0,500]")
+                    en = f"[500,0,0]" if ax=='X' else (f"[0,500,0]" if ax=='Y' else f"[0,500,0]")
                     code += f"  return dron.subtract(CSG.cylinder({{start:{st}, end:{en}, radius:{p}}}));\n}}"
             else:
                 if h == "cubo": code += f"  return CSG.cube({{center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]}});\n}}"
@@ -296,7 +295,7 @@ def main(page: ft.Page):
                 txt_code.value = code; page.update()
 
         # =========================================================
-        # FIX CASCADA DE COMBOS
+        # CASCADA DE COMBOS (FIXEADA)
         # =========================================================
         categorias = {
             "Geometría Básica": [("cubo", "Cubo G"), ("cilindro", "Cilindro / Hueco"), ("escuadra", "Escuadra L"), ("pcb", "Caja Electrónica")],
@@ -313,7 +312,7 @@ def main(page: ft.Page):
             cat = dd_cat.value
             dd_tool.options = [ft.dropdown.Option(key=k, text=v) for k, v in categorias[cat]]
             dd_tool.value = categorias[cat][0][0]
-            page.update() # Fix crucial para la UI
+            page.update() 
             on_tool_change(None)
 
         def on_tool_change(e):
@@ -344,7 +343,8 @@ def main(page: ft.Page):
             ft.ElevatedButton("🗑️ LIMPIAR", on_click=lambda _: clear_editor(), bgcolor="#B71C1C", color="white")
         ], alignment="spaceBetween")
 
-        editor_exp = ft.ExpansionTile(title=ft.Text("📝 CÓDIGO FUENTE RAW", color="#FFAB00", weight="bold"), controls=[botones_raw, txt_code], bgcolor="#0B0E14", initially_expanded=True)
+        # FIX: Eliminado el parámetro conflictivo 'initially_expanded'
+        editor_exp = ft.ExpansionTile(title=ft.Text("📝 CÓDIGO FUENTE RAW", color="#FFAB00", weight="bold"), controls=[botones_raw, txt_code], bgcolor="#0B0E14")
 
         view_constructor = ft.Column([
             ft.Row([ft.Text("Cat:", color="#8B949E", size=11), dd_cat, ft.Text("Tool:", color="#8B949E", size=11), dd_tool], wrap=True),

@@ -95,7 +95,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 <script>function up(){var f=document.getElementById('f').files[0]; if(!f)return;
                 document.getElementById('s').style.color='#FFAB00'; document.getElementById('s').innerText='Inyectando...';
                 fetch('/api/upload', {method:'POST', headers:{'File-Name':encodeURIComponent(f.name)}, body:f})
-                .then(r => { if(r.ok){ document.getElementById('s').style.color='#00E676'; document.getElementById('s').innerText='✓ ¡ÉXITO! Vuelve a la App.'; } else { throw 'Error'; } })
+                .then(r => { if(r.ok){ document.getElementById('s').style.color='#00E676'; document.getElementById('s').innerText='✓ ¡ÉXITO! Vuelve a la App y pulsa REFRESCAR.'; } else { throw 'Error'; } })
                 .catch(e => { document.getElementById('s').style.color='red'; document.getElementById('s').innerText='❌ Error de red'; });}</script></body></html>"""
             self.send_response(200); self.send_header("Content-type", "text/html"); self._send_cors(); self.end_headers(); self.wfile.write(html.encode('utf-8'))
             
@@ -123,12 +123,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v25.2 Pro"
+        page.title = "NEXUS CAD v25.3 Pro"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v25.2 Pro | Sistemas Online", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v25.3 Pro | UI & Files Fixed", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -281,7 +281,7 @@ def main(page: ft.Page):
                 elif h == "stl_drill":
                     ax = dd_stld_axis.value; p = sl_stld_r.value
                     st = f"[-500,0,0]" if ax=='X' else (f"[0,-500,0]" if ax=='Y' else f"[0,0,-500]")
-                    en = f"[500,0,0]" if ax=='X' else (f"[0,500,0]" if ax=='Y' else f"[0,500,0]")
+                    en = f"[500,0,0]" if ax=='X' else (f"[0,500,0]" if ax=='Y' else f"[0,0,500]")
                     code += f"  return dron.subtract(CSG.cylinder({{start:{st}, end:{en}, radius:{p}}}));\n}}"
             else:
                 if h == "cubo": code += f"  return CSG.cube({{center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]}});\n}}"
@@ -343,7 +343,6 @@ def main(page: ft.Page):
             ft.ElevatedButton("🗑️ LIMPIAR", on_click=lambda _: clear_editor(), bgcolor="#B71C1C", color="white")
         ], alignment="spaceBetween")
 
-        # FIX: Eliminado el parámetro conflictivo 'initially_expanded'
         editor_exp = ft.ExpansionTile(title=ft.Text("📝 CÓDIGO FUENTE RAW", color="#FFAB00", weight="bold"), controls=[botones_raw, txt_code], bgcolor="#0B0E14")
 
         view_constructor = ft.Column([
@@ -400,7 +399,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # ECOSISTEMA FILES
+        # ECOSISTEMA FILES (CON FIX DE ICONOS DIRECTOS)
         # =========================================================
         list_nexus_db = ft.ListView(expand=True, spacing=10)
 
@@ -412,13 +411,15 @@ def main(page: ft.Page):
                 for f in files:
                     ext = f.lower().split('.')[-1]
                     p = os.path.join(EXPORT_DIR, f)
+                    
+                    # FIX: Iconos pasados directamente como Strings. A prueba de fallos de versiones Flet.
                     list_nexus_db.controls.append(
                         ft.Container(content=ft.Row([
                             ft.Text("🧊" if ext=="stl" else "🧩", size=24),
                             ft.Text(f, color="white", weight="bold", expand=True),
-                            ft.IconButton(ft.icons.PLAY_CIRCLE, icon_color="#00E676", on_click=lambda e, fp=p: load_file(fp)),
-                            ft.IconButton(ft.icons.DOWNLOAD, icon_color="#00E5FF", on_click=lambda e, fn=f: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/descargar/{fn}")),
-                            ft.IconButton(ft.icons.DELETE, icon_color="#B71C1C", on_click=lambda e, fp=p: [os.remove(fp), refresh_nexus_db()])
+                            ft.IconButton(icon="play_circle", icon_color="#00E676", on_click=lambda e, fp=p: load_file(fp)),
+                            ft.IconButton(icon="download", icon_color="#00E5FF", on_click=lambda e, fn=f: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/descargar/{fn}")),
+                            ft.IconButton(icon="delete", icon_color="#B71C1C", on_click=lambda e, fp=p: [os.remove(fp), refresh_nexus_db()])
                         ]), bgcolor="#161B22", padding=10, border_radius=8)
                     )
             except Exception as e: list_nexus_db.controls.append(ft.Text(f"Error DB: {e}"))
@@ -435,9 +436,10 @@ def main(page: ft.Page):
                 txt_code.value = open(filepath).read(); set_tab(0); status.value = "✓ Código Cargado"
             page.update()
 
+        # FIX: "refresh" como texto directo
         view_archivos = ft.Column([
             ft.ElevatedButton("🚀 INYECTAR ARCHIVO (WEB)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf'), height=60, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))),
-            ft.Row([ft.Text("📁 NEXUS DB", color="white", weight="bold"), ft.IconButton(ft.icons.REFRESH, on_click=lambda _: refresh_nexus_db(), icon_color="#00E5FF")], alignment="spaceBetween"),
+            ft.Row([ft.Text("📁 NEXUS DB", color="white", weight="bold"), ft.IconButton(icon="refresh", on_click=lambda _: refresh_nexus_db(), icon_color="#00E5FF")], alignment="spaceBetween"),
             ft.Divider(color="#30363D"),
             list_nexus_db
         ], expand=True)

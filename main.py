@@ -90,12 +90,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v24.0 MASTER"
+        page.title = "NEXUS CAD v24.1 MASTER"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v24.0 MASTER | All-in-One Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v24.1 MASTER | All-in-One Activo", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(label="Código JS-CSG (Editable en RAW)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -110,7 +110,8 @@ def main(page: ft.Page):
             sl = ft.Slider(min=min_v, max=max_v, value=val, expand=True, active_color="#00E5FF", inactive_color="#2A303C")
             if is_int: sl.divisions = int(max_v - min_v)
             def internal_change(e):
-                txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"; txt_val.update()
+                txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"
+                if txt_val.page: txt_val.update()
                 if not modo_ensamble: update_code_wrapper()
             sl.on_change = internal_change
             return sl, ft.Row([ft.Text(label, width=90, size=11, color="#E6EDF3"), sl, txt_val])
@@ -118,7 +119,7 @@ def main(page: ft.Page):
         def mk_col(title, desc, controls, visible=False):
             return ft.Column([ft.Text(title, color="#00E676", weight="bold"), ft.Text("ℹ️ "+desc, color="#FFD54F", size=10, italic=True), ft.Container(content=ft.Column(controls, spacing=2), bgcolor="#161B22", padding=10, border_radius=8)], visible=visible)
 
-        # === GLOBALES Y ENSAMBLADOR (EL FIX DEL CRASH) ===
+        # === GLOBALES Y ENSAMBLADOR ===
         sl_g_w, r_g_w = create_slider("Ancho (GW)", 1, 300, 50, False)
         sl_g_l, r_g_l = create_slider("Largo (GL)", 1, 300, 50, False)
         sl_g_h, r_g_h = create_slider("Alto (GH)", 1, 300, 20, False)
@@ -143,11 +144,23 @@ def main(page: ft.Page):
                 fc += f"  // --- Mod {i} ({item['op']}) ---\n{item['body']}\n"
                 if item["op"] == "base": fv = item["var"]
                 else: fc += f"  {fv} = {fv}.{item['op']}({item['var']});\n"
-            txt_code.value = fc + f"  return {fv};\n}}"; txt_code.update(); page.update()
+            txt_code.value = fc + f"  return {fv};\n}}"
+            if txt_code.page: txt_code.update()
+            page.update()
+
+        def clear_editor():
+            nonlocal ensamble_stack
+            ensamble_stack = []
+            txt_code.value = "function main() {\n  return CSG.cube({radius:[0,0,0]});\n}"
+            status.value = "✓ Código borrado."
+            status.color = "#B71C1C"
+            if txt_code.page: txt_code.update()
+            page.update()
 
         panel_ensamble_ops = ft.Row([
             ft.ElevatedButton("➕ UNIR", on_click=lambda _: add_to_stack("union"), bgcolor="#1B5E20", color="white", expand=True),
-            ft.ElevatedButton("➖ RESTAR", on_click=lambda _: add_to_stack("subtract"), bgcolor="#B71C1C", color="white", expand=True)
+            ft.ElevatedButton("➖ RESTAR", on_click=lambda _: add_to_stack("subtract"), bgcolor="#B71C1C", color="white", expand=True),
+            ft.ElevatedButton("🗑️ RESET", on_click=lambda _: clear_editor(), bgcolor="#B71C1C", color="white")
         ], visible=False)
 
         panel_globales = ft.Container(content=ft.Column([
@@ -162,12 +175,13 @@ def main(page: ft.Page):
 
         def run_render():
             global LATEST_CODE_B64; LATEST_CODE_B64 = base64.b64encode(prepare_js_payload().encode('utf-8')).decode()
-            set_tab(2)
+            set_tab(1) # Tab de visor 3D
 
         # === AYUDA IA ===
         def inject_snippet(code):
             c = txt_code.value; pos = c.rfind('return ')
-            txt_code.value = (c[:pos] + code + "\n  " + c[pos:]) if pos != -1 else (c + "\n" + code); txt_code.update()
+            txt_code.value = (c[:pos] + code + "\n  " + c[pos:]) if pos != -1 else (c + "\n" + code)
+            if txt_code.page: txt_code.update()
 
         help_box = ft.ExpansionTile(title=ft.Text("💡 Ayuda IA / Plantillas", color="#00E5FF", size=12, weight="bold"), collapsed_text_color="#00E5FF", controls=[
             ft.Container(padding=10, bgcolor="#161B22", border_radius=8, content=ft.Column([
@@ -233,7 +247,7 @@ def main(page: ft.Page):
         sl_stl_z, r_stl_z = create_slider("Mover Z", -200, 200, 0, False)
         panel_stl_transform = ft.Container(content=ft.Column([
             ft.Row([ft.Text("🔄 Transformación Base STL", color="#00E676", weight="bold"), lbl_stl_status]),
-            ft.ElevatedButton("📂 ABRIR EXPLORADOR (FILES)", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf'), height=35),
+            ft.ElevatedButton("📂 ABRIR EXPLORADOR (FILES)", on_click=lambda _: set_tab(2), bgcolor="#00E5FF", color="black", width=float('inf'), height=35),
             r_stl_sc, r_stl_x, r_stl_y, r_stl_z
         ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676"), visible=False)
 
@@ -301,7 +315,6 @@ def main(page: ft.Page):
                     code += f"  var c4=CSG.cylinder({{start:[{-d/2},{-d/2},0], end:[{-d/2},{-d/2},0.4], radius:{r}, slices:32}});\n"
                     code += f"  return dron.union(c1).union(c2).union(c3).union(c4);\n}}"
             else:
-                # Resto de herramientas... (Cubo, Cilindro, etc)
                 if h == "cubo":
                     code += f"  var c = CSG.cube({{center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]}});\n"
                     code += f"  if({sl_c_g.value} > 0) c = c.subtract(CSG.cube({{center:[0,0,GH/2+1], radius:[GW/2-{sl_c_g.value}, GL/2-{sl_c_g.value}, GH/2]}}));\n  return c;\n}}"
@@ -375,7 +388,11 @@ def main(page: ft.Page):
                     code += f"  var baseObj = CSG.cube({{center:[0,0,GH/2], radius:[GW/2+5, 15, GH/2]}});\n"
                     code += f"  if({str(sw_txt_grabado.value).lower()}) return baseObj.subtract(pText.translate([0,0,-2]));\n  return baseObj.union(pText);\n}}"
 
-            if not modo_ensamble: txt_code.value = code; txt_code.update()
+            # LA CLAVE DEL FIX: Solo actualizar si el control está montado en pantalla
+            if not modo_ensamble:
+                txt_code.value = code
+                if txt_code.page: 
+                    txt_code.update()
 
         # =========================================================
         # COMBOS Y CATEGORÍAS UI
@@ -439,7 +456,7 @@ def main(page: ft.Page):
                         cpu, ram, cores = get_sys_info()
                         pb_cpu.value = cpu / 100.0; txt_cpu_val.value = f"{cpu:.1f}%"
                         pb_ram.value = ram / 100.0; txt_ram_val.value = f"{ram:.1f}%"
-                        hw_panel.update()
+                        if hw_panel.page: hw_panel.update()
                 except: pass
         threading.Thread(target=hw_monitor_loop, daemon=True).start()
 
@@ -460,14 +477,15 @@ def main(page: ft.Page):
                     lbl_stl_status.value = f"✓ STL Listo: {os.path.basename(filepath)}"
                     lbl_stl_status.color = "#00E676"
                     
-                    # MAGIA: Saltar automáticamente a la herramienta STL!
                     dd_cat.value = "Ultimate STL Forge"; on_cat_change(None)
                     dd_tool.value = "stl"; on_tool_change(None)
                     set_tab(0) 
                     status.value = "✓ STL Cargado. Listo para modificar."
                 except Exception as e: status.value = f"❌ Error: {e}"; status.color = "red"
             elif ext == "jscad":
-                try: txt_code.value = open(filepath).read(); set_tab(3); status.value = f"✓ Código cargado."; status.color = "#00E676"
+                try: 
+                    txt_code.value = open(filepath).read(); set_tab(3); 
+                    status.value = f"✓ Código cargado."; status.color = "#00E676"
                 except Exception as e: status.value = f"❌ Error: {e}"; status.color = "red"
             page.update()
 

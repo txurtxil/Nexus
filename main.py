@@ -77,7 +77,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 with open(filepath, "rb") as f:
                     self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             else: 
-                # FIX: STL Fantasma para evitar el error [object ProgressEvent] en el Visor 3D
+                # FIX: STL Fantasma para evitar el error ProgressEvent en el Visor 3D
                 self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers()
                 self.wfile.write(b"solid dummy\nfacet normal 0 0 0\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid dummy\n")
 
@@ -115,21 +115,20 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# LÓGICA DE LA APLICACIÓN FLET (ESTILO 20.5)
+# LÓGICA DE LA APLICACIÓN FLET
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v26.3 PRO"
+        page.title = "NEXUS CAD v26.4 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v26.3 PRO | Rollback Estable", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v26.4 PRO | Carrusel + Híbrido", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
         herramienta_actual = "custom"
-        dd_tool = None # Placeholder para el dropdown dinámico
 
         def update_code_wrapper(e=None):
             generate_param_code()
@@ -169,13 +168,19 @@ def main(page: ft.Page):
         # =========================================================
         panels = {}
 
-        # 1. BÁSICAS (Restauradas)
+        # 1. BÁSICAS
         sl_c_g, r_c_g = create_slider("Vaciado Pared", 0, 20, 0)
         panels["cubo"] = mk_col("Cubo Paramétrico", "Base sólida o hueca.", [r_c_g])
         sl_p_r, r_p_r = create_slider("Radio Hueco", 0, 95, 15)
         panels["cilindro"] = mk_col("Cilindro / Prisma", "Cuerpos de revolución.", [r_p_r])
 
-        # 2. ULTIMATE STL FORGE (Las 10 herramientas pedidas)
+        # 2. TEXTO Y LLAVEROS
+        tf_texto = ft.TextField(label="Contenido Texto", value="NEXUS", max_length=15, bgcolor="#1E1E1E")
+        sw_txt_grabado = ft.Switch(label="Modo Hueco (Grabado)", value=False, active_color="#00E5FF")
+        tf_texto.on_change = update_code_wrapper; sw_txt_grabado.on_change = update_code_wrapper
+        panels["texto"] = mk_col("Generador de Texto 3D", "Llaveros y placas identificativas.", [tf_texto, sw_txt_grabado])
+
+        # 3. ULTIMATE STL FORGE
         lbl_stl_status = ft.Text("No hay STL en memoria.", color="#8B949E", size=11)
         sl_stl_sc, r_stl_sc = create_slider("Escala (%)", 1, 500, 100, True)
         sl_stl_x, r_stl_x = create_slider("Mover X", -200, 200, 0)
@@ -230,30 +235,19 @@ def main(page: ft.Page):
         sl_stlp_y, r_stlp_ry = create_slider("Centro Y", -100, 100, 0)
         panels["stl_propguard"] = mk_col("Protector de Hélice", "Fusiona un aro protector cilíndrico.", [r_stlp_r, r_stlp_t, r_stlp_rx, r_stlp_ry])
 
-        # 3. TEXTO Y LLAVEROS (Añadido)
-        tf_texto = ft.TextField(label="Contenido Texto", value="NEXUS", max_length=15, bgcolor="#1E1E1E")
-        sw_txt_grabado = ft.Switch(label="Modo Hueco (Grabado)", value=False, active_color="#00E5FF")
-        tf_texto.on_change = update_code_wrapper; sw_txt_grabado.on_change = update_code_wrapper
-        panels["texto"] = mk_col("Generador de Texto 3D", "Llaveros y placas identificativas.", [tf_texto, sw_txt_grabado])
-
         panels["custom"] = mk_col("Código Libre RAW", "Edita el código fuente directamente.", [])
 
-        # === GENERADOR JAVASCRIPT CON HÍBRIDO MULTI-BODY Y TEXTO ===
+        # === GENERADOR JAVASCRIPT CON HÍBRIDO MULTI-BODY ===
         def get_stl_base_js():
             sc = sl_stl_sc.value / 100.0; tx = sl_stl_x.value; ty = sl_stl_y.value; tz = sl_stl_z.value
             return f"""
   var sc = {sc}; var tx = {tx}; var ty = {ty}; var tz = {tz};
   var dron = null;
   if (typeof IMPORTED_STL !== 'undefined') {{
-      // BYPASS HÍBRIDO AVANZADO (MULTI-BODY)
       if (Array.isArray(IMPORTED_STL) && IMPORTED_STL.length > 0) {{
           dron = IMPORTED_STL[0];
-          for(var i = 1; i < IMPORTED_STL.length; i++) {{
-              dron = dron.union(IMPORTED_STL[i]);
-          }}
-      }} else {{
-          dron = IMPORTED_STL;
-      }}
+          for(var i = 1; i < IMPORTED_STL.length; i++) {{ dron = dron.union(IMPORTED_STL[i]); }}
+      }} else {{ dron = IMPORTED_STL; }}
   }}
   if(!dron || !dron.polygons) {{ return CSG.cube({{radius:[0.1,0.1,0.1]}}); }}
   dron = dron.scale([sc, sc, sc]).translate([tx, ty, tz]);
@@ -324,7 +318,7 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # FIX DEFINITIVO DE LOS COMBOS (DESTROZAR Y RECREAR)
+        # SISTEMA CARRUSEL (BLINDADO CONTRA FALLOS DE TIPO KWARG)
         # =========================================================
         categorias = {
             "Ultimate STL Forge": [
@@ -340,42 +334,62 @@ def main(page: ft.Page):
                 ("stl_propguard", "Protector de Hélice")
             ],
             "Geometría Básica": [("cubo", "Cubo G"), ("cilindro", "Cilindro / Hueco")],
-            "Especiales": [("texto", "Llaveros y Carteles"), ("custom", "Código Libre RAW")]
+            "Texto y Placas": [("texto", "Llaveros y Carteles")],
+            "Especiales": [("custom", "Código Libre RAW")]
         }
 
-        dd_cat = ft.Dropdown(options=[ft.dropdown.Option(k) for k in categorias.keys()], value="Ultimate STL Forge", width=170, bgcolor="#161B22")
-        
-        # El contenedor que va a alojar el segundo combo para obligar a Flet a redibujarlo.
         container_tool = ft.Container()
+        dd_tool = None # Variable global para el sub-combo
 
         def on_tool_change(e):
             nonlocal herramienta_actual
-            herramienta_actual = dd_tool.value
-            for k, p in panels.items(): 
-                p.visible = (k == herramienta_actual)
-            
-            panel_stl_transform.visible = herramienta_actual.startswith("stl")
-            generate_param_code()
-            page.update()
+            if dd_tool and dd_tool.value:
+                herramienta_actual = dd_tool.value
+                for k, p in panels.items(): 
+                    p.visible = (k == herramienta_actual)
+                
+                panel_stl_transform.visible = herramienta_actual.startswith("stl")
+                generate_param_code()
+                page.update()
 
-        def on_cat_change(e):
+        def on_cat_click(cat_name):
             nonlocal dd_tool
-            cat = dd_cat.value
+            # 1. Pintamos colores del carrusel para el feedback visual
+            for btn in cat_carousel.controls:
+                btn.bgcolor = "#00E676" if btn.data == cat_name else "#161B22"
+                btn.color = "black" if btn.data == cat_name else "white"
             
-            # TRUCO MAESTRO: Destruimos el Dropdown y lo volvemos a crear en memoria. 
-            # Esto evita el bug de la interfaz gráfica antigua de Termux donde no se actualizaban las opciones.
+            # 2. Re-creamos el Dropdown limpio, sin el parametro on_change dentro del init.
             dd_tool = ft.Dropdown(
-                options=[ft.dropdown.Option(key=k, text=v) for k, v in categorias[cat]],
-                value=categorias[cat][0][0],
+                options=[ft.dropdown.Option(key=k, text=v) for k, v in categorias[cat_name]],
+                value=categorias[cat_name][0][0],
                 width=170,
-                bgcolor="#161B22",
-                on_change=on_tool_change
+                bgcolor="#161B22"
             )
+            # 3. Le asignamos la función de cambio DESPUÉS de crearlo (Esto salva el Crash).
+            dd_tool.on_change = on_tool_change
+            
+            # 4. Lo inyectamos en el contenedor visual
             container_tool.content = dd_tool
-            page.update()
+            
+            # 5. Forzamos actualización UI
+            cat_carousel.update()
+            container_tool.update()
             on_tool_change(None)
 
-        dd_cat.on_change = on_cat_change
+        # CARRUSEL CON POSITIONAL ARGUMENTS (Salva el error unexpected keyword text)
+        cat_carousel = ft.Row(
+            controls=[
+                ft.ElevatedButton(
+                    cat,  # El texto del botón SIEMPRE en primera posición, sin text=""
+                    data=cat, 
+                    on_click=lambda e, c=cat: on_cat_click(c),
+                    bgcolor="#00E676" if cat == "Ultimate STL Forge" else "#161B22",
+                    color="black" if cat == "Ultimate STL Forge" else "white"
+                ) for cat in categorias.keys()
+            ],
+            scroll="auto"
+        )
         
         botones_raw = ft.Row([
             ft.ElevatedButton("💾 GUARDAR", bgcolor="#0D47A1", color="white")
@@ -383,8 +397,10 @@ def main(page: ft.Page):
 
         editor_exp = ft.ExpansionTile(title=ft.Text("📝 CÓDIGO FUENTE RAW", color="#FFAB00", weight="bold"), controls=[botones_raw, txt_code], bgcolor="#0B0E14")
 
+        # Interfaz de Construcción
         view_constructor = ft.Column([
-            ft.Row([ft.Text("Cat:", color="#8B949E", size=11), dd_cat, ft.Text("Tool:", color="#8B949E", size=11), container_tool], wrap=True),
+            cat_carousel, 
+            ft.Row([ft.Text("⚙️ Tool:", color="#8B949E", size=12, weight="bold"), container_tool]),
             ft.Divider(color="#30363D"),
             panel_globales, panel_stl_transform, 
             ft.Column(list(panels.values())), 
@@ -415,7 +431,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # ECOSISTEMA FILES (¡FIX ROBUSTO DE ICONOS Y TEXTO!)
+        # ECOSISTEMA FILES (EMOJIS SEGUROS)
         # =========================================================
         list_nexus_db = ft.ListView(expand=True, spacing=10)
 
@@ -429,7 +445,6 @@ def main(page: ft.Page):
                     ext = f.lower().split('.')[-1]
                     p = os.path.join(EXPORT_DIR, f)
                     
-                    # FIX TOTAL: ft.TextButton con Emojis (sin keywords peligrosos)
                     list_nexus_db.controls.append(
                         ft.Container(content=ft.Row([
                             ft.Text("🧊" if ext=="stl" else "🧩", size=24),
@@ -448,10 +463,13 @@ def main(page: ft.Page):
             if ext == "stl":
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl"))
                 lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
-                dd_cat.value = "Ultimate STL Forge"
-                on_cat_change(None)
-                dd_tool.value = "stl"
-                on_tool_change(None)
+                
+                # Sincroniza visualmente y carga herramienta STL
+                on_cat_click("Ultimate STL Forge")
+                if dd_tool:
+                    dd_tool.value = "stl"
+                    on_tool_change(None)
+                
                 set_tab(0); status.value = "✓ STL Listo en Forge"
             elif ext == "jscad":
                 txt_code.value = open(filepath).read()
@@ -459,7 +477,7 @@ def main(page: ft.Page):
             page.update()
 
         view_archivos = ft.Column([
-            ft.ElevatedButton("🚀 INYECTAR ARCHIVO (WEB)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf'), height=60, style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))),
+            ft.ElevatedButton("🚀 INYECTAR ARCHIVO (WEB)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf'), height=60),
             ft.Row([
                 ft.Text("📁 NEXUS DB", color="white", weight="bold"), 
                 ft.ElevatedButton("🔄 ACTUALIZAR", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", color="#00E5FF")
@@ -483,8 +501,8 @@ def main(page: ft.Page):
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
         
-        # Inicialización segura
-        on_cat_change(None)
+        # Inicializamos en STL Forge de forma segura
+        on_cat_click("Ultimate STL Forge")
 
     except Exception:
         page.clean(); page.add(ft.Container(ft.Text("CRASH FATAL:\n" + traceback.format_exc(), color="red"), padding=50)); page.update()

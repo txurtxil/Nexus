@@ -1,5 +1,5 @@
 import flet as ft
-import os, base64, json, threading, http.server, socket, time, warnings, traceback, shutil, socketserver
+import os, base64, json, threading, http.server, socket, time, warnings, traceback, shutil
 from urllib.parse import urlparse, unquote
 
 try: import psutil; HAS_PSUTIL = True
@@ -37,25 +37,14 @@ LAN_IP = get_lan_ip()
 LATEST_CODE_B64 = ""
 
 # =========================================================
-# SERVIDOR WEB MULTI-HILO (FIX DEFINITIVO PROGRESSEVENT)
+# SERVIDOR WEB (CLON EXACTO DE LA 20.5 ESTABLE)
+# Ni un solo cambio respecto al código que me pasaste que funcionaba.
 # =========================================================
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-
-    def send_file_response(self, content_type, data_bytes):
-        try:
-            self.send_response(200)
-            self.send_header("Content-type", content_type)
-            self.send_header("Content-Length", str(len(data_bytes)))
-            self._send_cors()
-            self.end_headers()
-            self.wfile.write(data_bytes)
-        except Exception as e:
-            print(f"Error serving HTTP: {e}")
+        self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
 
     def do_OPTIONS(self):
         self.send_response(200); self._send_cors(); self.end_headers()
@@ -68,7 +57,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     with open(os.path.join(EXPORT_DIR, fn), 'wb') as f:
                         f.write(self.rfile.read(cl))
-                    self.send_file_response("text/plain", b'ok'); return
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok'); return
                 except Exception as e: print(f"Error: {e}")
             self.send_response(500); self._send_cors(); self.end_headers()
 
@@ -77,21 +66,18 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         
         if parsed.path == '/api/get_code_b64.json':
+            self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
             stl_path = os.path.join(EXPORT_DIR, "imported.stl")
             stl_hash = str(os.path.getmtime(stl_path)) if os.path.exists(stl_path) else "0"
-            data = json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": stl_hash}).encode('utf-8')
-            self.send_file_response("application/json", data)
+            self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": stl_hash}).encode())
             LATEST_CODE_B64 = "" 
 
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
-            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+            if os.path.exists(filepath):
                 with open(filepath, "rb") as f:
-                    self.send_file_response("application/octet-stream", f.read())
-            else: 
-                # FIX: STL Fantasma si el archivo no existe o pesa 0
-                dummy = b"solid dummy\nfacet normal 0 0 0\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid dummy\n"
-                self.send_file_response("application/octet-stream", dummy)
+                    self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+            else: self.send_response(404); self._send_cors(); self.end_headers()
 
         elif parsed.path == '/upload_ui':
             html = """<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta charset="UTF-8"></head>
@@ -107,50 +93,36 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 fetch('/api/upload', {method:'POST', headers:{'File-Name':encodeURIComponent(f.name)}, body:f})
                 .then(r => { if(r.ok){ document.getElementById('s').style.color='#00E676'; document.getElementById('s').innerText='✓ ¡ÉXITO! Vuelve a la App y pulsa REFRESCAR.'; } else { throw 'Error'; } })
                 .catch(e => { document.getElementById('s').style.color='red'; document.getElementById('s').innerText='❌ Error de red'; });}</script></body></html>"""
-            self.send_file_response("text/html", html.encode('utf-8'))
+            self.send_response(200); self.send_header("Content-type", "text/html"); self._send_cors(); self.end_headers(); self.wfile.write(html.encode('utf-8'))
             
         elif parsed.path.startswith('/descargar/'):
             filename = unquote(parsed.path.replace('/descargar/', ''))
             filepath = os.path.join(EXPORT_DIR, filename)
             if os.path.exists(filepath):
-                with open(filepath, "rb") as f: data = f.read()
-                try:
-                    self.send_response(200)
-                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-                    self.send_header("Content-Length", str(len(data)))
-                    self._send_cors()
-                    self.end_headers()
-                    self.wfile.write(data)
-                except: pass
+                with open(filepath, "rb") as f:
+                    self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
         else:
             try:
                 fn = self.path.strip("/") or "openscad_engine.html"
-                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
-                    data = f.read()
-                    self.send_file_response("text/html" if fn.endswith(".html") else "application/javascript", data)
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f: self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             except: self.send_response(404); self._send_cors(); self.end_headers()
-            
     def log_message(self, *args): pass
 
-# INYECCIÓN DEL MOTOR MULTI-HILO REAL PARA EVITAR CUELLOS DE BOTELLA
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    daemon_threads = True
-
-threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
+threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
-# LÓGICA DE LA APLICACIÓN FLET
+# LÓGICA DE LA APLICACIÓN FLET (CARRUSEL Y HÍBRIDO INYECTADO)
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v26.6 PRO"
+        page.title = "NEXUS CAD v26.7 PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v26.6 PRO | Servidor Multi-Hilo Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v26.7 PRO | Kernel 20.5 Activo", color="#00E676", weight="bold")
         T_INICIAL = "function main() {\n  return CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n}"
         txt_code = ft.TextField(multiline=True, min_lines=10, max_lines=20, value=T_INICIAL, bgcolor="#0B0E14", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -344,7 +316,7 @@ def main(page: ft.Page):
             page.update()
 
         # =========================================================
-        # INTERFAZ DE CARRUSEL
+        # INTERFAZ DE CARRUSEL Y HERRAMIENTAS
         # =========================================================
         categorias = {
             "Ultimate STL Forge": [

@@ -7,7 +7,7 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 import urllib.request
 
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -68,7 +68,7 @@ def get_lan_ip():
     except: return "127.0.0.1"
 
 # =========================================================
-# SERVIDOR LOCAL WEBGL (INTACTO v20.7)
+# SERVIDOR LOCAL WEBGL (CON ENDPOINTS FUSIONADOS)
 # =========================================================
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -86,6 +86,14 @@ def get_stl_hash():
     return ""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
+    def _send_cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
+
+    def do_OPTIONS(self):
+        self.send_response(200); self._send_cors(); self.end_headers()
+
     def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path == '/api/save_export':
@@ -96,52 +104,79 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     data = json.loads(post_data.decode('utf-8'))
                     filepath = os.path.join(EXPORT_DIR, data['filename'])
                     with open(filepath, 'w') as f: f.write(data['data'])
-                    self.send_response(200)
-                    self.send_header("Content-type", "application/json")
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                    self.end_headers()
+                    self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
                     self.wfile.write(b'{"status": "ok"}')
                     return
                 except Exception: pass
-            self.send_response(500)
-            self.end_headers()
+            self.send_response(500); self._send_cors(); self.end_headers()
+            
+        elif parsed.path == '/api/upload':
+            cl = int(self.headers.get('Content-Length', 0))
+            fn = unquote(self.headers.get('File-Name', 'uploaded_file.stl'))
+            if cl > 0:
+                try:
+                    with open(os.path.join(EXPORT_DIR, fn), 'wb') as f:
+                        f.write(self.rfile.read(cl))
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok'); return
+                except Exception as e: print(f"Error: {e}")
+            self.send_response(500); self._send_cors(); self.end_headers()
 
     def do_GET(self):
         global LATEST_CODE_B64
         parsed = urlparse(self.path)
         
         if parsed.path == '/api/get_code_b64.json':
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
+            self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
             payload = json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": get_stl_hash()})
             self.wfile.write(payload.encode())
             LATEST_CODE_B64 = "" 
+
+        elif parsed.path == '/imported.stl':
+            filepath = os.path.join(EXPORT_DIR, "imported.stl")
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as f:
+                    self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+            else: self.send_response(404); self._send_cors(); self.end_headers()
+
+        elif parsed.path == '/upload_ui':
+            html = """<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta charset="UTF-8"></head>
+            <body style="background:#0B0E14; color:#E6EDF3; font-family:sans-serif; text-align:center; padding:20px;">
+                <h2 style="color:#00E676;">🚀 INYECCIÓN WEB NEXUS</h2>
+                <div style="background:#161B22; padding:20px; border-radius:8px; border:1px solid #30363D; display:inline-block; width:90%; max-width:400px;">
+                    <input type="file" id="f" style="margin-bottom:20px; color:white; width:100%;">
+                    <button onclick="up()" style="background:#00E5FF; color:black; padding:15px; width:100%; font-weight:bold; border:none; border-radius:8px; cursor:pointer;">INYECTAR ARCHIVO</button>
+                    <p id="s" style="margin-top:20px; font-weight:bold;"></p>
+                </div>
+                <script>function up(){var f=document.getElementById('f').files[0]; if(!f)return;
+                document.getElementById('s').style.color='#FFAB00'; document.getElementById('s').innerText='Inyectando...';
+                fetch('/api/upload', {method:'POST', headers:{'File-Name':encodeURIComponent(f.name)}, body:f})
+                .then(r => { if(r.ok){ document.getElementById('s').style.color='#00E676'; document.getElementById('s').innerText='✓ ¡ÉXITO! Vuelve a la App y pulsa REFRESCAR.'; } else { throw 'Error'; } })
+                .catch(e => { document.getElementById('s').style.color='red'; document.getElementById('s').innerText='❌ Error de red'; });}</script></body></html>"""
+            self.send_response(200); self.send_header("Content-type", "text/html"); self._send_cors(); self.end_headers(); self.wfile.write(html.encode('utf-8'))
             
-        elif parsed.path.startswith('/exports/'):
-            filename = parsed.path.replace('/exports/', '')
+        elif parsed.path.startswith('/descargar/'):
+            filename = unquote(parsed.path.replace('/descargar/', ''))
             filepath = os.path.join(EXPORT_DIR, filename)
             if os.path.exists(filepath):
                 with open(filepath, "rb") as f:
-                    self.send_response(200)
-                    self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-                    self.end_headers()
-                    self.wfile.write(f.read())
-            else:
-                self.send_response(404)
-                self.end_headers()
+                    self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+            else: self.send_response(404); self._send_cors(); self.end_headers()
+            
+        elif parsed.path.startswith('/exports/'):
+            filename = unquote(parsed.path.replace('/exports/', ''))
+            filepath = os.path.join(EXPORT_DIR, filename)
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as f:
+                    self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+            else: self.send_response(404); self._send_cors(); self.end_headers()
+            
         else:
             try:
-                filename = self.path.strip("/")
-                if not filename: filename = "openscad_engine.html"
-                with open(os.path.join(ASSETS_DIR, filename), "rb") as f:
-                    self.send_response(200)
-                    self.end_headers()
-                    self.wfile.write(f.read())
-            except:
-                self.send_response(404)
-                self.end_headers()
+                fn = self.path.strip("/") or "openscad_engine.html"
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+            except: self.send_response(404); self._send_cors(); self.end_headers()
+            
     def log_message(self, *args): pass
 
 threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
@@ -151,12 +186,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.8 TITAN"
+        page.title = "NEXUS CAD v20.9 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.8 TITAN | Explorador Nativo + Híbrido", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.9 TITAN | Fusión de Exploradores Activa", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -275,7 +310,7 @@ def main(page: ft.Page):
 
         panel_stl_transform = ft.Container(content=ft.Column([
             ft.Row([ft.Text("🔄 TRANSFORMACIÓN BASE STL", color="#00E676", weight="bold"), lbl_stl_status]),
-            ft.ElevatedButton("📂 BUSCAR STL EN ANDROID", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf')),
+            ft.ElevatedButton("📂 IR A FILES PARA CARGAR UN STL", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black", width=float('inf')),
             inst("El Motor Híbrido soldará automáticamente piezas multi-body."),
             r_stl_sc, r_stl_x, r_stl_y, r_stl_z
         ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676"), visible=False)
@@ -325,7 +360,7 @@ def main(page: ft.Page):
 
 
         # =========================================================
-        # HERRAMIENTAS Y PANELES (INTACTOS V20.7)
+        # HERRAMIENTAS Y PANELES BÁSICOS
         # =========================================================
         tf_texto = ft.TextField(label="Escribe Texto", value="NEXUS", max_length=15, bgcolor="#161B22")
         dd_txt_estilo = ft.Dropdown(options=[ft.dropdown.Option("Voxel Fino"), ft.dropdown.Option("Voxel Grueso"), ft.dropdown.Option("Braille")], value="Voxel Grueso", expand=True, bgcolor="#161B22")
@@ -959,16 +994,11 @@ def main(page: ft.Page):
 
         cat_especial = ft.Row([thumbnail("🧠", "Código Libre", "custom", "#000000"), thumbnail("🔠", "Placas Texto", "texto", "#880E4F"), thumbnail("🥽", "Pedestal VR", "vr_pedestal", "#B388FF")], scroll="auto")
         cat_stl_forge = ft.Row([
-            thumbnail("🧊", "Híbrido Base", "stl", "#00C853"),
-            thumbnail("📏", "Flatten", "stl_flatten", "#00C853"),
-            thumbnail("✂️", "Split XYZ", "stl_split", "#00C853"),
-            thumbnail("📦", "Crop Box", "stl_crop", "#00C853"),
-            thumbnail("🕳️", "Taladro 3D", "stl_drill", "#00C853"),
-            thumbnail("🔩", "Orejetas", "stl_mount", "#00C853"),
-            thumbnail("🖱️", "Mouse Ears", "stl_ears", "#00C853"),
-            thumbnail("🧱", "Bloque Ref", "stl_patch", "#00C853"),
-            thumbnail("🐝", "Honeycomb", "stl_honeycomb", "#00C853"),
-            thumbnail("🛡️", "Prop Guard", "stl_propguard", "#00C853")
+            thumbnail("🧊", "Híbrido Base", "stl", "#00C853"), thumbnail("📏", "Flatten", "stl_flatten", "#00C853"),
+            thumbnail("✂️", "Split XYZ", "stl_split", "#00C853"), thumbnail("📦", "Crop Box", "stl_crop", "#00C853"),
+            thumbnail("🕳️", "Taladro 3D", "stl_drill", "#00C853"), thumbnail("🔩", "Orejetas", "stl_mount", "#00C853"),
+            thumbnail("🖱️", "Mouse Ears", "stl_ears", "#00C853"), thumbnail("🧱", "Bloque Ref", "stl_patch", "#00C853"),
+            thumbnail("🐝", "Honeycomb", "stl_honeycomb", "#00C853"), thumbnail("🛡️", "Prop Guard", "stl_propguard", "#00C853")
         ], scroll="auto")
         cat_accesorios = ft.Row([thumbnail("📱", "Stand Móvil", "stand_movil", "#00C853"), thumbnail("🔌", "Clip Cables", "clip_cable", "#00C853")], scroll="auto")
         cat_produccion = ft.Row([thumbnail("🔪", "Perfil Láser", "laser", "#D50000"), thumbnail("🔲", "Matriz Grid", "array_lin", "#0091EA"), thumbnail("🎡", "Matriz Polar", "array_pol", "#00B0FF")], scroll="auto")
@@ -1067,35 +1097,58 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # PESTAÑA FILES: EXPLORADOR ANDROID NATIVO (MODO EMOJI SEGURO)
+        # PESTAÑA FILES: FUSIÓN DE INYECCIÓN WEB Y EXPLORADOR NATIVO
         # =========================================================
+        # 1. BLOQUE DE INYECCIÓN WEB (NEXUS DB)
+        list_nexus_db = ft.ListView(height=130, spacing=5)
+
+        def refresh_nexus_db():
+            list_nexus_db.controls.clear()
+            try:
+                files = [f for f in os.listdir(EXPORT_DIR) if not f.startswith('.') and f != "imported.stl"]
+                if not files:
+                    list_nexus_db.controls.append(ft.Text("Vacío. Inyecta un archivo vía Web.", color="#8B949E", italic=True))
+                for f in files:
+                    ext = f.lower().split('.')[-1]
+                    p = os.path.join(EXPORT_DIR, f)
+                    list_nexus_db.controls.append(
+                        ft.Container(content=ft.Row([
+                            ft.Text("🧊" if ext=="stl" else "🧩", size=20),
+                            ft.Text(f, color="white", weight="bold", expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
+                            ft.TextButton("▶️", on_click=lambda e, fp=p: load_file(fp), tooltip="Cargar al Forge"),
+                            ft.TextButton("⬇️", on_click=lambda e, fn=f: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/descargar/{fn}"), tooltip="Bajar"),
+                            ft.TextButton("🗑️", on_click=lambda e, fp=p: [os.remove(fp), refresh_nexus_db()], tooltip="Borrar")
+                        ]), bgcolor="#21262D", padding=5, border_radius=5)
+                    )
+            except Exception as e: list_nexus_db.controls.append(ft.Text(f"Error DB: {e}"))
+            page.update()
+
+        def load_file(filepath):
+            fn = os.path.basename(filepath); ext = fn.lower().split('.')[-1]
+            if ext == "stl":
+                shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl"))
+                lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
+                select_tool("stl")
+                set_tab(1)
+                update_code_wrapper()
+                status.value = "✓ STL Listo en Forge"
+            elif ext == "jscad":
+                txt_code.value = open(filepath).read()
+                set_tab(0); status.value = "✓ Código Cargado"
+            page.update()
+
+        # 2. BLOQUE DEL EXPLORADOR NATIVO ANDROID
         current_android_dir = ANDROID_ROOT
         tf_path = ft.TextField(value=current_android_dir, expand=True, bgcolor="#161B22", height=40, text_size=12)
         list_android = ft.ListView(expand=True, spacing=5)
 
         def file_action(filepath):
             ext = filepath.lower().split('.')[-1] if '.' in filepath else ''
-            if ext == "stl":
-                dest = os.path.join(EXPORT_DIR, "imported.stl")
-                try:
-                    shutil.copy(filepath, dest)
-                    lbl_stl_status.value = f"✓ STL Android: {os.path.basename(filepath)}"
-                    lbl_stl_status.color = "#00E676"
-                    select_tool("stl")
-                    set_tab(1)
-                    update_code_wrapper()
-                except Exception as e:
-                    status.value = f"❌ Error leyendo STL: {e}"; status.color = "red"
-            elif ext == "jscad":
-                try:
-                    txt_code.value = open(filepath).read()
-                    set_tab(0)
-                    status.value = f"✓ Código {os.path.basename(filepath)} cargado."; status.color = "#00E676"
-                except Exception as e:
-                    status.value = f"❌ Error leyendo JSCAD: {e}"; status.color = "red"
+            if ext in ["stl", "jscad"]:
+                load_file(filepath)
             else:
-                status.value = f"⚠️ Formato .{ext} no soportado para importación directa."; status.color = "#FFAB00"
-            page.update()
+                status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"
+                page.update()
 
         def refresh_explorer(path):
             list_android.controls.clear()
@@ -1106,37 +1159,28 @@ def main(page: ft.Page):
                 dirs.sort(); files.sort()
                 
                 if path != "/" and path != "/storage" and path != "/storage/emulated":
-                    list_android.controls.append(
-                        ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path)))
-                    )
+                    list_android.controls.append(ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path))))
                     
                 for d in dirs:
                     if d.startswith('.'): continue
-                    list_android.controls.append(
-                        ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p))
-                    )
+                    list_android.controls.append(ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p)))
                     
                 for f in files:
                     ext = f.lower().split('.')[-1] if '.' in f else ''
                     icon = "📄"; color = "#8B949E"
                     if ext == "stl": icon = "🧊"; color = "#00E676"
                     elif ext == "jscad": icon = "🧩"; color = "#00E5FF"
-                    
-                    list_android.controls.append(
-                        ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{os.path.getsize(os.path.join(path, f)) // 1024} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p))
-                    )
+                    list_android.controls.append(ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{os.path.getsize(os.path.join(path, f)) // 1024} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p)))
             except PermissionError:
-                list_android.controls.append(ft.Text("❌ Permiso Denegado por Android. Ve a Termux y escribe 'termux-setup-storage' y dale permisos.", color="red", weight="bold"))
-            except Exception as ex:
-                list_android.controls.append(ft.Text(f"Error accediendo a carpeta: {ex}", color="red"))
+                list_android.controls.append(ft.Text("❌ Permiso Denegado. Termux: 'termux-setup-storage'.", color="red", weight="bold"))
+            except Exception as ex: list_android.controls.append(ft.Text(f"Error: {ex}", color="red"))
                 
             tf_path.value = path
             page.update()
 
         def nav_to(path):
             nonlocal current_android_dir
-            current_android_dir = path
-            refresh_explorer(path)
+            current_android_dir = path; refresh_explorer(path)
 
         def save_to_android(e):
             if not os.path.isdir(current_android_dir): return
@@ -1146,8 +1190,7 @@ def main(page: ft.Page):
                 with open(dest, "w") as f: f.write(txt_code.value)
                 status.value = f"✓ Guardado en Android: {fname}"; status.color = "#00E676"
                 refresh_explorer(current_android_dir)
-            except Exception as ex:
-                status.value = f"❌ Error guardando: {ex}"; status.color = "red"
+            except Exception as ex: status.value = f"❌ Error guardando: {ex}"; status.color = "red"
             page.update()
 
         def save_project_to_nexus():
@@ -1161,13 +1204,25 @@ def main(page: ft.Page):
             ft.ElevatedButton("📁 Nexus DB", on_click=lambda _: nav_to(EXPORT_DIR), bgcolor="#1B5E20", color="white")
         ], scroll="auto")
 
+        # FUSIÓN DEFINITIVA DE FILES
         view_archivos = ft.Column([
-            ft.Text("Explorador de Dispositivo (Android Native)", color="#00E5FF", weight="bold"),
-            ft.Text("Navega por tu móvil. Toca un .stl para el Híbrido, o .jscad para Editar.", size=10, color="#8B949E"),
-            row_quick_paths,
-            ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]),
-            ft.ElevatedButton("💾 GUARDAR CÓDIGO EN ESTA CARPETA", on_click=save_to_android, bgcolor="#00E676", color="black", width=float('inf')),
-            ft.Container(content=list_android, expand=True, bgcolor="#161B22", border_radius=8, padding=5)
+            ft.Container(content=ft.Column([
+                ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
+                ft.ElevatedButton("🚀 INYECTAR ARCHIVO (VÍA NAVEGADOR PC)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf')),
+                ft.Row([ft.Text("Archivos listos en memoria:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", color="#00E5FF", width=50)], alignment="spaceBetween"),
+                ft.Container(content=list_nexus_db, height=130, bgcolor="#0B0E14", border_radius=5, padding=5)
+            ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
+            
+            ft.Container(height=5),
+            
+            ft.Container(content=ft.Column([
+                ft.Text("📱 EXPLORADOR NATIVO ANDROID", color="#00E5FF", weight="bold"),
+                ft.Text("Toca un .stl (Carga al Forge) o .jscad (Editar):", size=10, color="#8B949E"),
+                row_quick_paths,
+                ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]),
+                ft.ElevatedButton("💾 GUARDAR CÓDIGO AQUÍ", on_click=save_to_android, bgcolor="#0D47A1", color="white", width=float('inf')),
+                ft.Container(content=list_android, expand=True, bgcolor="#0B0E14", border_radius=5, padding=5)
+            ], expand=True), bgcolor="#161B22", padding=10, border_radius=8, expand=True)
         ], expand=True)
 
         main_container = ft.Container(content=view_editor, expand=True)
@@ -1176,7 +1231,9 @@ def main(page: ft.Page):
             if idx == 2:
                 global LATEST_CODE_B64
                 LATEST_CODE_B64 = base64.b64encode(prepare_js_payload().encode('utf-8')).decode()
-            if idx == 3: refresh_explorer(current_android_dir)
+            if idx == 3:
+                refresh_nexus_db()
+                refresh_explorer(current_android_dir)
             main_container.content = [view_editor, view_constructor, view_visor, view_archivos][idx]
             page.update()
 

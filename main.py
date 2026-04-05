@@ -336,7 +336,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path == '/api/save_model':
-            # INTERCEPTOR NATIVO DE EXPORTACIÓN (Recibe archivos STL/OBJ desde el visor)
+            # INTERCEPTOR NATIVO DE EXPORTACIÓN BLOB -> BYTES
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
                 try:
@@ -345,12 +345,12 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     b64_data = data.get('data', '').split(',')[1]
                     file_bytes = base64.b64decode(b64_data)
                     
-                    # Guardar directo en Descargas de Android
+                    # 1. Guardar en Descargas Android (Bypass de Webview)
                     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
                     with open(os.path.join(DOWNLOAD_DIR, filename), 'wb') as f:
                         f.write(file_bytes)
                         
-                    # Guardar copia de seguridad en Nexus DB
+                    # 2. Guardar en Nexus DB interna
                     with open(os.path.join(EXPORT_DIR, filename), 'wb') as f:
                         f.write(file_bytes)
                         
@@ -435,7 +435,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 fn = "openscad_engine.html"
                 with open(os.path.join(ASSETS_DIR, fn), "r", encoding="utf-8") as f: content = f.read()
                 
-                # INYECTOR SEGURO PARA EL MOTOR: Intercepta importaciones y bloquea la descarga por defecto en Android WebView enviándolo a Python nativo.
+                # INYECTOR SEGURO PARA EL MOTOR: Intercepta importaciones Y secuestra Blobs de exportación (BLOB MAP HACK).
                 injector = '''<script>
                 var _origFetch = window.fetch;
                 window.fetch = function() {
@@ -449,34 +449,42 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     if(url && typeof url === "string" && url.includes("imported.stl")) { arguments[1] = "/imported.stl?t=" + Date.now(); }
                     return _origXHR.apply(this, arguments);
                 };
-                window.addEventListener('load', function() {
-                    var _origClick = window.HTMLAnchorElement.prototype.click;
-                    window.HTMLAnchorElement.prototype.click = function() {
-                        if(this.download && this.href) {
-                            var filename = this.download;
-                            var url = this.href;
-                            fetch(url).then(r => r.blob()).then(blob => {
-                                var reader = new FileReader();
-                                reader.onload = function() {
-                                    fetch('/api/save_model', {
-                                        method: 'POST',
-                                        headers: {'Content-Type': 'application/json'},
-                                        body: JSON.stringify({filename: filename, data: reader.result})
-                                    }).then(r => {
-                                        var t = document.createElement('div');
-                                        t.innerText = '✅ ' + filename + ' guardado en Descargas de Android';
-                                        t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00E676;color:black;padding:15px;border-radius:8px;font-weight:bold;z-index:999999;box-shadow:0 4px 10px rgba(0,0,0,0.5);font-family:sans-serif;';
-                                        document.body.appendChild(t);
-                                        setTimeout(function(){t.remove();}, 4000);
-                                    });
-                                };
-                                reader.readAsDataURL(blob);
-                            });
-                            return; // PREVIENE EL BLOQUEO DE ANDROID WEBVIEW
+                
+                // Hack para robar Blobs de exportación antes de que WebView los bloquee
+                var nexus_blob_map = {};
+                var _origCreateObj = URL.createObjectURL;
+                URL.createObjectURL = function(obj) {
+                    var url = _origCreateObj(obj);
+                    if(obj instanceof Blob) { nexus_blob_map[url] = obj; }
+                    return url;
+                };
+
+                document.addEventListener('click', function(e) {
+                    var target = e.target.closest('a');
+                    if(target && target.download && target.href && target.href.includes('blob:')) {
+                        var blob = nexus_blob_map[target.href];
+                        if(blob) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var filename = target.download;
+                            var reader = new FileReader();
+                            reader.onload = function() {
+                                fetch('/api/save_model', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({filename: filename, data: reader.result})
+                                }).then(function(){
+                                    var t = document.createElement('div');
+                                    t.innerText = '✅ ' + filename + ' guardado en Descargas de Android';
+                                    t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00E676;color:black;padding:15px;border-radius:8px;font-weight:bold;z-index:999999;box-shadow:0 4px 10px rgba(0,0,0,0.5);font-family:sans-serif;';
+                                    document.body.appendChild(t);
+                                    setTimeout(function(){t.remove();}, 4000);
+                                });
+                            };
+                            reader.readAsDataURL(blob);
                         }
-                        _origClick.apply(this, arguments);
-                    };
-                });
+                    }
+                }, true);
                 </script>'''
                 
                 if "<head>" in content: content = content.replace("<head>", "<head>" + injector)
@@ -506,12 +514,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.40 NEXUS APEX"
+        page.title = "NEXUS CAD v20.50 OMEGA"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.40 | Ensamble Blindado & Exportación Web Nativa", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.50 OMEGA | Blobs Hackeados & Ensamble Aislado", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -1106,56 +1114,48 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # TAB 3: ENSAMBLADOR VISUAL PBR (SEGURO FLET FIX - FINAL)
+        # TAB 3: ENSAMBLADOR VISUAL PBR (MODULAR AISLADO OMEGA)
         # =========================================================
         def update_pbr_state():
             global PBR_STATE, ASSEMBLY_PARTS
             PBR_STATE["mode"] = "assembly"
             PBR_STATE["parts"] = ASSEMBLY_PARTS
             
-        def render_assembly_ui():
-            global ASSEMBLY_PARTS
-            col_assembly.controls.clear()
+        def create_part_card(part):
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
+            if part["file"] not in files and files: part["file"] = files[0]
             
-            if not files:
-                col_assembly.controls.append(ft.Text("⚠️ DB de STLs vacía.\nVe a la pestaña FILES y sube o guarda STLs primero.", color="#FFAB00", weight="bold"))
-                page.update()
-                return
+            opts_file = [ft.dropdown.Option(f) for f in files]
+            opts_mat = [ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")]
             
-            # EL GRAN FIX FLET: Generar listas Option *nuevas* y únicas para cada control
-            for i, part in enumerate(ASSEMBLY_PARTS):
-                if part["file"] not in files: part["file"] = files[0]
+            df = ft.Dropdown(options=opts_file, value=part.get("file", ""), width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
+            dm = ft.Dropdown(options=opts_mat, value=part.get("mat", "pla"), width=100, text_size=12, bgcolor="#0B0E14")
+            
+            card = ft.Container(bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"))
+            
+            def handle_file(e): part["file"] = e.control.value; update_pbr_state()
+            def handle_mat(e): part["mat"] = e.control.value; update_pbr_state()
+            df.on_change = handle_file
+            dm.on_change = handle_mat
+            
+            def sl(k, l):
+                s = ft.Slider(min=-200, max=200, value=part.get(k, 0), expand=True)
+                def handle_sl(e): part[k] = e.control.value; update_pbr_state()
+                s.on_change = handle_sl
+                return ft.Row([ft.Text(l, size=10, color="#8B949E", width=15), s])
                 
-                # Instancias de Option totalmente nuevas por cada Dropdown
-                opts_file = [ft.dropdown.Option(f) for f in files]
-                opts_mat = [ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")]
+            def handle_delete(e):
+                if part in ASSEMBLY_PARTS: ASSEMBLY_PARTS.remove(part)
+                if card in col_assembly.controls: col_assembly.controls.remove(card)
+                update_pbr_state()
+                if not ASSEMBLY_PARTS: render_assembly_ui()
+                else: page.update()
                 
-                def create_change_handler(p, key):
-                    def handler(e): p[key] = e.control.value; update_pbr_state()
-                    return handler
-
-                def create_delete_handler(p):
-                    def handler(e): ASSEMBLY_PARTS.remove(p); render_assembly_ui(); update_pbr_state()
-                    return handler
-                    
-                df = ft.Dropdown(options=opts_file, value=part["file"], width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
-                dm = ft.Dropdown(options=opts_mat, value=part.get("mat", "pla"), width=100, text_size=12, bgcolor="#0B0E14")
-                
-                df.on_change = create_change_handler(part, "file")
-                dm.on_change = create_change_handler(part, "mat")
-                
-                def sl(k, l, p=part):
-                    s = ft.Slider(min=-200, max=200, value=p.get(k, 0), expand=True)
-                    s.on_change = create_change_handler(p, k)
-                    return ft.Row([ft.Text(l, size=10, color="#8B949E", width=15), s])
-                
-                card = ft.Container(content=ft.Column([
-                    ft.Row([df, dm, ft.IconButton(ft.icons.DELETE, icon_color="red", on_click=create_delete_handler(part))], alignment="spaceBetween"),
-                    sl("x","X"), sl("y","Y"), sl("z","Z")
-                ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"))
-                col_assembly.controls.append(card)
-            page.update()
+            card.content = ft.Column([
+                ft.Row([df, dm, ft.IconButton(ft.icons.DELETE, icon_color="red", on_click=handle_delete)], alignment="spaceBetween"),
+                sl("x","X"), sl("y","Y"), sl("z","Z")
+            ])
+            return card
 
         def add_assembly_part(e):
             global ASSEMBLY_PARTS
@@ -1165,11 +1165,27 @@ def main(page: ft.Page):
                 status.color = "#FF5252"
                 page.update()
                 return
-            ASSEMBLY_PARTS.append({"file": files[0], "mat": "pla", "x": 0, "y": 0, "z": 0})
-            render_assembly_ui()
+            
+            if len(col_assembly.controls) == 1 and isinstance(col_assembly.controls[0], ft.Text):
+                col_assembly.controls.clear()
+                
+            new_part = {"file": files[0], "mat": "pla", "x": 0, "y": 0, "z": 0}
+            ASSEMBLY_PARTS.append(new_part)
+            col_assembly.controls.append(create_part_card(new_part))
             update_pbr_state()
+            page.update()
 
         col_assembly = ft.Column(scroll="auto", expand=True)
+        
+        def render_assembly_ui():
+            col_assembly.controls.clear()
+            files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
+            if not files:
+                col_assembly.controls.append(ft.Text("⚠️ DB de STLs vacía.\nVe a la pestaña FILES y sube o guarda STLs primero.", color="#FFAB00", weight="bold"))
+            else:
+                for part in ASSEMBLY_PARTS:
+                    col_assembly.controls.append(create_part_card(part))
+
         view_ensamble = ft.Column([
             ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"),
             ft.Text("Une múltiples STLs de la DB. Se reflejará instantáneamente en la pestaña PBR.", color="#8B949E", size=11),

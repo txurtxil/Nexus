@@ -206,7 +206,6 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
                 controls.update();
             }, undefined, function(error) {
                 console.error(error);
-                alert("Error cargando PBR STL: ¿Está la pieza seleccionada en FILES?");
             });
         }
 
@@ -277,7 +276,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             dummy_stl = b'\x00' * 84
             data_to_send = dummy_stl
             
-            # Intentar leer el STL real
             if os.path.exists(filepath):
                 try:
                     sz = os.path.getsize(filepath)
@@ -287,7 +285,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 except Exception:
                     pass
             
-            # Enviar con TODOS los headers de binario y tamaño explícito para evitar fallos ProgressEvent en WebView
             self.send_response(200)
             self.send_header("Content-type", "application/octet-stream")
             self.send_header("Content-Length", str(len(data_to_send)))
@@ -313,9 +310,38 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
+        elif parsed.path == '/' or parsed.path == '/openscad_engine.html':
+            # =========================================================================
+            # PARCHE CRÍTICO v20.22 PARA EL WORKER EN WEBVIEW DE ANDROID
+            # =========================================================================
+            try:
+                fn = "openscad_engine.html"
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
+                    content = f.read().decode('utf-8')
+                
+                # Android WebViews tiran [object ProgressEvent] si un Worker creado 
+                # desde un Blob usa rutas relativas ('/imported.stl'). Interceptamos
+                # el código HTML al vuelo y forzamos la ruta absoluta del servidor.
+                host = self.headers.get('Host', f'127.0.0.1:{LOCAL_PORT}')
+                abs_url = f"http://{host}/imported.stl"
+                
+                content = content.replace("'/imported.stl", f"'{abs_url}")
+                content = content.replace('"/imported.stl', f'"{abs_url}')
+                
+                encoded_content = content.encode('utf-8')
+                self.send_response(200)
+                self.send_header("Content-type", "text/html")
+                self.send_header("Content-Length", str(len(encoded_content)))
+                self._send_cors()
+                self.end_headers()
+                self.wfile.write(encoded_content)
+                return
+            except Exception as e:
+                self.send_response(404); self._send_cors(); self.end_headers(); self.wfile.write(str(e).encode())
+
         else:
             try:
-                fn = self.path.strip("/") or "openscad_engine.html"
+                fn = self.path.strip("/")
                 with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
                     self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             except: self.send_response(404); self._send_cors(); self.end_headers()
@@ -329,12 +355,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.21 PBR TITAN"
+        page.title = "NEXUS CAD v20.22 PBR TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.21 TITAN | Network Patch Activo", color="#C51162", weight="bold")
+        status = ft.Text("NEXUS v20.22 TITAN | Worker Interceptor Activo", color="#C51162", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)

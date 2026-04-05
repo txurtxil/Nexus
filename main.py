@@ -142,7 +142,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
-            # PARCHE CRÍTICO PARA EL DATA_VIEW: STL de 84 bytes binario puro
             dummy_stl = b'\x00' * 84
             if os.path.exists(filepath):
                 try:
@@ -181,12 +180,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.18 TITAN"
+        page.title = "NEXUS CAD v20.19 TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.18 TITAN | DataView & Worker Matrix Fix", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.19 TITAN | Anti-Undefined Engine Activo", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -259,17 +258,16 @@ def main(page: ft.Page):
             
             header = f"  var GW = {sl_g_w.value}; var GL = {sl_g_l.value}; var GH = {sl_g_h.value}; var GT = {sl_g_t.value}; var G_TOL = {sl_g_tol.value}; var KINE_T = {sl_kine.value}; var MAT_C = {c_val};\n"
             
-            # POLIFILL EXTREMO: Resuelve el error de Matrix4x4 missing ('scaling' / 'translation' crash)
             polyfill = "  if(typeof CSG !== 'undefined' && typeof CSG.Matrix4x4 === 'undefined' && typeof Matrix4x4 !== 'undefined') { CSG.Matrix4x4 = Matrix4x4; }\n"
             
-            # UTILS ACTUALIZADO: Triplemente blindado contra errores en métodos del worker
+            # BLOQUE UTILS 100% INMUNE A UNDEFINED
             utils_block = """  var UTILS = {
-    trans: function(o, v) { try { return o.translate(v); } catch(e) { try { if(typeof translate !== 'undefined') return translate(v, o); } catch(e2) {} } return o; },
-    scale: function(o, v) { try { return o.scale(v); } catch(e) { try { if(typeof scale !== 'undefined') return scale(v, o); } catch(e2) {} } return o; },
-    rotZ: function(o, d) { try { return o.rotateZ(d); } catch(e) { try { if(typeof rotate !== 'undefined') return rotate([0,0,d], o); } catch(e2) { try { return o.rotate([0,0,0],[0,0,1],d); } catch(e3) { return o; } } } },
-    rotX: function(o, d) { try { return o.rotateX(d); } catch(e) { try { if(typeof rotate !== 'undefined') return rotate([d,0,0], o); } catch(e2) { try { return o.rotate([0,0,0],[1,0,0],d); } catch(e3) { return o; } } } },
-    rotY: function(o, d) { try { return o.rotateY(d); } catch(e) { try { if(typeof rotate !== 'undefined') return rotate([0,d,0], o); } catch(e2) { try { return o.rotate([0,0,0],[0,1,0],d); } catch(e3) { return o; } } } },
-    mat: function(o) { try { if(typeof o.setColor === 'function') return o.setColor(MAT_C); } catch(e) {} return o; }
+    trans: function(o, v) { if(!o) return o; var r; try { r = o.translate(v); } catch(e) { try { if(typeof translate !== 'undefined') r = translate(v, o); } catch(e2) {} } return r ? r : o; },
+    scale: function(o, v) { if(!o) return o; var r; try { r = o.scale(v); } catch(e) { try { if(typeof scale !== 'undefined') r = scale(v, o); } catch(e2) {} } return r ? r : o; },
+    rotZ: function(o, d) { if(!o) return o; var r; try { r = o.rotateZ(d); } catch(e) { try { if(typeof rotate !== 'undefined') r = rotate([0,0,d], o); else r = o.rotate([0,0,0],[0,0,1],d); } catch(e2) {} } return r ? r : o; },
+    rotX: function(o, d) { if(!o) return o; var r; try { r = o.rotateX(d); } catch(e) { try { if(typeof rotate !== 'undefined') r = rotate([d,0,0], o); else r = o.rotate([0,0,0],[1,0,0],d); } catch(e2) {} } return r ? r : o; },
+    rotY: function(o, d) { if(!o) return o; var r; try { r = o.rotateY(d); } catch(e) { try { if(typeof rotate !== 'undefined') r = rotate([0,d,0], o); else r = o.rotate([0,0,0],[0,1,0],d); } catch(e2) {} } return r ? r : o; },
+    mat: function(o) { if(!o) return CSG.cube({radius:[0.01,0.01,0.01]}); try { if(typeof o.setColor === 'function') return o.setColor(MAT_C); } catch(e) {} return o; }
   };
 """
             header += polyfill + utils_block
@@ -431,13 +429,13 @@ def main(page: ft.Page):
               try {{ p = CSG.fromPolygons(p.polygons); }} catch(e) {{}}
           }}
           if(p && typeof p.union === 'function') {{
-              if(dron === null) dron = p; else dron = dron.union(p);
+              if(!dron) dron = p; else dron = dron.union(p);
           }}
       }}
   }}
   if(!dron || typeof dron.union !== 'function') {{ return CSG.cube({{radius:[0.01, 0.01, 0.01]}}); }}
   dron = UTILS.scale(dron, [sc, sc, sc]);
-  try {{ dron = UTILS.trans(dron, [tx, ty, tz]); }} catch(e) {{}}
+  dron = UTILS.trans(dron, [tx, ty, tz]);
 """
 
         def generate_param_code():
@@ -491,7 +489,7 @@ def main(page: ft.Page):
                     hex_r = sl_stlh_r.value
                     code += f"  var dx = {hex_r}*1.732+2; var dy = {hex_r}*1.5+2; var holes = null;\n"
                     code += f"  for(var x = -100; x < 100; x += dx) {{ for(var y = -100; y < 100; y += dy) {{\n      var offset = (Math.abs(Math.round(y/dy)) % 2 === 1) ? dx/2 : 0;\n"
-                    code += f"      var hex = CSG.cylinder({{start:[x+offset, y, -500], end:[x+offset, y, 500], radius:{hex_r}, slices:6}});\n      if(holes === null) holes = hex; else holes = holes.union(hex);\n  }} }}\n  return UTILS.mat(dron.subtract(holes));\n}}"
+                    code += f"      var hex = CSG.cylinder({{start:[x+offset, y, -500], end:[x+offset, y, 500], radius:{hex_r}, slices:6}});\n      if(!holes) holes = hex; else holes = holes.union(hex);\n  }} }}\n  if(holes) return UTILS.mat(dron.subtract(holes));\n  return UTILS.mat(dron);\n}}"
                 elif h == "stl_propguard":
                     r = sl_stlpg_r.value; t = sl_stlpg_t.value; px = sl_stlpg_x.value; py = sl_stlpg_y.value
                     code += f"  var out = CSG.cylinder({{start:[{px},{py},0], end:[{px},{py},10], radius:{r+t}, slices:32}});\n  var inn = CSG.cylinder({{start:[{px},{py},-1], end:[{px},{py},11], radius:{r}, slices:32}});\n"
@@ -514,7 +512,7 @@ def main(page: ft.Page):
     for(var r=0; r<5; r++) {{ for(var c=0; c<5; c++) {{
         if ((cMat[r] >> (4 - c)) & 1) {{
            var vox = CSG.cube({{center:[offX+(c*vSize), (4-r)*vSize, {z_start}], radius:[vSize/{es_grueso}, vSize/{es_grueso}, {h_letra}/2]}});
-           if(pText === null) pText = vox; else pText = pText.union(vox);
+           if(!pText) pText = vox; else pText = pText.union(vox);
         }}
     }} }}
   }}
@@ -531,19 +529,19 @@ def main(page: ft.Page):
         var p = dots[d]; if (p === 0) continue;
         var cx = (p>3) ? stepX : 0; var cy = ((p-1)%3 === 0) ? stepY*2 : (((p-1)%3 === 1) ? stepY : 0);
         var domo = CSG.sphere({{center:[offX+cx, cy, {z_start}], radius:{rad_braille}, resolution:16}});
-        if(pText === null) pText = domo; else pText = pText.union(domo);
+        if(!pText) pText = domo; else pText = pText.union(domo);
     }}
   }}
   var totalL = Math.max(texto.length * charWidth, 10);
 """
-                code += "  if (pText === null) pText = CSG.cube({center:[0,0,0], radius:[0.01, 0.01, 0.01]});\n  var baseObj = null;\n"
+                code += "  if (!pText) pText = CSG.cube({center:[0,0,0], radius:[0.01, 0.01, 0.01]});\n  var baseObj = null;\n"
                 if base == "Llavero (Anilla)": code += "  var bc = CSG.cube({center:[(totalL/2)-3, 3, h/4], radius:[(totalL/2)+2, 8, h/4]});\n  var anclaje = CSG.cylinder({start:[totalL, 3, 0], end:[totalL, 3, h/2], radius:6, slices:32}).subtract(CSG.cylinder({start:[totalL, 3, -1], end:[totalL, 3, h/2+1], radius:3, slices:16}));\n  baseObj = bc.union(anclaje);\n"
                 elif base == "Placa Atornillable": code += "  var bc = CSG.cube({center:[totalL/2-3, 3, h/4], radius:[totalL/2+10, 10, h/4]});\n  var h1 = CSG.cylinder({start:[-8, 3, -1], end:[-8, 3, h], radius:2.5, slices:16});\n  var h2 = CSG.cylinder({start:[totalL+2, 3, -1], end:[totalL+2, 3, h], radius:2.5, slices:16});\n  baseObj = bc.subtract(h1).subtract(h2);\n"
                 elif base == "Soporte de Mesa": code += "  var bc = CSG.cube({center:[totalL/2-3, 3, h/4], radius:[totalL/2+2, 5, h/4]});\n  var pata = CSG.cube({center:[totalL/2-3, -5, h/8], radius:[totalL/2+2, 10, h/8]});\n  baseObj = bc.union(pata);\n"
                 elif base == "Colgante Militar": code += "  var b_cen = CSG.cube({center:[totalL/2-3, 4, h/4], radius:[totalL/2-1, 10, h/4]});\n  var b_izq = CSG.cylinder({start:[-4, 4, 0], end:[-4, 4, h/2], radius:10, slices:32});\n  var b_der = CSG.cylinder({start:[totalL-2, 4, 0], end:[totalL-2, 4, h/2], radius:10, slices:32});\n  var agujero = CSG.cylinder({start:[-8, 4, -1], end:[-8, 4, h], radius:2.5, slices:16});\n  baseObj = b_cen.union(b_izq).union(b_der).subtract(agujero);\n"
                 elif base == "Placa Ovalada": code += "  var c1 = CSG.cylinder({start:[-2, 4, 0], end:[-2, 4, h/2], radius:12, slices:64});\n  var c2 = CSG.cylinder({start:[totalL-4, 4, 0], end:[totalL-4, 4, h/2], radius:12, slices:64});\n  var p_med = CSG.cube({center:[totalL/2-3, 4, h/4], radius:[totalL/2-1, 12, h/4]});\n  baseObj = p_med.union(c1).union(c2);\n"
 
-                code += "  if(baseObj !== null) {\n"
+                code += "  if(baseObj) {\n"
                 if grabado: code += "      return UTILS.mat(baseObj.subtract(pText));\n  } else {\n      return UTILS.mat(pText);\n  }\n}"
                 else: code += "      return UTILS.mat(baseObj.union(pText));\n  } else {\n      return UTILS.mat(pText);\n  }\n}"
 
@@ -570,7 +568,7 @@ def main(page: ft.Page):
                 code += f"  for(var i=0; i<filas; i++) {{ for(var j=0; j<columnas; j++) {{\n"
                 code += f"      var px = start_x + (j * dx); var py = start_y + (i * dy);\n"
                 code += f"      var pieza = CSG.cylinder({{start:[px,py,0], end:[px,py,h], radius:5, slices:16}});\n"
-                code += f"      if(array_obj === null) array_obj = pieza; else array_obj = array_obj.union(pieza);\n"
+                code += f"      if(!array_obj) array_obj = pieza; else array_obj = array_obj.union(pieza);\n"
                 code += f"  }} }}\n  return UTILS.mat(array_obj || CSG.cube({{radius:[1,1,1]}}));\n}}"
 
             elif h == "array_pol":
@@ -578,9 +576,9 @@ def main(page: ft.Page):
                 code += f"  var array_obj = null;\n"
                 code += f"  for(var i=0; i<n; i++) {{\n      var a = (i * Math.PI * 2) / n; var px = Math.cos(a) * radio_corona; var py = Math.sin(a) * radio_corona;\n"
                 code += f"      var pieza = CSG.cylinder({{start:[px,py,0], end:[px,py,h], radius:r_pieza, slices:16}});\n"
-                code += f"      if(array_obj === null) array_obj = pieza; else array_obj = array_obj.union(pieza);\n  }}\n"
+                code += f"      if(!array_obj) array_obj = pieza; else array_obj = array_obj.union(pieza);\n  }}\n"
                 code += f"  var base = CSG.cylinder({{start:[0,0,0], end:[0,0,h/2], radius:radio_corona + r_pieza + 2, slices:32}});\n"
-                code += f"  if(array_obj !== null) base = base.subtract(array_obj);\n  return UTILS.mat(base);\n}}"
+                code += f"  if(array_obj) base = base.subtract(array_obj);\n  return UTILS.mat(base);\n}}"
 
             elif h == "loft":
                 code += f"  var side_base = {sl_loft_w.value}; var r_top = {sl_loft_r.value}; var h = {sl_loft_h.value}; var wall = {sl_loft_g.value};\n"
@@ -596,8 +594,9 @@ def main(page: ft.Page):
                 code += f"          var y_int = (Math.abs(sqy1)>0 ? sqy1-Math.sign(sqy1)*wall : 0)*(1-t) + Math.sin(a1)*(r_top-wall)*t;\n"
                 code += f"          var p_ext = CSG.cylinder({{start:[x_curr, y_curr, z], end:[x_curr, y_curr, z+dz+0.1], radius:wall/2, slices:8}});\n"
                 code += f"          var p_int = CSG.cylinder({{start:[x_int, y_int, z], end:[x_int, y_int, z+dz+0.1], radius:wall/4, slices:4}});\n"
-                code += f"          if(loft_obj === null) loft_obj = p_ext; else loft_obj = loft_obj.union(p_ext);\n"
-                code += f"          if(hueco === null) hueco = p_int; else hueco = hueco.union(p_int);\n      }}\n  }}\n"
+                code += f"          if(!loft_obj) loft_obj = p_ext; else loft_obj = loft_obj.union(p_ext);\n"
+                code += f"          if(!hueco) hueco = p_int; else hueco = hueco.union(p_int);\n      }}\n  }}\n"
+                code += f"  if(hueco) loft_obj = loft_obj.subtract(hueco);\n"
                 code += f"  return UTILS.mat(loft_obj || CSG.cube({{radius:[1,1,1]}}));\n}}"
 
             elif h == "panal":
@@ -609,8 +608,8 @@ def main(page: ft.Page):
                 code += f"      var offset = (Math.abs(Math.round(y/dy)) % 2 === 1) ? dx/2 : 0; var cx = x + offset;\n"
                 code += f"      if(cx < w/2 - r_hex && cx > -w/2 + r_hex) {{\n"
                 code += f"          var hex = CSG.cylinder({{start:[cx, y, -1], end:[cx, y, h+1], radius:r_hex, slices:6}});\n"
-                code += f"          if(holes === null) holes = hex; else holes = holes.union(hex);\n      }}\n  }} }}\n"
-                code += f"  if(holes !== null) core_vol = core_vol.subtract(holes);\n  return UTILS.mat(frame.union(core_vol));\n}}"
+                code += f"          if(!holes) holes = hex; else holes = holes.union(hex);\n      }}\n  }} }}\n"
+                code += f"  if(holes) core_vol = core_vol.subtract(holes);\n  return UTILS.mat(frame.union(core_vol));\n}}"
 
             elif h == "voronoi":
                 code += f"  var r_out = {sl_vor_ro.value}; var r_in = {sl_vor_ri.value}; var h = {sl_vor_h.value}; var d = {int(sl_vor_d.value)};\n"
@@ -620,8 +619,8 @@ def main(page: ft.Page):
                 code += f"      for(var i=0; i<d; i++) {{\n          var a = (i * Math.PI * 2 / d) + offset_a;\n"
                 code += f"          var cx = Math.cos(a) * (r_out - (r_out-r_in)/2); var cy = Math.sin(a) * (r_out - (r_out-r_in)/2);\n"
                 code += f"          var hole = CSG.sphere({{center:[cx, cy, z], radius:r_esfera, resolution:8}});\n"
-                code += f"          if(holes === null) holes = hole; else holes = holes.union(hole);\n      }}\n      t++;\n  }}\n"
-                code += f"  if(holes !== null) return UTILS.mat(pipe.subtract(holes));\n  return UTILS.mat(pipe);\n}}"
+                code += f"          if(!holes) holes = hole; else holes = holes.union(hole);\n      }}\n      t++;\n  }}\n"
+                code += f"  if(holes) return UTILS.mat(pipe.subtract(holes));\n  return UTILS.mat(pipe);\n}}"
 
             elif h == "evolvente":
                 code += f"  var dientes = {int(sl_evo_d.value)}; var m = {sl_evo_m.value}; var h = {sl_evo_h.value};\n"
@@ -653,7 +652,7 @@ def main(page: ft.Page):
                 code += f"  var res = 20; var dz = h / res; var gear = null; var m = rb / (dientes/2);\n"
                 code += f"  for(var z=0; z<res; z++) {{\n      var z_pos = z * dz; var r_curr = rb - (rb - rt)*(z/res); var r_root = Math.max(0.1, r_curr - m);\n"
                 code += f"      var core = CSG.cylinder({{start:[0,0,z_pos], end:[0,0,z_pos+dz], radius:r_root, slices:32}});\n"
-                code += f"      if(gear === null) gear = core; else gear = gear.union(core);\n"
+                code += f"      if(!gear) gear = core; else gear = gear.union(core);\n"
                 code += f"      var t_w = (Math.PI * r_curr / dientes) * 0.8;\n"
                 code += f"      for(var i=0; i<dientes; i++) {{\n          var a = (i * Math.PI * 2) / dientes;\n"
                 code += f"          var cx1 = Math.cos(a)*(r_root + m*0.3); var cy1 = Math.sin(a)*(r_root + m*0.3);\n"
@@ -662,7 +661,7 @@ def main(page: ft.Page):
                 code += f"          var t2 = CSG.cylinder({{start:[cx2,cy2,z_pos], end:[cx2,cy2,z_pos+dz], radius:t_w*0.3, slices:8}});\n"
                 code += f"          gear = gear.union(t1).union(t2);\n      }}\n  }}\n"
                 code += f"  var hole = CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius: rt * 0.3, slices:16}});\n"
-                code += f"  if(gear !== null) return UTILS.mat(UTILS.rotZ(gear.subtract(hole), KINE_T));\n  return UTILS.mat(CSG.cube({{radius:[1,1,1]}}));\n}}"
+                code += f"  if(gear) return UTILS.mat(UTILS.rotZ(gear.subtract(hole), KINE_T));\n  return UTILS.mat(CSG.cube({{radius:[1,1,1]}}));\n}}"
 
             elif h == "multicaja":
                 code += f"  var w = {sl_mc_x.value}; var l = {sl_mc_y.value}; var h = {sl_mc_z.value}; var tol = {sl_mc_tol.value}; var sep = {sl_mc_sep.value};\n"
@@ -685,11 +684,11 @@ def main(page: ft.Page):
                 code += f"  var res = 60; var dz = h / res; var solido = null; var hueco = null;\n"
                 code += f"  for(var i=0; i<res; i++) {{\n      var z = i * dz; var f = Math.sin((z/h) * Math.PI); var rad = r1 + (r2 - r1)*(z/h) + (f * 15);\n"
                 code += f"      var capa = CSG.cylinder({{start:[0,0,z], end:[0,0,z+dz], radius:rad, slices:32}});\n"
-                code += f"      if(solido === null) solido = capa; else solido = solido.union(capa);\n"
+                code += f"      if(!solido) solido = capa; else solido = solido.union(capa);\n"
                 code += f"      if (grosor > 0 && z > grosor) {{\n         var r_int = Math.max(0.1, rad - grosor);\n"
                 code += f"         var capa_h = CSG.cylinder({{start:[0,0,z], end:[0,0,z+dz+0.1], radius:r_int, slices:32}});\n"
-                code += f"         if(hueco === null) hueco = capa_h; else hueco = hueco.union(capa_h);\n      }}\n  }}\n"
-                code += f"  if(grosor > 0 && hueco !== null) solido = solido.subtract(hueco);\n  return UTILS.mat(solido);\n}}"
+                code += f"         if(!hueco) hueco = capa_h; else hueco = hueco.union(capa_h);\n      }}\n  }}\n"
+                code += f"  if(grosor > 0 && hueco) solido = solido.subtract(hueco);\n  return UTILS.mat(solido);\n}}"
 
             elif h == "escuadra":
                 code += f"  var l = {sl_l_largo.value}; var w = {sl_l_ancho.value}; var t = {sl_l_grosor.value}; var r = {sl_l_hueco.value}; var chaf = {sl_l_chaf.value};\n"
@@ -798,14 +797,14 @@ def main(page: ft.Page):
                 code += f"      var angulo_pos = ap + (carrier_T * Math.PI / 180);\n"
                 code += f"      var cx = Math.cos(angulo_pos) * dist_centros; var cy = Math.sin(angulo_pos) * dist_centros;\n"
                 code += f"      planeta = UTILS.trans(planeta, [cx, cy, 0]);\n"
-                code += f"      if(planetas === null) planetas = planeta; else planetas = planetas.union(planeta);\n  }}\n"
+                code += f"      if(!planetas) planetas = planeta; else planetas = planetas.union(planeta);\n  }}\n"
                 code += f"  var corona = CSG.cylinder({{start:[0,0,0], end:[0,0,h], radius:r_anillo + 5, slices:64}}).subtract(CSG.cylinder({{start:[0,0,-1], end:[0,0,h+1], radius:r_anillo + G_TOL, slices:64}}));\n"
                 code += f"  var dientes_corona = Math.floor(r_anillo * 1.5); var anillo_dientes = null;\n"
                 code += f"  for(var i=0; i<dientes_corona; i++) {{\n      var a = (i * Math.PI * 2) / dientes_corona;\n"
                 code += f"      var diente_c = CSG.cylinder({{start:[Math.cos(a)*(r_anillo + G_TOL), Math.sin(a)*(r_anillo + G_TOL), 0], end:[Math.cos(a)*(r_anillo + G_TOL), Math.sin(a)*(r_anillo + G_TOL), h], radius:1.2, slices:12}});\n"
-                code += f"      if(anillo_dientes === null) anillo_dientes = diente_c; else anillo_dientes = anillo_dientes.union(diente_c);\n  }}\n"
-                code += f"  if(anillo_dientes !== null) corona = corona.union(anillo_dientes);\n"
-                code += f"  var obj = sol.union(corona);\n  if(planetas !== null) obj = obj.union(planetas);\n  return UTILS.mat(obj);\n}}"
+                code += f"      if(!anillo_dientes) anillo_dientes = diente_c; else anillo_dientes = anillo_dientes.union(diente_c);\n  }}\n"
+                code += f"  if(anillo_dientes) corona = corona.union(anillo_dientes);\n"
+                code += f"  var obj = sol.union(corona);\n  if(planetas) obj = obj.union(planetas);\n  return UTILS.mat(obj);\n}}"
 
             elif h == "polea":
                 code += f"  var dientes = {int(sl_pol_t.value)}; var ancho = {sl_pol_w.value}; var r_eje = {sl_pol_d.value/2};\n"
@@ -814,8 +813,8 @@ def main(page: ft.Page):
                 code += f"  var matriz_dientes = null;\n"
                 code += f"  for(var i=0; i<dientes; i++) {{\n      var a = (i * Math.PI * 2) / dientes;\n"
                 code += f"      var d = CSG.cylinder({{start:[Math.cos(a)*r_ext, Math.sin(a)*r_ext, 1], end:[Math.cos(a)*r_ext, Math.sin(a)*r_ext, 2+ancho], radius:0.55, slices:8}});\n"
-                code += f"      if(matriz_dientes === null) matriz_dientes = d; else matriz_dientes = matriz_dientes.union(d);\n  }}\n"
-                code += f"  if(matriz_dientes !== null) cuerpo = cuerpo.subtract(matriz_dientes);\n"
+                code += f"      if(!matriz_dientes) matriz_dientes = d; else matriz_dientes = matriz_dientes.union(d);\n  }}\n"
+                code += f"  if(matriz_dientes) cuerpo = cuerpo.subtract(matriz_dientes);\n"
                 code += f"  var base = CSG.cylinder({{start:[0,0,0], end:[0,0,1.5], radius:r_ext + 1, slices:64}});\n"
                 code += f"  var tapa = CSG.cylinder({{start:[0,0,1.5+ancho], end:[0,0,3+ancho], radius:r_ext + 1, slices:64}});\n"
                 code += f"  var polea = base.union(cuerpo).union(tapa);\n"
@@ -828,8 +827,8 @@ def main(page: ft.Page):
                 code += f"  var aspas = null;\n"
                 code += f"  for(var i=0; i<n; i++) {{\n    var a = (i * Math.PI * 2) / n; var dx = Math.cos(a); var dy = Math.sin(a);\n"
                 code += f"    var aspa = CSG.cylinder({{start:[6*dx, 6*dy, 5 - (pitch/10)], end:[rad*dx, rad*dy, 5 + (pitch/10)], radius: 3, slices: 4}});\n"
-                code += f"    if(aspas === null) aspas = aspa; else aspas = aspas.union(aspa);\n  }}\n"
-                code += f"  if(aspas !== null) hub = hub.union(aspas);\n  return UTILS.mat(UTILS.rotZ(hub.subtract(agujero), KINE_T));\n}}"
+                code += f"    if(!aspas) aspas = aspa; else aspas = aspas.union(aspa);\n  }}\n"
+                code += f"  if(aspas) hub = hub.union(aspas);\n  return UTILS.mat(UTILS.rotZ(hub.subtract(agujero), KINE_T));\n}}"
 
             elif h == "rotula":
                 code += f"  var r_bola = {sl_rot_r.value};\n"
@@ -849,8 +848,8 @@ def main(page: ft.Page):
                 code += f"      base = base.union(post).subtract(hole);\n  }}\n"
                 code += f"  var vents = null;\n  for(var vx=-(w/2)+15; vx < (w/2)-15; vx += 7) {{\n      for(var vy=-(l/2)+15; vy < (l/2)-15; vy += 7) {{\n"
                 code += f"          var agujero = CSG.cylinder({{start:[vx,vy,-1], end:[vx,vy,t+1], radius:2, slices:8}});\n"
-                code += f"          if(vents === null) vents = agujero; else vents = vents.union(agujero);\n      }}\n  }}\n"
-                code += f"  if(vents !== null) base = base.subtract(vents);\n  return UTILS.mat(base);\n}}"
+                code += f"          if(!vents) vents = agujero; else vents = vents.union(agujero);\n      }}\n  }}\n"
+                code += f"  if(vents) base = base.subtract(vents);\n  return UTILS.mat(base);\n}}"
 
             elif h == "muelle":
                 code += f"  var r_res = {sl_mue_r.value}; var r_hilo = {sl_mue_h.value}; var h = {sl_mue_alt.value}; var vueltas = {sl_mue_v.value};\n"
@@ -860,7 +859,7 @@ def main(page: ft.Page):
                 code += f"      var x2 = Math.cos(a2)*r_res; var y2 = Math.sin(a2)*r_res; var z2 = (i+1)*paso_z;\n"
                 code += f"      var seg = CSG.cylinder({{start:[x1,y1,z1], end:[x2,y2,z2], radius:r_hilo, slices:8}});\n"
                 code += f"      var esp = CSG.sphere({{center:[x2,y2,z2], radius:r_hilo, resolution:8}});\n"
-                code += f"      if(resorte === null) resorte = seg.union(esp); else resorte = resorte.union(seg).union(esp);\n  }}\n  return UTILS.mat(resorte);\n}}"
+                code += f"      if(!resorte) resorte = seg.union(esp); else resorte = resorte.union(seg).union(esp);\n  }}\n  return UTILS.mat(resorte);\n}}"
 
             elif h == "acme":
                 code += f"  var r = {sl_acme_d.value/2}; var pitch = {sl_acme_p.value}; var len = {sl_acme_l.value};\n"
@@ -868,8 +867,8 @@ def main(page: ft.Page):
                 code += f"  var thread = null; var steps = Math.floor((len / pitch) * 24); var z_step = len / steps; var a_step = (Math.PI * 2 * (len/pitch)) / steps; var w = pitch * 0.35;\n"
                 code += f"  for(var i=0; i<steps; i++) {{\n      var a1 = i * a_step; var a2 = (i+1) * a_step; var z1 = i * z_step; var z2 = (i+1) * z_step;\n"
                 code += f"      var seg = CSG.cylinder({{start:[Math.cos(a1)*r, Math.sin(a1)*r, z1], end:[Math.cos(a2)*r, Math.sin(a2)*r, z2], radius:w, slices:8}});\n"
-                code += f"      if(thread === null) thread = seg; else thread = thread.union(seg);\n  }}\n"
-                code += f"  if(thread !== null) eje = eje.union(thread);\n  return UTILS.mat(UTILS.rotZ(eje, KINE_T));\n}}"
+                code += f"      if(!thread) thread = seg; else thread = thread.union(seg);\n  }}\n"
+                code += f"  if(thread) eje = eje.union(thread);\n  return UTILS.mat(UTILS.rotZ(eje, KINE_T));\n}}"
 
             elif h == "codo":
                 code += f"  var r_tubo = {sl_codo_r.value}; var r_curva = {sl_codo_c.value}; var angulo = {sl_codo_a.value}; var grosor = {sl_codo_g.value};\n"
@@ -878,14 +877,14 @@ def main(page: ft.Page):
                 code += f"      var x1 = Math.cos(a1)*r_curva; var y1 = Math.sin(a1)*r_curva; var x2 = Math.cos(a2)*r_curva; var y2 = Math.sin(a2)*r_curva;\n"
                 code += f"      var ext = CSG.cylinder({{start:[x1,y1,0], end:[x2,y2,0], radius:r_tubo, slices:16}});\n"
                 code += f"      var esf = CSG.sphere({{center:[x2,y2,0], radius:r_tubo, resolution:16}});\n"
-                code += f"      var sol = ext.union(esf);\n      if(codo === null) codo = sol; else codo = codo.union(sol);\n  }}\n"
+                code += f"      var sol = ext.union(esf);\n      if(!codo) codo = sol; else codo = codo.union(sol);\n  }}\n"
                 code += f"  if(grosor > 0) {{\n     var hueco = null;\n     for(var i=0; i<pasos; i++) {{\n"
                 code += f"         var a1 = (i * (angulo/pasos)) * Math.PI / 180; var a2 = ((i+1) * (angulo/pasos)) * Math.PI / 180;\n"
                 code += f"         var x1 = Math.cos(a1)*r_curva; var y1 = Math.sin(a1)*r_curva; var x2 = Math.cos(a2)*r_curva; var y2 = Math.sin(a2)*r_curva;\n"
                 code += f"         var int_c = CSG.cylinder({{start:[x1,y1,0], end:[x2,y2,0], radius:r_tubo-grosor, slices:12}});\n"
                 code += f"         var isf = CSG.sphere({{center:[x2,y2,0], radius:r_tubo-grosor, resolution:12}});\n"
-                code += f"         var hol = int_c.union(isf); if(hueco === null) hueco = hol; else hueco = hueco.union(hol);\n"
-                code += f"     }}\n     if(hueco !== null) codo = codo.subtract(hueco);\n  }}\n  return UTILS.mat(codo);\n}}"
+                code += f"         var hol = int_c.union(isf); if(!hueco) hueco = hol; else hueco = hueco.union(hol);\n"
+                code += f"     }}\n     if(hueco) codo = codo.subtract(hueco);\n  }}\n  return UTILS.mat(codo);\n}}"
 
             elif h == "naca":
                 code += f"  var cuerda = {sl_naca_c.value}; var grosor = {sl_naca_g.value}; var envergadura = {sl_naca_e.value};\n"
@@ -894,7 +893,7 @@ def main(page: ft.Page):
                 code += f"      var yt = 5 * (grosor/100) * (0.2969*Math.sqrt(x) - 0.1260*x - 0.3516*(x*x) + 0.2843*Math.pow(x,3) - 0.1015*Math.pow(x,4));\n"
                 code += f"      var x_real = x * cuerda; var yt_real = Math.max(yt * cuerda, 0.1);\n"
                 code += f"      var cyl = CSG.cylinder({{start:[x_real, 0, 0], end:[x_real, 0, envergadura], radius: yt_real, slices: 16}});\n"
-                code += f"      if(ala === null) ala = cyl; else ala = ala.union(cyl);\n  }}\n  return UTILS.mat(ala);\n}}"
+                code += f"      if(!ala) ala = cyl; else ala = ala.union(cyl);\n  }}\n  return UTILS.mat(ala);\n}}"
 
             elif h == "stand_movil":
                 code += f"  var ang = {sl_st_ang.value} * Math.PI / 180; var w = {sl_st_w.value}; var t = {sl_st_t.value};\n"
@@ -1051,7 +1050,6 @@ def main(page: ft.Page):
         # =========================================================
         list_nexus_db = ft.ListView(height=130, spacing=5)
 
-        # FIX PARA FLET ANDROID BUTTONS BUG (IconButton Issue)
         def custom_icon_btn(text, action, tooltip_txt):
             return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
 

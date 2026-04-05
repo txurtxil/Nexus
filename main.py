@@ -1,5 +1,5 @@
 import flet as ft
-import os, base64, json, threading, http.server, socket, time, warnings, traceback, shutil
+import os, base64, json, threading, http.server, socket, time, warnings, traceback, shutil, re
 
 try:
     import psutil
@@ -312,21 +312,23 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             
         elif parsed.path == '/' or parsed.path == '/openscad_engine.html':
             # =========================================================================
-            # PARCHE CRÍTICO v20.22 PARA EL WORKER EN WEBVIEW DE ANDROID
+            # PARCHE NUCLEAR v20.23: INYECCIÓN DIRECTA BASE64 (DATA URI)
             # =========================================================================
             try:
                 fn = "openscad_engine.html"
                 with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
                     content = f.read().decode('utf-8')
                 
-                # Android WebViews tiran [object ProgressEvent] si un Worker creado 
-                # desde un Blob usa rutas relativas ('/imported.stl'). Interceptamos
-                # el código HTML al vuelo y forzamos la ruta absoluta del servidor.
-                host = self.headers.get('Host', f'127.0.0.1:{LOCAL_PORT}')
-                abs_url = f"http://{host}/imported.stl"
-                
-                content = content.replace("'/imported.stl", f"'{abs_url}")
-                content = content.replace('"/imported.stl', f'"{abs_url}')
+                # Leemos el STL y lo convertimos a Data URI puro para eludir
+                # por completo la capa de red (WebView/CORS/VPN) del Worker.
+                filepath = os.path.join(EXPORT_DIR, "imported.stl")
+                if os.path.exists(filepath) and os.path.getsize(filepath) >= 84:
+                    with open(filepath, "rb") as stl_file:
+                        b64_stl = base64.b64encode(stl_file.read()).decode('utf-8')
+                    
+                    data_uri = f"data:application/octet-stream;base64,{b64_stl}"
+                    # Reemplazamos cualquier mención a '/imported.stl' por el bloque base64.
+                    content = re.sub(r'[\'"]/imported\.stl(\?.*?)?[\'"]', f"'{data_uri}'", content)
                 
                 encoded_content = content.encode('utf-8')
                 self.send_response(200)
@@ -355,12 +357,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.22 PBR TITAN"
+        page.title = "NEXUS CAD v20.23 PBR TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.22 TITAN | Worker Interceptor Activo", color="#C51162", weight="bold")
+        status = ft.Text("NEXUS v20.23 TITAN | Base64 Injector Activo", color="#C51162", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)

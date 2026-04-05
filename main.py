@@ -39,8 +39,14 @@ LOCAL_PORT = 8556
 LATEST_CODE_B64 = ""
 LATEST_NEEDS_STL = False
 
-ASSEMBLY_PARTS = [] 
+MAX_ASSEMBLY_PARTS = 10
+ASSEMBLY_PARTS_STATE = [{"active": False, "file": "", "mat": "pla", "x": 0, "y": 0, "z": 0} for _ in range(MAX_ASSEMBLY_PARTS)]
 PBR_STATE = {"mode": "single", "parts": []}
+
+def update_pbr_state():
+    global PBR_STATE
+    PBR_STATE["mode"] = "assembly"
+    PBR_STATE["parts"] = [p for p in ASSEMBLY_PARTS_STATE if p["active"]]
 
 def get_sys_info():
     cores = os.cpu_count() or 1
@@ -335,29 +341,32 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if parsed.path == '/api/save_model':
-            # INTERCEPTOR NATIVO DE EXPORTACIÓN BLOB -> BYTES
+        # Soporta save_export (v20.12 nativo) o save_model indistintamente
+        if parsed.path in ['/api/save_export', '/api/save_model']:
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
                 try:
                     data = json.loads(self.rfile.read(cl).decode('utf-8'))
                     filename = data.get('filename', f'nexus_export_{int(time.time())}.stl')
-                    b64_data = data.get('data', '').split(',')[1]
-                    file_bytes = base64.b64decode(b64_data)
+                    file_data = data.get('data', '')
                     
-                    # 1. Guardar en Descargas Android (Bypass de Webview)
+                    if isinstance(file_data, str) and file_data.startswith('data:'):
+                        b64_data = file_data.split(',')[1]
+                        file_bytes = base64.b64decode(b64_data)
+                        mode = 'wb'
+                    else:
+                        file_bytes = file_data.encode('utf-8') if isinstance(file_data, str) else file_data
+                        mode = 'wb' if isinstance(file_bytes, bytes) else 'w'
+
                     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-                    with open(os.path.join(DOWNLOAD_DIR, filename), 'wb') as f:
+                    with open(os.path.join(DOWNLOAD_DIR, filename), mode) as f:
+                        f.write(file_bytes)
+                    with open(os.path.join(EXPORT_DIR, filename), mode) as f:
                         f.write(file_bytes)
                         
-                    # 2. Guardar en Nexus DB interna
-                    with open(os.path.join(EXPORT_DIR, filename), 'wb') as f:
-                        f.write(file_bytes)
-                        
-                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok')
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'{"status":"ok"}')
                     return
-                except Exception as e:
-                    pass
+                except Exception: pass
             self.send_response(500); self._send_cors(); self.end_headers()
             
         elif parsed.path == '/api/save_image':
@@ -410,7 +419,8 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     if os.path.getsize(filepath) >= 84:
                         with open(filepath, "rb") as f: data_to_send = f.read()
                 except: pass
-            self.send_response(200); self.send_header("Content-type", "application/octet-stream"); self.send_header("Content-Length", str(len(data_to_send))); self.send_header("Cache-Control", "no-cache"); self._send_cors(); self.end_headers()
+            # Uso de application/sla (Como en v20.12)
+            self.send_response(200); self.send_header("Content-type", "application/sla"); self.send_header("Content-Length", str(len(data_to_send))); self.send_header("Cache-Control", "no-cache"); self._send_cors(); self.end_headers()
             try:
                 self.wfile.write(data_to_send)
             except: pass
@@ -431,74 +441,19 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
         elif parsed.path == '/' or parsed.path == '/openscad_engine.html':
+            # CARGA PURA EXACTAMENTE COMO EN V20.12 TITAN (SIN HACKS QUE BLOQUEAN DESCARGAS)
             try:
                 fn = "openscad_engine.html"
-                with open(os.path.join(ASSETS_DIR, fn), "r", encoding="utf-8") as f: content = f.read()
-                
-                # INYECTOR SEGURO PARA EL MOTOR: Intercepta importaciones Y secuestra Blobs de exportación (BLOB MAP HACK).
-                injector = '''<script>
-                var _origFetch = window.fetch;
-                window.fetch = function() {
-                    if (arguments[0] && typeof arguments[0] === "string" && arguments[0].includes("imported.stl")) {
-                        arguments[0] = "/imported.stl?t=" + Date.now();
-                    }
-                    return _origFetch.apply(this, arguments);
-                };
-                var _origXHR = window.XMLHttpRequest.prototype.open;
-                window.XMLHttpRequest.prototype.open = function(method, url) {
-                    if(url && typeof url === "string" && url.includes("imported.stl")) { arguments[1] = "/imported.stl?t=" + Date.now(); }
-                    return _origXHR.apply(this, arguments);
-                };
-                
-                // Hack para robar Blobs de exportación antes de que WebView los bloquee
-                var nexus_blob_map = {};
-                var _origCreateObj = URL.createObjectURL;
-                URL.createObjectURL = function(obj) {
-                    var url = _origCreateObj(obj);
-                    if(obj instanceof Blob) { nexus_blob_map[url] = obj; }
-                    return url;
-                };
-
-                document.addEventListener('click', function(e) {
-                    var target = e.target.closest('a');
-                    if(target && target.download && target.href && target.href.includes('blob:')) {
-                        var blob = nexus_blob_map[target.href];
-                        if(blob) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            var filename = target.download;
-                            var reader = new FileReader();
-                            reader.onload = function() {
-                                fetch('/api/save_model', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({filename: filename, data: reader.result})
-                                }).then(function(){
-                                    var t = document.createElement('div');
-                                    t.innerText = '✅ ' + filename + ' guardado en Descargas de Android';
-                                    t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#00E676;color:black;padding:15px;border-radius:8px;font-weight:bold;z-index:999999;box-shadow:0 4px 10px rgba(0,0,0,0.5);font-family:sans-serif;';
-                                    document.body.appendChild(t);
-                                    setTimeout(function(){t.remove();}, 4000);
-                                });
-                            };
-                            reader.readAsDataURL(blob);
-                        }
-                    }
-                }, true);
-                </script>'''
-                
-                if "<head>" in content: content = content.replace("<head>", "<head>" + injector)
-                else: content = injector + content
-                    
-                encoded_content = content.encode('utf-8')
-                self.send_response(200); self.send_header("Content-type", "text/html"); self.send_header("Content-Length", str(len(encoded_content))); self._send_cors(); self.end_headers(); self.wfile.write(encoded_content)
-                return
-            except Exception as e: self.send_response(500); self._send_cors(); self.end_headers(); self.wfile.write(str(e).encode())
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+            except Exception as e:
+                self.send_response(500); self._send_cors(); self.end_headers(); self.wfile.write(str(e).encode())
 
         else:
             try:
                 fn = self.path.strip("/")
-                with open(os.path.join(ASSETS_DIR, fn), "rb") as f: self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             except: self.send_response(404); self._send_cors(); self.end_headers()
             
     def log_message(self, *args): pass
@@ -514,12 +469,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.50 OMEGA"
+        page.title = "NEXUS CAD v20.60 QUANTUM"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.50 OMEGA | Blobs Hackeados & Ensamble Aislado", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.60 QUANTUM | Export Native Fix & Ensamble Estático", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -1109,86 +1064,123 @@ def main(page: ft.Page):
             ft.Container(height=5), hw_panel, ft.Container(height=5),
             ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
             ft.Container(height=5),
-            ft.Text("Motor Web Worker (Exportación 100% Nativa Activada)", text_align="center", color="#00E5FF", weight="bold"),
+            ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
             ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # TAB 3: ENSAMBLADOR VISUAL PBR (MODULAR AISLADO OMEGA)
+        # TAB 3: ENSAMBLADOR VISUAL PBR (MODO SLOTS ESTÁTICOS - ANTI CUELGUE)
         # =========================================================
-        def update_pbr_state():
-            global PBR_STATE, ASSEMBLY_PARTS
-            PBR_STATE["mode"] = "assembly"
-            PBR_STATE["parts"] = ASSEMBLY_PARTS
-            
-        def create_part_card(part):
+        def build_static_assembly_cards():
+            cards = []
+            for i in range(MAX_ASSEMBLY_PARTS):
+                df = ft.Dropdown(options=[], width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
+                dm = ft.Dropdown(options=[ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")], value="pla", width=100, text_size=12, bgcolor="#0B0E14")
+                
+                sl_x = ft.Slider(min=-200, max=200, value=0, expand=True)
+                sl_y = ft.Slider(min=-200, max=200, value=0, expand=True)
+                sl_z = ft.Slider(min=-200, max=200, value=0, expand=True)
+                
+                card = ft.Container(bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"), visible=False)
+                
+                def make_change_handler(idx, d_f, d_m, s_x, s_y, s_z):
+                    def handler(e):
+                        if not ASSEMBLY_PARTS_STATE[idx]["active"]: return
+                        ASSEMBLY_PARTS_STATE[idx]["file"] = d_f.value
+                        ASSEMBLY_PARTS_STATE[idx]["mat"] = d_m.value
+                        ASSEMBLY_PARTS_STATE[idx]["x"] = s_x.value
+                        ASSEMBLY_PARTS_STATE[idx]["y"] = s_y.value
+                        ASSEMBLY_PARTS_STATE[idx]["z"] = s_z.value
+                        update_pbr_state()
+                    return handler
+                    
+                change_handler = make_change_handler(i, df, dm, sl_x, sl_y, sl_z)
+                df.on_change = change_handler
+                dm.on_change = change_handler
+                sl_x.on_change = change_handler
+                sl_y.on_change = change_handler
+                sl_z.on_change = change_handler
+                
+                def make_delete_handler(idx, c):
+                    def handler(e):
+                        ASSEMBLY_PARTS_STATE[idx]["active"] = False
+                        c.visible = False
+                        update_pbr_state()
+                        c.update()
+                        check_empty_assembly()
+                    return handler
+                    
+                btn_del = ft.IconButton(ft.icons.DELETE, icon_color="red", on_click=make_delete_handler(i, card))
+                
+                card.content = ft.Column([
+                    ft.Row([df, dm, btn_del], alignment="spaceBetween"),
+                    ft.Row([ft.Text("X", size=10, color="#8B949E", width=15), sl_x]),
+                    ft.Row([ft.Text("Y", size=10, color="#8B949E", width=15), sl_y]),
+                    ft.Row([ft.Text("Z", size=10, color="#8B949E", width=15), sl_z])
+                ])
+                
+                def refresh_opts(d=df, idx=i):
+                    files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
+                    d.options = [ft.dropdown.Option(f) for f in files]
+                    if not d.value and files: d.value = files[0]
+                    elif d.value not in files and files: d.value = files[0]
+                    if files: ASSEMBLY_PARTS_STATE[idx]["file"] = d.value
+                    
+                card.data = {"refresh": refresh_opts, "df": df, "dm": dm, "sx": sl_x, "sy": sl_y, "sz": sl_z}
+                cards.append(card)
+            return cards
+
+        col_assembly_cards = build_static_assembly_cards()
+        lbl_ensamble_warn = ft.Text("⚠️ DB de STLs vacía.\nVe a la pestaña FILES y sube o guarda STLs primero.", color="#FFAB00", weight="bold", visible=False)
+        col_assembly = ft.Column([lbl_ensamble_warn] + col_assembly_cards, scroll="auto", expand=True)
+
+        def check_empty_assembly():
+            has_active = any(p["active"] for p in ASSEMBLY_PARTS_STATE)
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
-            if part["file"] not in files and files: part["file"] = files[0]
-            
-            opts_file = [ft.dropdown.Option(f) for f in files]
-            opts_mat = [ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")]
-            
-            df = ft.Dropdown(options=opts_file, value=part.get("file", ""), width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
-            dm = ft.Dropdown(options=opts_mat, value=part.get("mat", "pla"), width=100, text_size=12, bgcolor="#0B0E14")
-            
-            card = ft.Container(bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"))
-            
-            def handle_file(e): part["file"] = e.control.value; update_pbr_state()
-            def handle_mat(e): part["mat"] = e.control.value; update_pbr_state()
-            df.on_change = handle_file
-            dm.on_change = handle_mat
-            
-            def sl(k, l):
-                s = ft.Slider(min=-200, max=200, value=part.get(k, 0), expand=True)
-                def handle_sl(e): part[k] = e.control.value; update_pbr_state()
-                s.on_change = handle_sl
-                return ft.Row([ft.Text(l, size=10, color="#8B949E", width=15), s])
-                
-            def handle_delete(e):
-                if part in ASSEMBLY_PARTS: ASSEMBLY_PARTS.remove(part)
-                if card in col_assembly.controls: col_assembly.controls.remove(card)
-                update_pbr_state()
-                if not ASSEMBLY_PARTS: render_assembly_ui()
-                else: page.update()
-                
-            card.content = ft.Column([
-                ft.Row([df, dm, ft.IconButton(ft.icons.DELETE, icon_color="red", on_click=handle_delete)], alignment="spaceBetween"),
-                sl("x","X"), sl("y","Y"), sl("z","Z")
-            ])
-            return card
+            lbl_ensamble_warn.visible = not has_active and not files
+            lbl_ensamble_warn.update()
 
         def add_assembly_part(e):
-            global ASSEMBLY_PARTS
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
             if not files:
                 status.value = "❌ No hay STLs para añadir. Sube archivos en la pestaña FILES."
-                status.color = "#FF5252"
-                page.update()
-                return
-            
-            if len(col_assembly.controls) == 1 and isinstance(col_assembly.controls[0], ft.Text):
-                col_assembly.controls.clear()
+                status.color = "#FF5252"; page.update(); return
                 
-            new_part = {"file": files[0], "mat": "pla", "x": 0, "y": 0, "z": 0}
-            ASSEMBLY_PARTS.append(new_part)
-            col_assembly.controls.append(create_part_card(new_part))
-            update_pbr_state()
-            page.update()
+            for i in range(MAX_ASSEMBLY_PARTS):
+                if not ASSEMBLY_PARTS_STATE[i]["active"]:
+                    ASSEMBLY_PARTS_STATE[i]["active"] = True
+                    card = col_assembly_cards[i]
+                    card.data["refresh"]()
+                    
+                    # Reset values
+                    card.data["sx"].value = 0; card.data["sy"].value = 0; card.data["sz"].value = 0
+                    ASSEMBLY_PARTS_STATE[i]["x"] = 0; ASSEMBLY_PARTS_STATE[i]["y"] = 0; ASSEMBLY_PARTS_STATE[i]["z"] = 0
+                    ASSEMBLY_PARTS_STATE[i]["mat"] = card.data["dm"].value
+                    
+                    card.visible = True; update_pbr_state(); card.update()
+                    check_empty_assembly()
+                    return
+            status.value = "❌ Límite máximo de piezas (10) alcanzado."
+            status.color = "#FFAB00"; page.update()
 
-        col_assembly = ft.Column(scroll="auto", expand=True)
-        
         def render_assembly_ui():
-            col_assembly.controls.clear()
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
             if not files:
-                col_assembly.controls.append(ft.Text("⚠️ DB de STLs vacía.\nVe a la pestaña FILES y sube o guarda STLs primero.", color="#FFAB00", weight="bold"))
+                lbl_ensamble_warn.visible = True
+                for i in range(MAX_ASSEMBLY_PARTS):
+                    col_assembly_cards[i].visible = False
+                    ASSEMBLY_PARTS_STATE[i]["active"] = False
             else:
-                for part in ASSEMBLY_PARTS:
-                    col_assembly.controls.append(create_part_card(part))
+                lbl_ensamble_warn.visible = not any(p["active"] for p in ASSEMBLY_PARTS_STATE)
+                for i, card in enumerate(col_assembly_cards):
+                    if ASSEMBLY_PARTS_STATE[i]["active"]:
+                        card.data["refresh"]()
+                        card.update()
+            lbl_ensamble_warn.update()
 
         view_ensamble = ft.Column([
-            ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"),
-            ft.Text("Une múltiples STLs de la DB. Se reflejará instantáneamente en la pestaña PBR.", color="#8B949E", size=11),
+            ft.Text("🧩 MESA DE ENSAMBLAJE (ANTI-CRASH)", size=20, color="#FFAB00", weight="bold"),
+            ft.Text("Une hasta 10 STLs. Se reflejará instantáneamente en PBR.", color="#8B949E", size=11),
             ft.Row([ft.ElevatedButton("➕ AÑADIR PIEZA", on_click=add_assembly_part, bgcolor="#1B5E20", color="white"), ft.ElevatedButton("👁️ ABRIR PBR", on_click=lambda _: set_tab(4), bgcolor="#C51162", color="white")]),
             ft.Divider(), col_assembly
         ], expand=True)
@@ -1233,7 +1225,7 @@ def main(page: ft.Page):
             os.makedirs(DOWNLOAD_DIR, exist_ok=True)
             success, msg = convert_stl_to_obj(stl_path, obj_path)
             if success:
-                status.value = f"✓ Función 5 Completa: {obj_name} guardado en Descargas."
+                status.value = f"✓ Convertido a OBJ y guardado en Descargas."
                 status.color = "#00E5FF"
             else:
                 status.value = f"❌ Error al exportar OBJ: {msg}"
@@ -1278,7 +1270,7 @@ def main(page: ft.Page):
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl"))
                 lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
                 select_tool("stl"); set_tab(1); update_code_wrapper()
-                status.value = f"✓ STL Inyectado en Memoria (Bypass Activado)"
+                status.value = f"✓ STL Inyectado en Memoria"
             elif ext == "jscad": txt_code.value = open(filepath).read(); set_tab(0); status.value = "✓ Código Cargado"
             page.update()
 

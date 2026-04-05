@@ -321,9 +321,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 except: pass
             self.send_response(500); self._send_cors(); self.end_headers()
 
-        # =================================================================
-        # FIX Carga Archivos Pesados: Lectura en Chunks en lugar de Todo en RAM
-        # =================================================================
         elif parsed.path == '/api/upload':
             cl = int(self.headers.get('Content-Length', 0))
             fn = unquote(self.headers.get('File-Name', 'uploaded_file.stl'))
@@ -332,7 +329,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     filepath = os.path.join(EXPORT_DIR, fn)
                     with open(filepath, 'wb') as f:
                         bytes_read = 0
-                        chunk_size = 65536  # 64KB buffers para que fluya constante
+                        chunk_size = 65536
                         while bytes_read < cl:
                             chunk = self.rfile.read(min(chunk_size, cl - bytes_read))
                             if not chunk: break
@@ -477,12 +474,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.67 TITAN FORGE"
+        page.title = "NEXUS CAD v20.68 TITAN FORGE"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.67 TITAN | Web Worker Bypass Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.68 TITAN | Web Worker Bypass Activo", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -1167,10 +1164,11 @@ def main(page: ft.Page):
                         c.visible = False
                         update_pbr_state()
                         check_empty_assembly()
-                        page.update()  # IMPORTANTE: No usar c.update() directo si no está en pantalla
+                        page.update()
                     return handler
                     
-                btn_del = ft.IconButton(icon="delete", icon_color="red", on_click=make_delete_handler(i, card))
+                # Fix: Reemplazado IconButton por Container text para evitar error en Termux/Android
+                btn_del = ft.Container(content=ft.Text("🗑️", size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=make_delete_handler(i, card), ink=True)
                 
                 card.content = ft.Column([
                     ft.Row([df, dm, btn_del], alignment="spaceBetween"),
@@ -1216,7 +1214,7 @@ def main(page: ft.Page):
                     card.visible = True
                     update_pbr_state()
                     check_empty_assembly()
-                    page.update()  # IMPORTANTE: Reemplaza card.update() para evitar cuelgues
+                    page.update()
                     return
             status.value = "❌ Límite máximo de piezas (10) alcanzado."
             status.color = "#FFAB00"; page.update()
@@ -1401,51 +1399,61 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # TAB 6: IA ASSISTANT
+        # TAB 6: IA ASSISTANT (RESTAURADA V20.29 - LIBRE DE ERRORES EN ANDROID)
         # =========================================================
-        chat_list = ft.ListView(expand=True, spacing=10, auto_scroll=True)
-        ia_input = ft.TextField(label="Pide a la IA que diseñe algo...", expand=True, bgcolor="#161B22", border_color="#B388FF")
+        tf_ia_prompt = ft.TextField(label="¿Qué pieza 3D exacta quieres que diseñe?", value="una caja 10x10x10", bgcolor="#161B22", border_color="#00E5FF", color="white", expand=True)
+        tf_ia_codigo = ft.TextField(label="Pega aquí el código Javascript que te dio la IA", multiline=True, height=200, bgcolor="#161B22", border_color="#B388FF", color="#58A6FF", text_size=12, expand=True)
 
-        def apply_ia_code(code):
-            txt_code.value = code
-            set_tab(0)
-            status.value = "✓ Código de IA aplicado al editor."
+        def copiar_prompt_ia(e):
+            prompt = f"Actúa como un programador experto en JSCAD (JS-CSG). Escribe una función 'function main(params)' que retorne una geometría 3D. El código debe ser compatible con la librería base de openjscad. Usa var GW=50, GL=50, GH=20 como referencia de tamaño. Solo devuelve el código javascript puro. La pieza que necesito es: {tf_ia_prompt.value}"
+            page.set_clipboard(prompt)
+            status.value = "✓ Prompt copiado al portapapeles."
+            status.color = "#00E5FF"
             page.update()
 
-        def send_ia(e=None):
-            user_text = ia_input.value.strip()
-            if not user_text: return
-            chat_list.controls.append(ft.Container(content=ft.Text(f"👤 {user_text}", color="white"), bgcolor="#21262D", padding=10, border_radius=8))
-            ia_input.value = ""
-            page.update()
-            
-            def think():
-                time.sleep(1)
-                # Template base IA
-                code_template = f"function main(params) {{\n  // Plantilla inteligente para: {user_text}\n  // Ajusta los valores según necesites.\n  var W = GW || 50;\n  var L = GL || 50;\n  var H = GH || 20;\n  var obj = CSG.cube({{radius: [W/2, L/2, H/2]}});\n  return UTILS.mat(obj);\n}}"
-                
-                btn_apply = ft.ElevatedButton("📥 APLICAR CÓDIGO AL EDITOR", on_click=lambda _: apply_ia_code(code_template), bgcolor="#00E676", color="black")
-                
-                resp_container = ft.Container(content=ft.Column([
-                    ft.Text(f"🤖 ¡Listo! He procesado una plantilla basada en tu petición: '{user_text}'. Puedes aplicarla al entorno CODE de inmediato.", color="#00E676", size=12),
-                    ft.Container(content=ft.Text(code_template, size=10, color="#58A6FF", font_family="monospace"), bgcolor="#0B0E14", padding=10, border_radius=5),
-                    btn_apply
-                ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676"))
-                
-                chat_list.controls.append(resp_container)
+        def inyectar_codigo_ia(e):
+            if not tf_ia_codigo.value.strip():
+                status.value = "❌ Pega primero el código."
+                status.color = "#FF5252"
                 page.update()
+                return
             
-            threading.Thread(target=think, daemon=True).start()
-
-        ia_input.on_submit = send_ia
-        btn_send_ia = ft.IconButton(icon="send", icon_color="#00E676", on_click=send_ia)
+            # Limpiar el markdown en caso de que el usuario lo pegue tal cual de ChatGPT
+            codigo = tf_ia_codigo.value
+            if "```javascript" in codigo:
+                codigo = codigo.split("```javascript")[1].split("```")[0].strip()
+            elif "```js" in codigo:
+                codigo = codigo.split("```js")[1].split("```")[0].strip()
+            elif "```" in codigo:
+                codigo = codigo.split("```")[1].split("```")[0].strip()
+                
+            txt_code.value = codigo
+            set_tab(0)
+            status.value = "✓ Código IA inyectado. Listo para renderizar."
+            status.color = "#B388FF"
+            page.update()
 
         view_ia = ft.Column([
-            ft.Row([ft.Text("🤖 NEXUS AI ASSISTANT", size=20, color="#B388FF", weight="bold")], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            ft.Text("Asistente interno para generación de plantillas JS-CSG a través de lenguaje natural.", color="#8B949E", size=11),
-            ft.Container(content=chat_list, expand=True, bgcolor="#0B0E14", padding=10, border_radius=8, border=ft.border.all(1, "#30363D")),
-            ft.Row([ia_input, btn_send_ia])
-        ], expand=True)
+            ft.Text("🤖 ASISTENTE IA NEXUS (PASO A PASO)", size=18, color="#B388FF", weight="bold"),
+            ft.Text("Dado que la app no tiene API Integrada, yo te ayudo a crear el código perfecto:", color="#8B949E", size=11),
+            
+            ft.Container(height=10),
+            
+            ft.Container(content=ft.Column([
+                ft.Text("PASO 1: CREAR INSTRUCCIÓN PARA LA IA", color="#00E5FF", weight="bold", size=13),
+                ft.Row([tf_ia_prompt]),
+                ft.ElevatedButton("1️⃣ COPIAR PROMPT AL PORTAPAPELES", on_click=copiar_prompt_ia, bgcolor="#00E5FF", color="black", width=float('inf'))
+            ]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#00E5FF")),
+            
+            ft.Container(height=10),
+            
+            ft.Container(content=ft.Column([
+                ft.Text("PASO 2: PEGA LA RESPUESTA Y RENDERIZA", color="#B388FF", weight="bold", size=13),
+                ft.Row([tf_ia_codigo]),
+                ft.ElevatedButton("2️⃣ INYECTAR Y VER EN 3D", on_click=inyectar_codigo_ia, bgcolor="#8E24AA", color="white", width=float('inf'))
+            ]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#B388FF"))
+            
+        ], expand=True, scroll="auto")
 
         main_container = ft.Container(content=view_editor, expand=True)
 

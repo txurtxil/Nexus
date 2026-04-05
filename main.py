@@ -112,8 +112,7 @@ def convert_stl_to_obj(stl_path, obj_path):
                     out.write(f"v {v1[0]} {v1[1]} {v1[2]}\nv {v2[0]} {v2[1]} {v2[2]}\nv {v3[0]} {v3[1]} {v3[2]}\nf {v_idx} {v_idx+1} {v_idx+2}\n")
                     v_idx += 3
         return True, "Convertido y guardado exitosamente."
-    except Exception as e:
-        return False, str(e)
+    except Exception as e: return False, str(e)
 
 def analyze_stl(filepath):
     try:
@@ -121,18 +120,15 @@ def analyze_stl(filepath):
             if b'solid ' in f.read(80)[:10]: return None
             f.seek(80)
             tri_count = int.from_bytes(f.read(4), byteorder='little')
-            
             min_x = min_y = min_z = float('inf')
             max_x = max_y = max_z = float('-inf')
             volume = 0.0
-
             for _ in range(tri_count):
                 data = f.read(50)
                 if len(data) < 50: break
                 v1 = struct.unpack('<3f', data[12:24])
                 v2 = struct.unpack('<3f', data[24:36])
                 v3 = struct.unpack('<3f', data[36:48])
-                
                 for v in (v1, v2, v3):
                     if v[0] < min_x: min_x = v[0]
                     if v[0] > max_x: max_x = v[0]
@@ -140,14 +136,10 @@ def analyze_stl(filepath):
                     if v[1] > max_y: max_y = v[1]
                     if v[2] < min_z: min_z = v[2]
                     if v[2] > max_z: max_z = v[2]
-
                 v321 = v3[0]*v2[1]*v1[2]; v231 = v2[0]*v3[1]*v1[2]; v312 = v3[0]*v1[1]*v2[2]
                 v132 = v1[0]*v3[1]*v2[2]; v213 = v2[0]*v1[1]*v3[2]; v123 = v1[0]*v2[1]*v3[2]
                 volume += (1.0/6.0)*(-v321 + v231 + v312 - v132 - v213 + v123)
-
-            vol_cm3 = abs(volume) / 1000.0
-            weight_pla = vol_cm3 * 1.24
-
+            vol_cm3 = abs(volume) / 1000.0; weight_pla = vol_cm3 * 1.24
             return {"dx": round(max_x - min_x, 2), "dy": round(max_y - min_y, 2), "dz": round(max_z - min_z, 2), "vol_cm3": round(vol_cm3, 2), "weight_g": round(weight_pla, 2)}
     except: return None
 
@@ -167,7 +159,6 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
 <body>
     <div class="panel">
         <h3 style="margin:0 0 10px 0;color:#FF007F;font-size:16px;">🎨 PBR STUDIO PRO</h3>
-        
         <div id="singleMatContainer">
             <select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;">
                 <option value="carbon">Fibra de Carbono</option>
@@ -178,12 +169,10 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
                 <option value="pla" selected>PLA Gris</option>
             </select>
         </div>
-        
         <div style="margin-bottom:10px;">
             <label style="color:#00E676;font-size:12px;font-weight:bold;">💡 Intensidad Luz</label>
             <input type="range" id="lightSlider" min="0.1" max="4.0" step="0.1" value="1.5" style="width:100%;">
         </div>
-
         <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
         <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
         <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
@@ -194,42 +183,26 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
         scene.background = new THREE.Color(0x0B0E14);
         scene.fog = new THREE.FogExp2(0x0B0E14, 0.002);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-        scene.add(hemiLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        dirLight.position.set(50, 100, 50);
-        scene.add(dirLight);
-        const backLight = new THREE.DirectionalLight(0x00E5FF, 1.0);
-        backLight.position.set(-50, 50, -50);
-        scene.add(backLight);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0); scene.add(hemiLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); scene.add(dirLight);
+        const backLight = new THREE.DirectionalLight(0x00E5FF, 1.0); backLight.position.set(-50, 50, -50); scene.add(backLight);
 
-        document.getElementById('lightSlider').addEventListener('input', (e) => {
-            dirLight.intensity = parseFloat(e.target.value);
-            hemiLight.intensity = parseFloat(e.target.value) * 0.6;
-        });
+        document.getElementById('lightSlider').addEventListener('input', (e) => { dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.6; });
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
         camera.position.set(150, 150, 150);
 
         const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.outputEncoding = THREE.sRGBEncoding;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
         document.body.appendChild(renderer.domElement);
 
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
+        const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
 
         function takeScreenshot() {
-            renderer.render(scene, camera);
-            const dataURL = renderer.domElement.toDataURL("image/png");
-            fetch('/api/save_image', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL})
-            }).then(r => r.json()).then(d => {
-                const t = document.getElementById('toast');
-                t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+            renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
+            fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => r.json()).then(d => {
+                const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
             });
         }
 
@@ -258,72 +231,43 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
             gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.15, metalness: 1.0})
         };
 
-        let currentGroup = null;
-        let stateHash = "";
-        const loader = new THREE.STLLoader();
-        let geomCache = {};
+        let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {};
 
         function checkState() {
             fetch('/api/assembly_state.json?t=' + Date.now()).then(r => r.json()).then(state => {
                 let newHash = JSON.stringify(state);
-                if(newHash !== stateHash) {
-                    stateHash = newHash;
-                    buildScene(state);
-                }
+                if(newHash !== stateHash) { stateHash = newHash; buildScene(state); }
             }).catch(()=>{});
         }
-
         setInterval(checkState, 1000);
 
         function buildScene(state) {
             if(currentGroup) scene.remove(currentGroup);
-            currentGroup = new THREE.Group();
-            scene.add(currentGroup);
-
+            currentGroup = new THREE.Group(); scene.add(currentGroup);
             if(state.mode === 'single') {
-                document.getElementById('singleMatContainer').style.display = 'block';
-                document.getElementById('modeText').innerText = "Modo: Pieza Única";
+                document.getElementById('singleMatContainer').style.display = 'block'; document.getElementById('modeText').innerText = "Modo: Pieza Única";
                 let matKey = document.getElementById('matSelect').value;
                 loadStlFile('/imported.stl?t='+Date.now(), 0, 0, 0, matKey, true);
             } else {
-                document.getElementById('singleMatContainer').style.display = 'none';
-                document.getElementById('modeText').innerText = "Modo: Mesa Ensamblaje";
-                state.parts.forEach(p => {
-                    if(p.file) loadStlFile('/descargar/' + encodeURIComponent(p.file), p.x, p.y, p.z, p.mat, false);
-                });
+                document.getElementById('singleMatContainer').style.display = 'none'; document.getElementById('modeText').innerText = "Modo: Mesa Ensamblaje";
+                state.parts.forEach(p => { if(p.file) loadStlFile('/descargar/' + encodeURIComponent(p.file), p.x, p.y, p.z, p.mat, false); });
             }
         }
 
         function loadStlFile(url, x, y, z, matKey, centerCam) {
-            if(geomCache[url] && !url.includes('?')) {
-                addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam);
-            } else {
-                loader.load(url, geom => {
-                    geom.center(); geom.computeVertexNormals();
-                    if(!url.includes('?')) geomCache[url] = geom;
-                    addMeshToGroup(geom, x, y, z, matKey, centerCam);
-                });
-            }
+            if(geomCache[url] && !url.includes('?')) addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam);
+            else loader.load(url, geom => { geom.center(); geom.computeVertexNormals(); if(!url.includes('?')) geomCache[url] = geom; addMeshToGroup(geom, x, y, z, matKey, centerCam); });
         }
 
         function addMeshToGroup(geom, x, y, z, matKey, centerCam) {
             let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
-            mesh.rotation.x = -Math.PI / 2;
-            mesh.position.set(x, z, -y);
+            mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y);
             currentGroup.add(mesh);
-            
-            if(centerCam) {
-                geom.computeBoundingSphere();
-                const r = geom.boundingSphere.radius;
-                camera.position.set(r*1.5, r*1.5, r*1.5);
-                controls.target.set(0,0,0);
-            }
+            if(centerCam) { geom.computeBoundingSphere(); const r = geom.boundingSphere.radius; camera.position.set(r*1.5, r*1.5, r*1.5); controls.target.set(0,0,0); }
         }
 
         document.getElementById('matSelect').addEventListener('change', () => { stateHash = ""; checkState(); });
-
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
-        animate();
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
@@ -348,7 +292,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     data = json.loads(self.rfile.read(cl).decode('utf-8'))
                     filename = data.get('filename', f'nexus_export_{int(time.time())}.stl')
                     file_data = data.get('data', '')
-                    
                     if isinstance(file_data, str) and file_data.startswith('data:'):
                         b64_data = file_data.split(',')[1]
                         file_bytes = base64.b64decode(b64_data)
@@ -356,13 +299,9 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     else:
                         file_bytes = file_data.encode('utf-8') if isinstance(file_data, str) else file_data
                         mode = 'wb' if isinstance(file_bytes, bytes) else 'w'
-
                     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-                    with open(os.path.join(DOWNLOAD_DIR, filename), mode) as f:
-                        f.write(file_bytes)
-                    with open(os.path.join(EXPORT_DIR, filename), mode) as f:
-                        f.write(file_bytes)
-                        
+                    with open(os.path.join(DOWNLOAD_DIR, filename), mode) as f: f.write(file_bytes)
+                    with open(os.path.join(EXPORT_DIR, filename), mode) as f: f.write(file_bytes)
                     self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'{"status":"ok"}')
                     return
                 except Exception: pass
@@ -410,18 +349,34 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
             self.wfile.write(json.dumps(PBR_STATE).encode('utf-8'))
 
+        # ========================================================
+        # RESTAURADO: GESTIÓN DE STL LOCAL EN CHUNKS PARA EVITAR CRASH
+        # ========================================================
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
             data_to_send = DUMMY_VALID_STL
             if os.path.exists(filepath):
                 try:
-                    if os.path.getsize(filepath) >= 84:
-                        with open(filepath, "rb") as f: data_to_send = f.read()
-                except: pass
-            self.send_response(200); self.send_header("Content-type", "application/sla"); self.send_header("Content-Length", str(len(data_to_send))); self.send_header("Cache-Control", "no-cache"); self._send_cors(); self.end_headers()
+                    sz = os.path.getsize(filepath)
+                    if sz >= 84:
+                        with open(filepath, "rb") as f:
+                            data_to_send = f.read()
+                except Exception: pass
+            
+            self.send_response(200)
+            self.send_header("Content-type", "model/stl")
+            self.send_header("Content-Length", str(len(data_to_send)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self._send_cors()
+            self.end_headers()
+            
             try:
-                self.wfile.write(data_to_send)
-            except: pass
+                chunk_size = 65536
+                for i in range(0, len(data_to_send), chunk_size):
+                    self.wfile.write(data_to_send[i:i+chunk_size])
+            except Exception: pass
 
         elif parsed.path == '/pbr_studio.html':
             self.send_response(200); self.send_header("Content-type", "text/html"); self.send_header("Content-Length", str(len(PBR_HTML_TEMPLATE.encode('utf-8')))); self._send_cors(); self.end_headers(); self.wfile.write(PBR_HTML_TEMPLATE.encode('utf-8'))
@@ -438,11 +393,62 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     self.send_response(200); self.send_header("Content-Disposition", f'attachment; filename="{filename}"'); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
+        # ========================================================
+        # RESTAURADO: INTERCEPTOR PROFUNDO PARA WEB WORKERS
+        # ========================================================
         elif parsed.path == '/' or parsed.path == '/openscad_engine.html':
             try:
                 fn = "openscad_engine.html"
-                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
-                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                with open(os.path.join(ASSETS_DIR, fn), "r", encoding="utf-8") as f:
+                    content = f.read()
+                
+                stl_path = os.path.join(EXPORT_DIR, "imported.stl")
+                b64_stl = base64.b64encode(DUMMY_VALID_STL).decode('utf-8')
+                if os.path.exists(stl_path):
+                    sz = os.path.getsize(stl_path)
+                    if sz >= 84:
+                        with open(stl_path, "rb") as stl_file:
+                            b64_stl = base64.b64encode(stl_file.read()).decode('utf-8')
+                
+                injector = '''
+                <script>
+                (function() {
+                    var stlData = "data:application/octet-stream;base64,__B64_STL__";
+                    var origOpen = XMLHttpRequest.prototype.open;
+                    XMLHttpRequest.prototype.open = function(method, url) {
+                        if (url && typeof url === "string" && url.indexOf("imported.stl") !== -1) {
+                            arguments[1] = stlData;
+                        }
+                        return origOpen.apply(this, arguments);
+                    };
+                    if(window.fetch) {
+                        var origFetch = window.fetch;
+                        window.fetch = function(resource, config) {
+                            if (resource && typeof resource === "string" && resource.indexOf("imported.stl") !== -1) {
+                                resource = stlData;
+                            }
+                            return origFetch.call(this, resource, config);
+                        };
+                    }
+                    if(window.Worker) {
+                        var origWorker = window.Worker;
+                        window.Worker = function(scriptURL, options) {
+                            var absUrl = new URL(scriptURL, location.href).href;
+                            var code = "var stlData = '" + stlData + "'; var origOpen = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function(m, u) { if (u && typeof u === 'string' && u.indexOf('imported.stl') !== -1) { arguments[1] = stlData; } return origOpen.apply(this, arguments); }; if(self.fetch) { var origFetch = self.fetch; self.fetch = function(r, c) { if (r && typeof r === 'string' && r.indexOf('imported.stl') !== -1) { r = stlData; } return origFetch.call(this, r, c); }; } importScripts('" + absUrl + "');";
+                            var blob = new Blob([code], { type: "application/javascript" });
+                            return new origWorker(URL.createObjectURL(blob), options);
+                        };
+                    }
+                })();
+                </script>
+                '''.replace("__B64_STL__", b64_stl)
+                
+                if "<head>" in content: content = content.replace("<head>", "<head>" + injector)
+                else: content = injector + content
+                    
+                encoded_content = content.encode('utf-8')
+                self.send_response(200); self.send_header("Content-type", "text/html"); self.send_header("Content-Length", str(len(encoded_content))); self._send_cors(); self.end_headers(); self.wfile.write(encoded_content)
+                return
             except Exception as e:
                 self.send_response(500); self._send_cors(); self.end_headers(); self.wfile.write(str(e).encode())
 
@@ -466,31 +472,38 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.61 QUANTUM FIX"
+        page.title = "NEXUS CAD v20.65 TITAN FORGE"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.61 QUANTUM | Export Native Fix & Ensamble Estático", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.65 TITAN | Web Worker Bypass Activo", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
+        # Variables para el CSG Assembler de código (v20.26)
+        ensamble_stack = []
         herramienta_actual = "custom"
+        modo_ensamble = False
 
         def clear_editor():
+            nonlocal ensamble_stack
+            ensamble_stack = []
             txt_code.value = "function main() {\n  return CSG.cube({radius:[0.01,0.01,0.01]});\n}"
             status.value = "✓ Código borrado."; status.color = "#B71C1C"
             txt_code.update(); page.update()
 
-        def update_code_wrapper(e=None): generate_param_code()
+        def update_code_wrapper(e=None): 
+            if not modo_ensamble: generate_param_code()
 
         def create_slider(label, min_v, max_v, val, is_int):
             txt_val = ft.Text(f"{int(val) if is_int else val:.1f}", color="#00E5FF", width=45, text_align="right", size=13, weight="bold")
             sl = ft.Slider(min=min_v, max=max_v, value=val, expand=True, active_color="#00E5FF", inactive_color="#2A303C")
             if is_int: sl.divisions = int(max_v - min_v)
             def internal_change(e):
-                txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"; txt_val.update(); update_code_wrapper()
+                txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"; txt_val.update(); 
+                if not modo_ensamble: update_code_wrapper()
             sl.on_change = internal_change
             return sl, ft.Row([ft.Text(label, width=110, size=12, color="#E6EDF3"), sl, txt_val])
 
@@ -529,7 +542,61 @@ def main(page: ft.Page):
             LATEST_NEEDS_STL = ("IMPORTED_STL" in js_payload) or herramienta_actual.startswith("stl")
             set_tab(2); page.update()
 
-        panel_globales = ft.Container(content=ft.Column([ft.Text("🌐 PARÁMETROS GLOBALES", color="#00E5FF", weight="bold", size=11), r_g_w, r_g_l, r_g_h, r_g_t, r_g_tol, ft.Divider(color="#333333"), ft.Row([ft.Text("🎨 TEXTURA / RENDER:", color="#E6EDF3", size=11, width=130), dd_mat]), ft.Divider(color="#333333"), ft.Text("🎬 CINEMÁTICA INTERACTIVA", color="#B388FF", weight="bold", size=11), r_kine]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
+        # ========================================================
+        # RESTAURADO: ENSAMBLADOR CSG (Código de v20.26)
+        # ========================================================
+        sw_ensamble = ft.Switch(label="Manejo Código Ensamblador", value=False, active_color="#FFAB00")
+        
+        def parse_current_tool_to_stack_var():
+            code_lines = txt_code.value.split('\n')
+            var_name = f"obj_{len(ensamble_stack)}"
+            body = []
+            for line in code_lines[1:-1]:
+                if line.strip().startswith("return "):
+                    ret_val = line.replace("return UTILS.mat(", "").replace("return ", "").replace(");", "").replace(";", "").strip()
+                    body.append(f"  var {var_name} = {ret_val};")
+                else: body.append(line)
+            return "\n".join(body), var_name
+
+        def add_to_stack(op_type):
+            nonlocal ensamble_stack
+            body, var_name = parse_current_tool_to_stack_var()
+            if not ensamble_stack: ensamble_stack.append({"body": body, "var": var_name, "op": "base"})
+            else: ensamble_stack.append({"body": body, "var": var_name, "op": op_type})
+            compile_stack_to_editor()
+
+        def compile_stack_to_editor():
+            if not ensamble_stack: return
+            final_code = "function main() {\n"
+            final_var = ""
+            for i, item in enumerate(ensamble_stack):
+                final_code += f"  // --- Modificador {i} ({item['op']}) ---\n{item['body']}\n"
+                if item["op"] == "base": final_var = item["var"]
+                elif item["op"] == "union": final_code += f"  {final_var} = {final_var}.union({item['var']});\n"
+                elif item["op"] == "subtract": final_code += f"  {final_var} = {final_var}.subtract({item['var']});\n"
+            final_code += f"  return UTILS.mat({final_var});\n}}"
+            txt_code.value = final_code; txt_code.update(); page.update()
+
+        panel_ensamble_ops = ft.Row([
+            ft.ElevatedButton(content=ft.Text("➕ UNIR PIEZA", color="white"), on_click=lambda _: add_to_stack("union"), bgcolor="#1B5E20", expand=True),
+            ft.ElevatedButton(content=ft.Text("➖ RESTAR PIEZA", color="white"), on_click=lambda _: add_to_stack("subtract"), bgcolor="#B71C1C", expand=True)
+        ], visible=False)
+
+        def toggle_ensamble(e):
+            nonlocal modo_ensamble
+            modo_ensamble = sw_ensamble.value
+            panel_ensamble_ops.visible = modo_ensamble
+            page.update()
+            
+        sw_ensamble.on_change = toggle_ensamble
+
+        panel_globales = ft.Container(content=ft.Column([
+            ft.Row([ft.Text("🌐 PARÁMETROS GLOBALES", color="#00E5FF", weight="bold", size=11), sw_ensamble], alignment=ft.MainAxisAlignment.SPACE_BETWEEN), 
+            r_g_w, r_g_l, r_g_h, r_g_t, r_g_tol, ft.Divider(color="#333333"), 
+            ft.Row([ft.Text("🎨 TEXTURA / RENDER:", color="#E6EDF3", size=11, width=130), dd_mat]), ft.Divider(color="#333333"), 
+            ft.Text("🎬 CINEMÁTICA INTERACTIVA", color="#B388FF", weight="bold", size=11), r_kine,
+            panel_ensamble_ops
+        ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
 
         col_custom = ft.Column([ft.Text("Modo Código Libre (Edita en la pestaña CODE)", color="#00E676")], visible=True)
         def inst(texto): return ft.Text("ℹ️ " + texto, color="#FFD54F", size=11, italic=True)
@@ -980,15 +1047,14 @@ def main(page: ft.Page):
                 code += f"  var top = CSG.cylinder({{start:[0,0,150], end:[0,0,160], radius: (s/4)+10, slices:32}});\n"
                 code += f"  return UTILS.mat(UTILS.rotZ(base1.union(base2).union(pillar).union(top), KINE_T));\n}}"
 
-            if h != "custom": txt_code.value = code
+            if not modo_ensamble and h != "custom": txt_code.value = code
             txt_code.update()
 
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
             herramienta_actual = nombre_herramienta
             tool_panels = {"custom": col_custom, "sketcher": col_sketcher, "stl": col_stl, "stl_flatten": col_stl_flatten, "stl_split": col_stl_split, "stl_crop": col_stl_crop, "stl_drill": col_stl_drill, "stl_mount": col_stl_mount, "stl_ears": col_stl_ears, "stl_patch": col_stl_patch, "stl_honeycomb": col_stl_honeycomb, "stl_propguard": col_stl_propguard, "texto": col_texto, "cubo": col_cubo, "cilindro": col_cilindro, "laser": col_laser, "array_lin": col_array_lin, "array_pol": col_array_pol, "loft": col_loft, "panal": col_panal, "voronoi": col_voronoi, "evolvente": col_evolvente, "cremallera": col_cremallera, "conico": col_conico, "multicaja": col_multicaja, "perfil": col_perfil, "revolucion": col_revolucion, "escuadra": col_escuadra, "engranaje": col_engranaje, "pcb": col_pcb, "vslot": col_vslot, "bisagra": col_bisagra, "abrazadera": col_abrazadera, "fijacion": col_fijacion, "rodamiento": col_rodamiento, "planetario": col_planetario, "polea": col_polea, "helice": col_helice, "rotula": col_rotula, "carcasa": col_carcasa, "muelle": col_muelle, "acme": col_acme, "codo": col_codo, "naca": col_naca, "stand_movil": col_stand_movil, "clip_cable": col_clip_cable, "vr_pedestal": col_vr_pedestal}
-            for k, p in tool_panels.items(): 
-                if p: p.visible = (k == nombre_herramienta)
+            for k, p in tool_panels.items(): p.visible = (k == nombre_herramienta)
             panel_stl_transform.visible = nombre_herramienta.startswith("stl")
             generate_param_code(); page.update()
 
@@ -1066,7 +1132,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # TAB 3: ENSAMBLADOR VISUAL PBR (MODO SLOTS ESTÁTICOS - ANTI CUELGUE)
+        # TAB 3: ENSAMBLADOR VISUAL PBR 
         # =========================================================
         def build_static_assembly_cards():
             cards = []
@@ -1092,22 +1158,17 @@ def main(page: ft.Page):
                     return handler
                     
                 change_handler = make_change_handler(i, df, dm, sl_x, sl_y, sl_z)
-                df.on_change = change_handler
-                dm.on_change = change_handler
-                sl_x.on_change = change_handler
-                sl_y.on_change = change_handler
-                sl_z.on_change = change_handler
+                df.on_change = change_handler; dm.on_change = change_handler; sl_x.on_change = change_handler; sl_y.on_change = change_handler; sl_z.on_change = change_handler
                 
                 def make_delete_handler(idx, c):
                     def handler(e):
                         ASSEMBLY_PARTS_STATE[idx]["active"] = False
                         c.visible = False
                         update_pbr_state()
-                        c.update()
                         check_empty_assembly()
+                        page.update()  # IMPORTANTE: No usar c.update() directo si no está en pantalla
                     return handler
                     
-                # FIX CRÍTICO: Usamos el string "delete" para evitar el error de ft.icons.DELETE en versiones Flet antiguas en Android
                 btn_del = ft.IconButton(icon="delete", icon_color="red", on_click=make_delete_handler(i, card))
                 
                 card.content = ft.Column([
@@ -1136,7 +1197,6 @@ def main(page: ft.Page):
             has_active = any(p["active"] for p in ASSEMBLY_PARTS_STATE)
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
             lbl_ensamble_warn.visible = not has_active and not files
-            lbl_ensamble_warn.update()
 
         def add_assembly_part(e):
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
@@ -1149,14 +1209,13 @@ def main(page: ft.Page):
                     ASSEMBLY_PARTS_STATE[i]["active"] = True
                     card = col_assembly_cards[i]
                     card.data["refresh"]()
-                    
-                    # Reset values
                     card.data["sx"].value = 0; card.data["sy"].value = 0; card.data["sz"].value = 0
                     ASSEMBLY_PARTS_STATE[i]["x"] = 0; ASSEMBLY_PARTS_STATE[i]["y"] = 0; ASSEMBLY_PARTS_STATE[i]["z"] = 0
                     ASSEMBLY_PARTS_STATE[i]["mat"] = card.data["dm"].value
-                    
-                    card.visible = True; update_pbr_state(); card.update()
+                    card.visible = True
+                    update_pbr_state()
                     check_empty_assembly()
+                    page.update()  # IMPORTANTE: Reemplaza card.update() para evitar cuelgues
                     return
             status.value = "❌ Límite máximo de piezas (10) alcanzado."
             status.color = "#FFAB00"; page.update()
@@ -1173,11 +1232,9 @@ def main(page: ft.Page):
                 for i, card in enumerate(col_assembly_cards):
                     if ASSEMBLY_PARTS_STATE[i]["active"]:
                         card.data["refresh"]()
-                        card.update()
-            lbl_ensamble_warn.update()
 
         view_ensamble = ft.Column([
-            ft.Text("🧩 MESA DE ENSAMBLAJE (ANTI-CRASH)", size=20, color="#FFAB00", weight="bold"),
+            ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"),
             ft.Text("Une hasta 10 STLs. Se reflejará instantáneamente en PBR.", color="#8B949E", size=11),
             ft.Row([ft.ElevatedButton("➕ AÑADIR PIEZA", on_click=add_assembly_part, bgcolor="#1B5E20", color="white"), ft.ElevatedButton("👁️ ABRIR PBR", on_click=lambda _: set_tab(4), bgcolor="#C51162", color="white")]),
             ft.Divider(), col_assembly
@@ -1342,65 +1399,6 @@ def main(page: ft.Page):
             ]), bgcolor="#161B22", padding=10, border_radius=8)
         ], expand=True, scroll="auto")
 
-        # =========================================================
-        # TAB 6: IA INTEGRADA (CON TEXTFIELD DE FALLBACK SEGURO)
-        # =========================================================
-        tf_ia_prompt = ft.TextField(label="¿Qué pieza 3D exacta quieres que diseñe?", hint_text="Ej: Una caja de 50x50x20 con un hueco cilíndrico en el centro", multiline=True, bgcolor="#0B0E14", color="white", border_color="#00E5FF")
-        tf_ia_output = ft.TextField(read_only=True, multiline=True, min_lines=4, label="TEXTO GENERADO (Manten pulsado aquí para copiar manualmente)", visible=False, bgcolor="#0B0E14", color="#00E676", border_color="#00E676")
-        
-        def copy_magic_prompt(e):
-            texto_usuario = tf_ia_prompt.value.strip()
-            if not texto_usuario:
-                status.value = "❌ Escribe primero lo que quieres diseñar."
-                status.color = "red"
-                page.update()
-                return
-            
-            prompt_magico = f"Actúa como un experto en programación 3D paramétrica OpenSCAD y JS-CSG. Necesito que escribas el código javascript estricto para crear lo siguiente: '{texto_usuario}'. Usa la librería @jscad/csg. Asegúrate de usar funciones como CSG.cube(), CSG.cylinder(), CSG.sphere(), .union() y .subtract() adecuadamente. OBLIGATORIO: Debes envolver todo el código en 'function main() {{ ... return pieza; }}'. Devuelve SOLO el código dentro de un bloque javascript, no me des explicaciones de texto, solo quiero el código puro para copiar y pegar."
-            
-            tf_ia_output.value = prompt_magico
-            tf_ia_output.visible = True
-            try:
-                page.set_clipboard(prompt_magico)
-                status.value = "✓ PROMPT COPIADO AL PORTAPAPELES. ¡Vete al chat de Gemini!"
-            except:
-                status.value = "⚠️ Android bloqueó la copia auto. CÓPIALO DEL RECUADRO VERDE DE ABAJO."
-            status.color = "#00E676"
-            page.update()
-
-        ia_code = ft.TextField(label="Pega aquí el código Javascript que te dio la IA", multiline=True, height=200, bgcolor="#161B22", color="#8E24AA", text_size=12, border_color="#8E24AA")
-        
-        def inject_ia_code(e):
-            if ia_code.value.strip():
-                txt_code.value = ia_code.value
-                txt_code.update()
-                set_tab(2)
-                run_render()
-                status.value = "✓ Código IA Inyectado y Renderizado en 3D."; status.color = "#8E24AA"; page.update()
-            else:
-                status.value = "❌ Pega primero el código."; status.color = "red"; page.update()
-
-        view_ia = ft.Column([
-            ft.Text("🤖 ASISTENTE IA NEXUS (PASO A PASO)", size=18, color="#8E24AA", weight="bold"),
-            ft.Text("Dado que la app no tiene API integrada, yo te ayudo a crear el código perfecto:", color="#E6EDF3", size=11),
-            
-            ft.Container(content=ft.Column([
-                ft.Text("PASO 1: CREAR INSTRUCCIÓN PARA LA IA", color="#00E5FF", weight="bold"),
-                tf_ia_prompt,
-                ft.ElevatedButton("1️⃣ COPIAR PROMPT", on_click=copy_magic_prompt, bgcolor="#00E5FF", color="black", width=float('inf')),
-                tf_ia_output
-            ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E5FF")),
-            
-            ft.Container(height=10),
-            
-            ft.Container(content=ft.Column([
-                ft.Text("PASO 2: PEGA LA RESPUESTA Y RENDERIZA", color="#8E24AA", weight="bold"),
-                ia_code,
-                ft.ElevatedButton("2️⃣ INYECTAR Y VER EN 3D", on_click=inject_ia_code, bgcolor="#8E24AA", color="white", height=60, width=float('inf'))
-            ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#8E24AA"))
-            
-        ], expand=True, scroll="auto")
-
         main_container = ft.Container(content=view_editor, expand=True)
 
         def set_tab(idx):
@@ -1408,7 +1406,7 @@ def main(page: ft.Page):
             if idx in [0, 1, 2]: PBR_STATE["mode"] = "single"
             if idx == 3: render_assembly_ui()
             if idx == 5: refresh_nexus_db(); refresh_explorer(current_android_dir)
-            main_container.content = [view_editor, view_constructor, view_visor, view_ensamble, view_pbr, view_archivos, view_ia][idx]
+            main_container.content = [view_editor, view_constructor, view_visor, view_ensamble, view_pbr, view_archivos][idx]
             page.update()
 
         nav_bar = ft.Row([
@@ -1418,7 +1416,6 @@ def main(page: ft.Page):
             ft.ElevatedButton("🧩 ENSAMBLE", on_click=lambda _: set_tab(3), bgcolor="#7CB342", color="white"),
             ft.ElevatedButton("🎨 PBR", on_click=lambda _: set_tab(4), bgcolor="#C51162", color="white"),
             ft.ElevatedButton("📂 FILES", on_click=lambda _: set_tab(5), bgcolor="#21262D", color="white"),
-            ft.ElevatedButton("🤖 IA", on_click=lambda _: set_tab(6), bgcolor="#8E24AA", color="white"),
         ], scroll="auto")
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))

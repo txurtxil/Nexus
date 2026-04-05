@@ -1,5 +1,5 @@
 import flet as ft
-import os, base64, json, threading, http.server, socket, time, warnings, traceback, shutil, re
+import os, base64, json, threading, http.server, socketserver, socket, time, warnings, traceback, shutil
 
 try:
     import psutil
@@ -85,6 +85,25 @@ def get_stl_hash():
             if sz > 84: return f"{os.path.getmtime(path)}_{sz}"
         except: pass
     return ""
+
+def validate_stl(filepath):
+    try:
+        sz = os.path.getsize(filepath)
+        if sz < 84: return False, "El archivo es demasiado pequeño."
+        with open(filepath, 'rb') as f:
+            header = f.read(80)
+            if b'solid ' in header[:10]:
+                return True, "ASCII STL Detectado"
+            tris = int.from_bytes(f.read(4), byteorder='little')
+            expected = 84 + (tris * 50)
+            if sz == expected:
+                return True, "Binario STL Válido"
+            return False, f"STL Incompleto/Roto: Pesa {sz}B, Motor exige {expected}B."
+    except Exception as e:
+        return False, f"Error lectura: {e}"
+
+# STL Binario de 1 triángulo (Matemáticamente perfecto para evitar crashes de DataView)
+DUMMY_VALID_STL = b'NEXUS_DUMMY_STL' + (b'\x00' * 65) + (1).to_bytes(4, 'little') + (b'\x00' * 50)
 
 PBR_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="es">
@@ -226,6 +245,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
+        self.send_header("Connection", "close") # Previene cuelgues ProgressEvent en WebView
 
     def do_OPTIONS(self):
         self.send_response(200); self._send_cors(); self.end_headers()
@@ -273,15 +293,12 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
-            dummy_stl = b'\x00' * 84
-            data_to_send = dummy_stl
+            data_to_send = DUMMY_VALID_STL
             
             if os.path.exists(filepath):
                 try:
-                    sz = os.path.getsize(filepath)
-                    if sz >= 84:
-                        with open(filepath, "rb") as f:
-                            data_to_send = f.read()
+                    with open(filepath, "rb") as f:
+                        data_to_send = f.read()
                 except Exception:
                     pass
             
@@ -311,24 +328,18 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             else: self.send_response(404); self._send_cors(); self.end_headers()
             
         elif parsed.path == '/' or parsed.path == '/openscad_engine.html':
-            # =========================================================================
-            # PARCHE NUCLEAR v20.23: INYECCIÓN DIRECTA BASE64 (DATA URI)
-            # =========================================================================
             try:
                 fn = "openscad_engine.html"
                 with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
                     content = f.read().decode('utf-8')
                 
-                # Leemos el STL y lo convertimos a Data URI puro para eludir
-                # por completo la capa de red (WebView/CORS/VPN) del Worker.
-                filepath = os.path.join(EXPORT_DIR, "imported.stl")
-                if os.path.exists(filepath) and os.path.getsize(filepath) >= 84:
-                    with open(filepath, "rb") as stl_file:
-                        b64_stl = base64.b64encode(stl_file.read()).decode('utf-8')
-                    
-                    data_uri = f"data:application/octet-stream;base64,{b64_stl}"
-                    # Reemplazamos cualquier mención a '/imported.stl' por el bloque base64.
-                    content = re.sub(r'[\'"]/imported\.stl(\?.*?)?[\'"]', f"'{data_uri}'", content)
+                # Inyección de URL Absoluta segura
+                host = self.headers.get('Host', f'127.0.0.1:{LOCAL_PORT}')
+                abs_url = f"http://{host}/imported.stl"
+                
+                content = content.replace("'/imported.stl", f"'{abs_url}")
+                content = content.replace('"/imported.stl', f'"{abs_url}')
+                content = content.replace("`/imported.stl", f"`{abs_url}")
                 
                 encoded_content = content.encode('utf-8')
                 self.send_response(200)
@@ -350,19 +361,24 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             
     def log_message(self, *args): pass
 
-threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
+# Servidor HTTP Multi-hilo para evitar cuelgues de WebView
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), NexusHandler).serve_forever(), daemon=True).start()
 
 # =========================================================
 # APP FLET MAIN
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.23 PBR TITAN"
+        page.title = "NEXUS CAD v20.24 PBR TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.23 TITAN | Base64 Injector Activo", color="#C51162", weight="bold")
+        status = ft.Text("NEXUS v20.24 TITAN | Threaded Server & STL Shield", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -1193,13 +1209,17 @@ def main(page: ft.Page):
         def load_file(filepath):
             fn = os.path.basename(filepath); ext = fn.lower().split('.')[-1]
             if ext == "stl":
-                try:
-                    if os.path.getsize(filepath) < 84:
-                        status.value = f"❌ Error: El archivo {fn} está corrupto."; status.color = "#FF5252"; page.update(); return
-                except: pass
+                # ESCANER FORENSE DE STL INCORPORADO
+                is_valid, msg = validate_stl(filepath)
+                if not is_valid:
+                    status.value = f"❌ {msg}"
+                    status.color = "#FF5252"
+                    page.update()
+                    return
+                    
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl"))
                 lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
-                select_tool("stl"); set_tab(1); update_code_wrapper(); status.value = "✓ STL Listo en Forge y PBR"
+                select_tool("stl"); set_tab(1); update_code_wrapper(); status.value = f"✓ STL Cargado ({msg})"
             elif ext == "jscad":
                 txt_code.value = open(filepath).read(); set_tab(0); status.value = "✓ Código Cargado"
             page.update()

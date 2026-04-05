@@ -137,7 +137,6 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // --- SHADERS PROCEDURALES CANVAS ---
         function createCarbonFiber() {
             const c = document.createElement('canvas'); c.width=64; c.height=64;
             const ctx = c.getContext('2d');
@@ -200,12 +199,14 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
                 currentMesh.rotation.x = -Math.PI / 2;
                 scene.add(currentMesh);
                 
-                // Auto-adjust camera
                 geometry.computeBoundingSphere();
                 const radius = geometry.boundingSphere.radius;
                 camera.position.set(radius*1.5, radius*1.5, radius*1.5);
                 controls.target.set(0,0,0);
                 controls.update();
+            }, undefined, function(error) {
+                console.error(error);
+                alert("Error cargando PBR STL: ¿Está la pieza seleccionada en FILES?");
             });
         }
 
@@ -214,10 +215,8 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
         });
 
         loadSTL();
-
         function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
         animate();
-
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
@@ -276,14 +275,28 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
         elif parsed.path == '/imported.stl':
             filepath = os.path.join(EXPORT_DIR, "imported.stl")
             dummy_stl = b'\x00' * 84
+            data_to_send = dummy_stl
+            
+            # Intentar leer el STL real
             if os.path.exists(filepath):
                 try:
-                    if os.path.getsize(filepath) >= 84:
+                    sz = os.path.getsize(filepath)
+                    if sz >= 84:
                         with open(filepath, "rb") as f:
-                            self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
-                        return
-                except: pass
-            self.send_response(200); self.send_header("Content-type", "application/sla"); self._send_cors(); self.end_headers(); self.wfile.write(dummy_stl)
+                            data_to_send = f.read()
+                except Exception:
+                    pass
+            
+            # Enviar con TODOS los headers de binario y tamaño explícito para evitar fallos ProgressEvent en WebView
+            self.send_response(200)
+            self.send_header("Content-type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(data_to_send)))
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self._send_cors()
+            self.end_headers()
+            self.wfile.write(data_to_send)
 
         elif parsed.path == '/pbr_studio.html':
             self.send_response(200); self.send_header("Content-type", "text/html"); self.send_header("Content-Length", str(len(PBR_HTML_TEMPLATE.encode('utf-8')))); self._send_cors(); self.end_headers(); self.wfile.write(PBR_HTML_TEMPLATE.encode('utf-8'))
@@ -316,12 +329,12 @@ threading.Thread(target=lambda: http.server.HTTPServer(("0.0.0.0", LOCAL_PORT), 
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.20 PBR TITAN"
+        page.title = "NEXUS CAD v20.21 PBR TITAN"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.20 TITAN | PBR Studio Engine Activo", color="#C51162", weight="bold")
+        status = ft.Text("NEXUS v20.21 TITAN | Network Patch Activo", color="#C51162", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)

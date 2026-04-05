@@ -39,6 +39,7 @@ LOCAL_PORT = 8556
 LATEST_CODE_B64 = ""
 LATEST_NEEDS_STL = False
 
+ASSEMBLY_PARTS = [] # Global robusta para las piezas
 PBR_STATE = {
     "mode": "single",
     "parts": []
@@ -433,12 +434,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.29 TITAN FULL"
+        page.title = "NEXUS CAD v20.30 TITAN POLISH"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.29 | Ensamble PBR & TODAS Las Herramientas Recuperadas", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.30 | Ensamble Seguro & Asistente IA Mejorado", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -1025,46 +1026,68 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
         
         # =========================================================
-        # TAB 3: ENSAMBLADOR VISUAL PBR
+        # TAB 3: ENSAMBLADOR VISUAL PBR (CORREGIDO Y SEGURO)
         # =========================================================
         def update_pbr_state():
-            global PBR_STATE
+            global PBR_STATE, ASSEMBLY_PARTS
             PBR_STATE["mode"] = "assembly"
-            PBR_STATE["parts"] = getattr(page, "assembly_parts", [])
+            PBR_STATE["parts"] = ASSEMBLY_PARTS
             
         def render_assembly_ui():
+            global ASSEMBLY_PARTS
             col_assembly.controls.clear()
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
-            opts = [ft.dropdown.Option(f) for f in files]
-            if not opts: col_assembly.controls.append(ft.Text("⚠️ DB vacía. Inyecta STLs en FILES.", color="#FFAB00"))
             
-            for idx, p in enumerate(getattr(page, "assembly_parts", [])):
-                df = ft.Dropdown(options=opts, value=p.get("file"), width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
+            if not files:
+                col_assembly.controls.append(ft.Text("⚠️ DB de STLs vacía.\nVe a la pestaña FILES y sube tus piezas a la Nexus DB primero para poder ensamblar.", color="#FFAB00", weight="bold"))
+                page.update()
+                return
+                
+            opts = [ft.dropdown.Option(f) for f in files]
+            
+            for p in ASSEMBLY_PARTS:
+                if p["file"] not in files: p["file"] = files[0]
+                
+                df = ft.Dropdown(options=opts, value=p["file"], width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
                 dm = ft.Dropdown(options=[ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")], value=p.get("mat", "pla"), width=100, text_size=12, bgcolor="#0B0E14")
                 
-                def sl(k, l):
-                    s = ft.Slider(min=-200, max=200, value=p.get(k, 0), expand=True)
-                    def oc(e, key=k, part=p): part[key] = e.control.value; update_pbr_state()
+                # Bindeo robusto usando def anidadas con kwargs explícitos
+                def make_slider(k, l, part=p):
+                    s = ft.Slider(min=-200, max=200, value=part.get(k, 0), expand=True)
+                    def oc(e, key=k, prt=part):
+                        prt[key] = e.control.value
+                        update_pbr_state()
                     s.on_change = oc
-                    return ft.Row([ft.Text(l, size=10, color="#8B949E"), s])
+                    return ft.Row([ft.Text(l, size=10, color="#8B949E", width=15), s])
                 
                 def onf(e, part=p): part["file"] = e.control.value; update_pbr_state()
                 def onm(e, part=p): part["mat"] = e.control.value; update_pbr_state()
-                def ond(e, i=idx): getattr(page, "assembly_parts").pop(i); render_assembly_ui(); update_pbr_state()
-                
+                def ond(e, part_to_remove=p):
+                    if part_to_remove in ASSEMBLY_PARTS:
+                        ASSEMBLY_PARTS.remove(part_to_remove)
+                    render_assembly_ui()
+                    update_pbr_state()
+                    
                 df.on_change = onf; dm.on_change = onm
+                
                 card = ft.Container(content=ft.Column([
                     ft.Row([df, dm, ft.IconButton(ft.icons.DELETE, icon_color="red", on_click=ond)], alignment="spaceBetween"),
-                    sl("x","X"), sl("y","Y"), sl("z","Z")
+                    make_slider("x","X"), make_slider("y","Y"), make_slider("z","Z")
                 ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"))
                 col_assembly.controls.append(card)
             page.update()
 
         def add_assembly_part(e):
-            if not hasattr(page, "assembly_parts"): page.assembly_parts = []
+            global ASSEMBLY_PARTS
             files = [f for f in os.listdir(EXPORT_DIR) if f.lower().endswith('.stl') and f != "imported.stl"]
-            page.assembly_parts.append({"file": files[0] if files else "", "mat": "pla", "x": 0, "y": 0, "z": 0})
-            render_assembly_ui(); update_pbr_state()
+            if not files:
+                status.value = "❌ No hay STLs para añadir. Sube archivos en la pestaña FILES."
+                status.color = "#FF5252"
+                page.update()
+                return
+            ASSEMBLY_PARTS.append({"file": files[0], "mat": "pla", "x": 0, "y": 0, "z": 0})
+            render_assembly_ui()
+            update_pbr_state()
 
         col_assembly = ft.Column(scroll="auto", expand=True)
         view_ensamble = ft.Column([
@@ -1215,23 +1238,56 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # TAB 6: IA INTEGRADA
+        # TAB 6: IA INTEGRADA (REDSIEÑADA PARA FLUJO HUMANO)
         # =========================================================
-        ia_code = ft.TextField(multiline=True, expand=True, bgcolor="#161B22", color="#00E676", text_size=12, border_color="#8E24AA")
+        tf_ia_prompt = ft.TextField(label="¿Qué pieza 3D exacta quieres que diseñe?", hint_text="Ej: Una caja de 50x50x20 con un hueco cilíndrico en el centro", multiline=True, bgcolor="#0B0E14", color="white", border_color="#00E5FF")
+        
+        def copy_magic_prompt(e):
+            texto_usuario = tf_ia_prompt.value.strip()
+            if not texto_usuario:
+                status.value = "❌ Escribe primero lo que quieres diseñar."
+                status.color = "red"
+                page.update()
+                return
+            
+            prompt_magico = f"Actúa como un experto en programación 3D paramétrica OpenSCAD y JS-CSG. Necesito que escribas el código javascript estricto para crear lo siguiente: '{texto_usuario}'. Usa la librería @jscad/csg. Asegúrate de usar funciones como CSG.cube(), CSG.cylinder(), CSG.sphere(), .union() y .subtract() adecuadamente. OBLIGATORIO: Debes envolver todo el código en 'function main() {{ ... return pieza; }}'. Devuelve SOLO el código dentro de un bloque javascript, no me des explicaciones de texto, solo quiero el código puro para copiar y pegar."
+            
+            page.set_clipboard(prompt_magico)
+            status.value = "✓ PROMPT COPIADO AL PORTAPAPELES. ¡Vete al chat de Gemini y pégamelo!"
+            status.color = "#00E676"
+            page.update()
+
+        ia_code = ft.TextField(label="Pega aquí el código Javascript que te dio la IA", multiline=True, height=200, bgcolor="#161B22", color="#00E676", text_size=12, border_color="#8E24AA")
+        
         def inject_ia_code(e):
             if ia_code.value.strip():
-                txt_code.value = ia_code.value; txt_code.update()
-                set_tab(2); run_render()
-                status.value = "✓ Código IA Inyectado y Renderizado."; status.color = "#8E24AA"; page.update()
+                txt_code.value = ia_code.value
+                txt_code.update()
+                set_tab(2)
+                run_render()
+                status.value = "✓ Código IA Inyectado y Renderizado en 3D."; status.color = "#8E24AA"; page.update()
             else:
                 status.value = "❌ Pega primero el código."; status.color = "red"; page.update()
 
         view_ia = ft.Column([
-            ft.Text("🤖 ASISTENTE IA NEXUS", size=20, color="#8E24AA", weight="bold"),
-            ft.Text("1. Pídele a la IA: 'Diseña el código JS-CSG de una caja...'\n2. Pega el bloque de código aquí abajo.", color="#E6EDF3", size=11),
-            ia_code,
-            ft.ElevatedButton("🚀 INYECTAR Y RENDERIZAR EN 3D", on_click=inject_ia_code, bgcolor="#8E24AA", color="white", height=60, width=float('inf'))
-        ], expand=True)
+            ft.Text("🤖 ASISTENTE IA NEXUS (PASO A PASO)", size=18, color="#8E24AA", weight="bold"),
+            ft.Text("Dado que la app no tiene API integrada, yo te ayudo a crear el código perfecto:", color="#E6EDF3", size=11),
+            
+            ft.Container(content=ft.Column([
+                ft.Text("PASO 1: CREAR INSTRUCCIÓN PARA LA IA", color="#00E5FF", weight="bold"),
+                tf_ia_prompt,
+                ft.ElevatedButton("1️⃣ COPIAR PROMPT AL PORTAPAPELES", on_click=copy_magic_prompt, bgcolor="#00E5FF", color="black", width=float('inf'))
+            ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E5FF")),
+            
+            ft.Container(height=10),
+            
+            ft.Container(content=ft.Column([
+                ft.Text("PASO 2: PEGA LA RESPUESTA Y RENDERIZA", color="#8E24AA", weight="bold"),
+                ia_code,
+                ft.ElevatedButton("2️⃣ INYECTAR Y VER EN 3D", on_click=inject_ia_code, bgcolor="#8E24AA", color="white", height=60, width=float('inf'))
+            ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#8E24AA"))
+            
+        ], expand=True, scroll="auto")
 
         main_container = ft.Container(content=view_editor, expand=True)
 

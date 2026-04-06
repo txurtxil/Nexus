@@ -160,6 +160,37 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        
+        # --- NUEVO: ENDPOINT OPTIMIZADO PARA ARCHIVOS GRANDES (RAW) ---
+        if parsed.path == '/api/upload_raw':
+            cl = int(self.headers.get('Content-Length', 0))
+            filename = unquote(self.headers.get('File-Name', f'nexus_upload_{int(time.time())}.stl'))
+            if cl > 0:
+                try:
+                    # Guardamos directamente leyendo el flujo en trozos de 8KB (No satura RAM)
+                    filepath_export = os.path.join(EXPORT_DIR, filename)
+                    with open(filepath_export, 'wb') as f:
+                        remaining = cl
+                        chunk_size = 8192 
+                        while remaining > 0:
+                            read_size = min(chunk_size, remaining)
+                            data = self.rfile.read(read_size)
+                            if not data: break
+                            f.write(data)
+                            remaining -= len(data)
+                    
+                    # Guardar una copia en la carpeta Descargas de Android
+                    try: shutil.copy(filepath_export, os.path.join(DOWNLOAD_DIR, filename))
+                    except: pass
+
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'{"status":"ok"}')
+                    return
+                except Exception as e:
+                    pass
+            self.send_response(500); self._send_cors(); self.end_headers()
+            return
+        # --------------------------------------------------------------
+
         if parsed.path == '/api/inject_code':
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
@@ -684,7 +715,6 @@ def main(page: ft.Page):
         txt_vol = ft.Text("0.0 cm³", color="#FFAB00", weight="bold"); txt_peso = ft.Text("0.0 g", color="#00E676", weight="bold")
         panel_calibre = ft.Container(content=ft.Column([ft.Text("📐 CALIBRE 3D Y PRESUPUESTO (STL ACTUAL)", color="#E6EDF3", weight="bold"), ft.Row([ft.Text("Ancho (X):", color="#8B949E", width=80), txt_dim_x]), ft.Row([ft.Text("Largo (Y):", color="#8B949E", width=80), txt_dim_y]), ft.Row([ft.Text("Alto (Z):", color="#8B949E", width=80), txt_dim_z]), ft.Divider(color="#30363D"), ft.Row([ft.Text("Volumen:", color="#8B949E", width=80), txt_vol]), ft.Row([ft.Text("Peso PLA:", color="#8B949E", width=80), txt_peso])]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#2962FF"))
 
-        # POPUP PARA RENOMBRAR (Se mantiene)
         rename_target = ""
         tf_rename = ft.TextField(label="Nuevo nombre.stl/.jscad", bgcolor="#161B22", color="#00E5FF")
         
@@ -779,7 +809,6 @@ def main(page: ft.Page):
             if ext in ["stl", "jscad"]: load_file(filepath)
             else: status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"; page.update()
 
-        # NUEVA FUNCIÓN PARA IMPORTAR A LA DB SIN DEPENDER DEL FILEPICKER
         def copy_to_db(e, filepath, filename):
             try:
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, filename))
@@ -820,7 +849,6 @@ def main(page: ft.Page):
                     elif ext == "png": icon = "🖼️"; color = "#C51162"
                     
                     p = os.path.join(path, f)
-                    # Botón exclusivo para importar
                     actions = [
                         custom_icon_btn("▶️", lambda e, fp=p: file_action(fp), "Cargar directamente"),
                         custom_icon_btn("📥", lambda e, fp=p, fn=f: copy_to_db(e, fp, fn), "Importar archivo a la DB")

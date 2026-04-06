@@ -36,6 +36,7 @@ ANDROID_ROOT = get_android_root()
 # GLOBALES DE ESTADO
 # =========================================================
 LAN_IP = "127.0.0.1"
+INTERNAL_IP = "127.0.0.1" # IP estática indestructible para la comunicación móvil-app
 LOCAL_PORT = 8556
 LATEST_CODE_B64 = ""
 LATEST_NEEDS_STL = False
@@ -161,13 +162,11 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         
-        # --- NUEVO: ENDPOINT OPTIMIZADO PARA ARCHIVOS GRANDES (RAW) ---
         if parsed.path == '/api/upload_raw':
             cl = int(self.headers.get('Content-Length', 0))
             filename = unquote(self.headers.get('File-Name', f'nexus_upload_{int(time.time())}.stl'))
             if cl > 0:
                 try:
-                    # Guardamos directamente leyendo el flujo en trozos de 8KB (No satura RAM)
                     filepath_export = os.path.join(EXPORT_DIR, filename)
                     with open(filepath_export, 'wb') as f:
                         remaining = cl
@@ -179,7 +178,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                             f.write(data)
                             remaining -= len(data)
                     
-                    # Guardar una copia en la carpeta Descargas de Android
                     try: shutil.copy(filepath_export, os.path.join(DOWNLOAD_DIR, filename))
                     except: pass
 
@@ -189,7 +187,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     pass
             self.send_response(500); self._send_cors(); self.end_headers()
             return
-        # --------------------------------------------------------------
 
         if parsed.path == '/api/inject_code':
             cl = int(self.headers.get('Content-Length', 0))
@@ -621,14 +618,15 @@ def main(page: ft.Page):
             ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
             ft.Container(height=5),
             ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
-            ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
+            # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
+            ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
         
         def build_static_assembly_cards():
             cards = []
             for i in range(MAX_ASSEMBLY_PARTS):
                 df = ft.Dropdown(options=[], width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF")
-                dm = ft.Dropdown(options=[ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")], value="pla", width=100, text_size=12, bgcolor="#0B0E14")
+                dm = ft.Dropdown(options=[ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("glass"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("copper"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")], value="pla", width=100, text_size=12, bgcolor="#0B0E14")
                 sl_x = ft.Slider(min=-200, max=200, value=0, expand=True); sl_y = ft.Slider(min=-200, max=200, value=0, expand=True); sl_z = ft.Slider(min=-200, max=200, value=0, expand=True)
                 card = ft.Container(bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"), visible=False)
                 
@@ -708,7 +706,8 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")),
             ft.Container(height=20),
-            ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{LAN_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
+            # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
+            ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
         ], expand=True, horizontal_alignment="center")
 
         txt_dim_x = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_dim_y = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_dim_z = ft.Text("0.0 mm", color="#00E5FF", weight="bold")
@@ -885,7 +884,8 @@ def main(page: ft.Page):
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                ft.ElevatedButton("🌐 ABRIR INYECTOR WEB STL", url=f"http://{LAN_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00B0FF", color="white", width=float('inf')),
+                # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
+                ft.ElevatedButton("🌐 ABRIR INYECTOR WEB STL", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00B0FF", color="white", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
             ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
@@ -902,7 +902,8 @@ def main(page: ft.Page):
             ft.Text("🤖 AGENTE IA AUTÓNOMO", size=24, color="#B388FF", weight="bold", text_align="center"),
             ft.Text("NEXUS ahora tiene su propio motor de IA integrado vía Web.", color="#E6EDF3", text_align="center"),
             ft.Container(height=30),
-            ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{LAN_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')),
+            # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
+            ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')),
             ft.Container(height=20),
             ft.Text("💡 Nota: El código generado por la IA se inyectará automáticamente en la pestaña CODE.", color="#8B949E", size=12, text_align="center")
         ], expand=True, horizontal_alignment="center")

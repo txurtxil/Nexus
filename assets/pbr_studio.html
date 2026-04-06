@@ -27,9 +27,11 @@
                 <option value="carbon">Fibra de Carbono</option>
                 <option value="wood">Madera Bambú</option>
                 <option value="petg">PETG Translúcido</option>
-                <option value="aluminum">Aluminio</option>
+                <option value="glass">Cristal Oscuro</option>
+                <option value="aluminum">Aluminio Mecanizado</option>
+                <option value="copper">Cobre Oxidado</option>
                 <option value="gold">Oro Puro</option>
-                <option value="pla" selected>PLA Gris</option>
+                <option value="pla" selected>PLA Gris Matte</option>
             </select>
         </div>
         <div style="margin-bottom:10px;">
@@ -46,9 +48,10 @@
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0B0E14);
-        scene.fog = new THREE.FogExp2(0x0B0E14, 0.002);
+        scene.fog = new THREE.FogExp2(0x0B0E14, 0.001); // Niebla un poco menos densa para modelos grandes
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
+        // CORRECCIÓN CLIPPING: near muy pequeño (0.01), far gigantesco (100000)
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 100000);
         camera.position.set(150, 150, 150);
 
         const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
@@ -71,16 +74,19 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
         dirLight.position.set(50, 150, 50); dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 500;
-        const d = 150; dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d; dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d; dirLight.shadow.bias = -0.0005; 
+        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 2000; // Sombra hasta más lejos
+        const d = 400; // Rango de sombra mucho más amplio para piezas grandes
+        dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d; dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d; 
+        dirLight.shadow.bias = -0.0005; 
         scene.add(dirLight);
 
-        const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+        // Suelo extra grande
+        const floorGeo = new THREE.PlaneGeometry(5000, 5000);
         const floorMat = new THREE.MeshStandardMaterial({color: 0x0B0E14, roughness: 0.1, metalness: 0.5});
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2; floor.position.y = -0.5; floor.receiveShadow = true; scene.add(floor);
 
-        const grid = new THREE.GridHelper(500, 50, 0x30363D, 0x161B22); grid.position.y = -0.49; scene.add(grid);
+        const grid = new THREE.GridHelper(2000, 100, 0x30363D, 0x161B22); grid.position.y = -0.49; scene.add(grid);
 
         document.getElementById('lightSlider').addEventListener('input', (e) => { 
             dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.4; renderer.toneMappingExposure = parseFloat(e.target.value) * 0.8;
@@ -94,17 +100,26 @@
         }
 
         function createTex(type) {
-            const c = document.createElement('canvas'); c.width=256; c.height=256; const ctx = c.getContext('2d');
+            const c = document.createElement('canvas'); c.width=512; c.height=512; const ctx = c.getContext('2d');
             if(type==='carbon') {
-                ctx.fillStyle='#111'; ctx.fillRect(0,0,256,256); ctx.fillStyle='#2a2a2a'; ctx.fillRect(0,0,128,128); ctx.fillRect(128,128,128,128);
-                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(16,16); return tex;
+                ctx.fillStyle='#111'; ctx.fillRect(0,0,512,512); ctx.fillStyle='#2a2a2a'; ctx.fillRect(0,0,256,256); ctx.fillRect(256,256,256,256);
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(32,32); return tex;
             } else if(type==='aluminum') {
-                ctx.fillStyle='#999'; ctx.fillRect(0,0,256,256);
-                for(let i=0;i<1000;i++){ ctx.fillStyle=Math.random()>0.5?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)'; ctx.fillRect(0,Math.random()*256,256,2); }
+                ctx.fillStyle='#999'; ctx.fillRect(0,0,512,512);
+                for(let i=0;i<2000;i++){ ctx.fillStyle=Math.random()>0.5?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'; ctx.fillRect(0,Math.random()*512,512,2); }
                 const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(4,4); return tex;
+            } else if(type==='copper') {
+                // Procedural Patina
+                ctx.fillStyle='#b87333'; ctx.fillRect(0,0,512,512);
+                for(let i=0;i<5000;i++){
+                    ctx.fillStyle=Math.random()>0.7?'rgba(46,139,87,0.3)':'rgba(60,30,10,0.2)'; // Verdigris / Dirt
+                    ctx.beginPath(); ctx.arc(Math.random()*512, Math.random()*512, Math.random()*15, 0, Math.PI*2); ctx.fill();
+                }
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2,2); return tex;
             } else {
-                ctx.fillStyle='#dcb68a'; ctx.fillRect(0,0,256,256);
-                for(let i=0;i<500;i++){ ctx.fillStyle='rgba(139,69,19,0.1)'; ctx.fillRect(Math.random()*256,0,2,256); }
+                ctx.fillStyle='#dcb68a'; ctx.fillRect(0,0,512,512);
+                for(let i=0;i<1000;i++){ ctx.fillStyle='rgba(139,69,19,0.15)'; ctx.fillRect(Math.random()*512,0,3,512); }
+                for(let i=0;i<20;i++){ ctx.beginPath(); ctx.strokeStyle='rgba(100,50,10,0.2)'; ctx.lineWidth=10; ctx.arc(Math.random()*512, Math.random()*512, Math.random()*50+20, 0, Math.PI*2); ctx.stroke(); }
                 const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; return tex;
             }
         }
@@ -112,8 +127,10 @@
         const mats = {
             pla: new THREE.MeshStandardMaterial({color: 0x888888, roughness: 0.6, metalness: 0.2}),
             petg: new THREE.MeshPhysicalMaterial({color: 0xddffff, transmission: 0.95, opacity: 1, transparent: true, roughness: 0.1, ior: 1.5, thickness: 3.0, clearcoat: 1.0}),
+            glass: new THREE.MeshPhysicalMaterial({color: 0x111111, transmission: 1.0, opacity: 1, transparent: true, roughness: 0.05, ior: 1.6, thickness: 5.0, clearcoat: 1.0, metalness: 0.3}),
             carbon: new THREE.MeshPhysicalMaterial({color: 0x333333, roughness: 0.4, metalness: 0.6, map: createTex('carbon'), clearcoat: 1.0}),
             aluminum: new THREE.MeshStandardMaterial({color: 0xb0b0b0, roughness: 0.2, metalness: 1.0, map: createTex('aluminum')}),
+            copper: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.8, metalness: 0.7, map: createTex('copper')}),
             wood: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.9, map: createTex('wood')}),
             gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.1, metalness: 1.0})
         };
@@ -171,7 +188,6 @@
             }
             if(centerCam) { 
                 geom.computeBoundingSphere(); 
-                // PROTECCIÓN CRÍTICA ANTI-CRASH NaN
                 let r = (geom.boundingSphere && geom.boundingSphere.radius > 1) ? geom.boundingSphere.radius : 50; 
                 if (isNaN(r) || !isFinite(r)) r = 50;
                 camera.position.set(r*1.5, r*1.2, r*1.5); 

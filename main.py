@@ -36,11 +36,14 @@ ANDROID_ROOT = get_android_root()
 # GLOBALES DE ESTADO
 # =========================================================
 LAN_IP = "127.0.0.1"
-INTERNAL_IP = "127.0.0.1" # IP estática indestructible para la comunicación móvil-app
+INTERNAL_IP = "127.0.0.1" 
 LOCAL_PORT = 8556
 LATEST_CODE_B64 = ""
 LATEST_NEEDS_STL = False
 INJECTED_CODE_IA = "" 
+
+# NUEVA VARIABLE GLOBAL PARA EL PUENTE DE VISIÓN
+VISION_B64 = ""
 
 MAX_ASSEMBLY_PARTS = 10
 ASSEMBLY_PARTS_STATE = [{"active": False, "file": "", "mat": "pla", "x": 0, "y": 0, "z": 0} for _ in range(MAX_ASSEMBLY_PARTS)]
@@ -162,7 +165,21 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         
-        if parsed.path == '/api/upload_raw':
+        # --- RUTA PARA RECIBIR IMAGEN DE VISIÓN ---
+        if parsed.path == '/api/send_vision':
+            cl = int(self.headers.get('Content-Length', 0))
+            if cl > 0:
+                try:
+                    data = json.loads(self.rfile.read(cl).decode('utf-8'))
+                    global VISION_B64
+                    VISION_B64 = data.get('image', '')
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'{"status":"ok"}')
+                    return
+                except: pass
+            self.send_response(500); self._send_cors(); self.end_headers()
+            return
+            
+        elif parsed.path == '/api/upload_raw':
             cl = int(self.headers.get('Content-Length', 0))
             filename = unquote(self.headers.get('File-Name', f'nexus_upload_{int(time.time())}.stl'))
             if cl > 0:
@@ -188,7 +205,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(500); self._send_cors(); self.end_headers()
             return
 
-        if parsed.path == '/api/inject_code':
+        elif parsed.path == '/api/inject_code':
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
                 try:
@@ -233,10 +250,17 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(500); self._send_cors(); self.end_headers()
 
     def do_GET(self):
-        global LATEST_CODE_B64, LATEST_NEEDS_STL, PBR_STATE
+        global LATEST_CODE_B64, LATEST_NEEDS_STL, PBR_STATE, VISION_B64
         parsed = urlparse(self.path)
         
-        if parsed.path == '/api/get_code_b64.json':
+        # --- RUTA PARA QUE LA PESTAÑA IA RECOJA LA IMAGEN ---
+        if parsed.path == '/api/get_vision.json':
+            self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
+            self.wfile.write(json.dumps({"image_b64": VISION_B64}).encode())
+            VISION_B64 = "" # Limpiamos la RAM después de dársela a la IA
+            return
+            
+        elif parsed.path == '/api/get_code_b64.json':
             self.send_response(200); self.send_header("Content-type", "application/json"); self._send_cors(); self.end_headers()
             hash_val = get_stl_hash() if LATEST_NEEDS_STL else ""
             self.wfile.write(json.dumps({"code_b64": LATEST_CODE_B64, "stl_hash": hash_val}).encode())
@@ -618,7 +642,6 @@ def main(page: ft.Page):
             ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
             ft.Container(height=5),
             ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
-            # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
             ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
         
@@ -706,7 +729,6 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")),
             ft.Container(height=20),
-            # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
             ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
         ], expand=True, horizontal_alignment="center")
 
@@ -884,7 +906,6 @@ def main(page: ft.Page):
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
                 ft.ElevatedButton("🌐 ABRIR INYECTOR WEB STL", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00B0FF", color="white", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
@@ -902,7 +923,6 @@ def main(page: ft.Page):
             ft.Text("🤖 AGENTE IA AUTÓNOMO", size=24, color="#B388FF", weight="bold", text_align="center"),
             ft.Text("NEXUS ahora tiene su propio motor de IA integrado vía Web.", color="#E6EDF3", text_align="center"),
             ft.Container(height=30),
-            # USO DE INTERNAL_IP AQUI PARA EVITAR CAIDAS POR CAMBIO DE RED
             ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')),
             ft.Container(height=20),
             ft.Text("💡 Nota: El código generado por la IA se inyectará automáticamente en la pestaña CODE.", color="#8B949E", size=12, text_align="center")

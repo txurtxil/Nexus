@@ -17,7 +17,6 @@
         .fab { position: absolute; bottom: 20px; right: 20px; background: #C51162; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; font-size: 24px; border: none; outline: none; transition: background 0.2s; }
         .fab:active { background: #FF007F; }
         
-        /* Estilos para los deslizadores (Sliders) */
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #30363D; border-radius: 2px; }
@@ -43,7 +42,11 @@
             <label style="color:#00E676;font-size:12px;font-weight:bold;">💡 Intensidad Luz</label>
             <input type="range" id="lightSlider" min="0.1" max="4.0" step="0.1" value="1.5" style="width:100%;">
         </div>
+        
         <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
+        
+        <button onclick="analyzeWithIA(event)" style="width:100%;background:#8E24AA;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">🤖 ANALIZAR ESTRUCTURA</button>
+
         <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
         <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
 
@@ -108,7 +111,6 @@
             dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.4; renderer.toneMappingExposure = parseFloat(e.target.value) * 0.8;
         });
 
-        // --- GESTIÓN DE TRANSFORMACIONES MANUALES (Sliders) ---
         function applyTransforms() {
             if(!currentGroup) return;
             const s = parseFloat(document.getElementById('scaleSlider').value);
@@ -131,6 +133,34 @@
             renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
             fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => r.json()).then(d => {
                 const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+            });
+        }
+
+        // NUEVA FUNCIÓN: Envía el render comprimido a Python para análisis de IA
+        function analyzeWithIA(event) {
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Capturando...";
+            renderer.render(scene, camera); 
+            // Usamos JPEG para no sobrecargar el payload HTTP hacia Python
+            const dataURL = renderer.domElement.toDataURL("image/jpeg", 0.8);
+            
+            fetch('/api/send_vision', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({image: dataURL}) 
+            }).then(r => r.json()).then(d => {
+                btn.innerText = "✅ ¡ENVIADO A IA!";
+                btn.style.background = "#00E676";
+                btn.style.color = "#000";
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = "#8E24AA";
+                    btn.style.color = "#fff";
+                }, 3000);
+            }).catch(e => {
+                btn.innerText = "❌ ERROR AL ENVIAR";
+                setTimeout(() => { btn.innerText = originalText; }, 3000);
             });
         }
 
@@ -182,7 +212,6 @@
         function buildScene(state) {
             if(currentGroup) scene.remove(currentGroup); currentGroup = new THREE.Group(); scene.add(currentGroup); interactableMeshes = [];
             
-            // Reaplicar transformaciones seleccionadas en la UI inmediatamente al grupo nuevo
             applyTransforms();
 
             if(state.mode === 'single') {
@@ -214,7 +243,6 @@
             let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
             mesh.material = mesh.material.clone(); mesh.material.flatShading = false;
             
-            // La rotación inicial convierte Y en Z (Típico en STL 3D)
             mesh.rotation.x = -Math.PI / 2; 
             mesh.position.set(x, z, -y); 
             mesh.castShadow = true; mesh.receiveShadow = true; 

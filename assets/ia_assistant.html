@@ -12,28 +12,39 @@
         label { font-size: 12px; color: #8B949E; font-weight: bold; margin-bottom: 5px; display: block; }
         input, select, textarea { width: 100%; padding: 10px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 5px; box-sizing: border-box; outline: none; }
         textarea { height: 120px; resize: none; font-family: monospace; }
-        .btn-gen { background-color: #8E24AA; color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
-        .btn-gen:active { background-color: #6A1B9A; }
-        .btn-inject { background-color: #00E676; color: black; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
+        
+        .btn-gen { background-color: #0277BD; color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 14px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
+        .btn-gen:active { background-color: #01579B; }
+        
+        .btn-vision { background-color: #8E24AA; color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 14px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
+        .btn-vision:active { background-color: #6A1B9A; }
+        
+        .btn-inject { background-color: #00E676; color: black; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 14px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
         .btn-inject:active { background-color: #00C853; }
+        
         .loader { display: none; text-align: center; color: #FFAB00; font-weight: bold; margin-top: 10px; }
         .error-msg { color: #FF5252; font-size: 12px; font-weight: bold; text-align: center; display: none; }
+        
+        /* Contenedor para la imagen recibida del PBR */
+        #visionContainer { display: none; background: #161B22; padding: 10px; border-radius: 8px; border: 1px dashed #8E24AA; text-align: center; position: relative; }
+        #visionPreview { max-width: 100%; max-height: 200px; border-radius: 5px; object-fit: contain; }
+        .btn-clear-img { position: absolute; top: 15px; right: 15px; background: rgba(255, 0, 0, 0.7); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="header">
     <h2>🤖 AGENTE IA AUTÓNOMO</h2>
-    <p style="margin: 5px 0 0 0; font-size: 11px; color: #8B949E;">Genera e inyecta código directamente a NEXUS</p>
+    <p style="margin: 5px 0 0 0; font-size: 11px; color: #8B949E;">Ingeniería Paramétrica y Análisis Estructural Web</p>
 </div>
 
 <div class="content">
     <div>
         <label>⚙️ MOTOR IA (API)</label>
         <select id="apiSelect">
-            <option value="gemini">Google Gemini (Empieza por AIzaSy...)</option>
-            <option value="groq" selected>Groq Llama-3.3 (Empieza por gsk_...)</option>
-            <option value="openai">OpenAI ChatGPT (Empieza por sk-...)</option>
+            <option value="gemini">Google Gemini (Multimodal - Recomendado para Visión)</option>
+            <option value="groq" selected>Groq Llama-3.3 (Rápido - Solo Texto)</option>
+            <option value="openai">OpenAI ChatGPT (Multimodal)</option>
         </select>
     </div>
     
@@ -42,37 +53,88 @@
         <input type="password" id="apiKey" placeholder="Pega tu clave aquí...">
     </div>
 
-    <div>
-        <label>📝 INSTRUCCIÓN (PROMPT)</label>
-        <textarea id="promptInput" placeholder="Ej: Diseña un engranaje cónico de 15 dientes con hueco central..." style="height: 80px;"></textarea>
+    <div id="visionContainer">
+        <label style="color: #B388FF;">👁️ CAPTURA PBR RECIBIDA</label>
+        <button class="btn-clear-img" onclick="clearVision()" title="Descartar imagen">X</button>
+        <img id="visionPreview" src="" alt="Render PBR">
     </div>
 
-    <button class="btn-gen" onclick="generateCode()">🧠 GENERAR CÓDIGO JS-CSG</button>
-    <div class="loader" id="loader">Conectando con la matriz de la IA... ⏳</div>
+    <div>
+        <label>📝 INSTRUCCIÓN (PROMPT) / CONSULTA</label>
+        <textarea id="promptInput" placeholder="Ej: Diseña un engranaje cónico... O si tienes una foto cargada: 'Analiza la tensión de esta pieza...'"></textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-gen" style="flex: 1;" onclick="processRequest('code')">🧠 GENERAR CÓDIGO 3D</button>
+        <button class="btn-vision" id="btnAnalysis" style="flex: 1; display: none;" onclick="processRequest('analysis')">🕵️‍♂️ ANÁLISIS INGENIERÍA</button>
+    </div>
+
+    <div class="loader" id="loader">Procesando solicitud en la red neuronal... ⏳</div>
     <div class="error-msg" id="errorMsg"></div>
 
     <div>
-        <label>💻 CÓDIGO GENERADO</label>
-        <textarea id="codeOutput" placeholder="El código aparecerá aquí..."></textarea>
+        <label>💻 RESPUESTA DE LA IA / CÓDIGO JS</label>
+        <textarea id="codeOutput" placeholder="El código o el análisis aparecerá aquí..."></textarea>
     </div>
 
-    <button class="btn-inject" onclick="injectToNexus()">🚀 INYECTAR EN LA APP NEXUS</button>
+    <button class="btn-inject" id="btnInject" onclick="injectToNexus()">🚀 INYECTAR CÓDIGO A NEXUS</button>
 </div>
 
 <script>
+    // Recuperar preferencias
     document.getElementById('apiKey').value = localStorage.getItem('nexus_api_key') || '';
     document.getElementById('apiSelect').value = localStorage.getItem('nexus_api_engine') || 'groq';
     
-    const sysPrompt = "Eres un experto en diseño paramétrico 3D usando OpenJSCAD (JS-CSG). Escribe una función 'function main(params)' que construya la pieza solicitada.\nREGLAS CRÍTICAS DEL MOTOR NEXUS CAD:\n1. Usa primitivas clásicas puras: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:r}), CSG.sphere({center:[x,y,z], radius:r}).\n2. Usa operaciones booleanas permitidas: .union(), .subtract(), .intersect().\n3. EL RETORNO ES OBLIGATORIO ASÍ: 'return UTILS.mat(tu_objeto);'.\n4. DEVUELVE SOLO CÓDIGO JS. Sin markdown ni texto extra.";
+    let currentVisionImageB64Raw = ""; // Aquí guardamos el base64 puro sin el prefijo data:image/jpeg
 
-    async function generateCode() {
+    // Verificar si hay una imagen esperando en el backend (Puente de Visión)
+    async function checkVisionBridge() {
+        try {
+            const res = await fetch('/api/get_vision.json');
+            const data = await res.json();
+            if (data.image_b64) {
+                // Separar cabecera "data:image/jpeg;base64," del contenido puro
+                const parts = data.image_b64.split(',');
+                currentVisionImageB64Raw = parts.length > 1 ? parts[1] : parts[0];
+                
+                document.getElementById('visionPreview').src = data.image_b64;
+                document.getElementById('visionContainer').style.display = 'block';
+                document.getElementById('btnAnalysis').style.display = 'block';
+                document.getElementById('promptInput').placeholder = "Ej: Actúa como ingeniero mecánico. Analiza esta pieza y dime dónde se romperá si aplico 5kg de carga vertical, y qué orientación de impresión recomiendas.";
+            }
+        } catch(e) { console.log("No hay imagen en la cola de visión."); }
+    }
+
+    function clearVision() {
+        currentVisionImageB64Raw = "";
+        document.getElementById('visionContainer').style.display = 'none';
+        document.getElementById('btnAnalysis').style.display = 'none';
+        document.getElementById('promptInput').placeholder = "Ej: Diseña un engranaje cónico de 15 dientes...";
+    }
+
+    // Comprobar al cargar la pestaña
+    window.onload = checkVisionBridge;
+    // Comprobar también cuando la ventana recupere el foco (por si venimos de PBR)
+    window.onfocus = checkVisionBridge;
+
+    const SYS_PROMPT_CODE = "Eres un experto en diseño paramétrico 3D usando OpenJSCAD (JS-CSG). Escribe una función 'function main(params)' que construya la pieza solicitada.\nREGLAS CRÍTICAS:\n1. Usa primitivas clásicas puras: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:r}), CSG.sphere({center:[x,y,z], radius:r}).\n2. Usa operaciones booleanas permitidas: .union(), .subtract(), .intersect().\n3. EL RETORNO ES OBLIGATORIO ASÍ: 'return UTILS.mat(tu_objeto);'.\n4. DEVUELVE SOLO CÓDIGO JS. Sin markdown ni texto extra.";
+    
+    const SYS_PROMPT_ANALYSIS = "Eres un ingeniero mecánico senior experto en diseño estructural e impresión 3D (FDM/SLA). Analiza exhaustivamente la estructura de la pieza de la imagen. Identifica puntos de tensión, debilidades estructurales (delaminación de capas), sugiere orientación de impresión ideal, % de Infill, y dónde requerirá material de soporte. Tu respuesta debe ser altamente técnica, clara y estructurada en Markdown.";
+
+    async function processRequest(mode) {
         const apiKey = document.getElementById('apiKey').value.trim();
         const prompt = document.getElementById('promptInput').value.trim();
         const apiType = document.getElementById('apiSelect').value;
         const errorBox = document.getElementById('errorMsg');
         
-        if(!apiKey || !prompt) {
+        if(!apiKey || (!prompt && mode === 'code')) {
             errorBox.innerText = "Falta la API Key o el Prompt";
+            errorBox.style.display = "block"; return;
+        }
+
+        // Validación de Visión para Groq
+        if (mode === 'analysis' && apiType === 'groq') {
+            errorBox.innerText = "⚠️ Groq Llama-3.3 es un modelo de texto puro. Por favor, selecciona Gemini u OpenAI para analizar imágenes.";
             errorBox.style.display = "block"; return;
         }
         
@@ -82,50 +144,77 @@
         document.getElementById('loader').style.display = 'block';
         errorBox.style.display = 'none';
         document.getElementById('codeOutput').value = '';
+        document.getElementById('btnInject').style.display = mode === 'code' ? 'block' : 'none'; // Ocultar inyección si es un texto de análisis
+        
+        const currentSysPrompt = mode === 'analysis' ? SYS_PROMPT_ANALYSIS : SYS_PROMPT_CODE;
+        let finalPrompt = prompt || "Por favor, analiza estructuralmente la pieza adjunta.";
         
         try {
-            let codeText = ""; let res, data;
+            let outputText = ""; let res, data;
             
             if (apiType === "gemini") {
+                // Payload Gemini (Soporta Multimodalidad Nativa)
+                let geminiParts = [{ text: currentSysPrompt + "\n\n" + finalPrompt }];
+                if (currentVisionImageB64Raw && mode === 'analysis') {
+                    geminiParts.push({
+                        inlineData: { mimeType: "image/jpeg", data: currentVisionImageB64Raw }
+                    });
+                }
+                
                 res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{ parts: [{ text: sysPrompt + "\n\nPieza: " + prompt }] }] })
+                    body: JSON.stringify({ contents: [{ parts: geminiParts }] })
                 });
                 data = await res.json();
                 if(data.error) throw new Error(data.error.message);
                 if(!data.candidates) throw new Error("API Key inválida o modelo no disponible.");
-                codeText = data.candidates[0].content.parts[0].text;
+                outputText = data.candidates[0].content.parts[0].text;
                 
             } else if (apiType === "groq") {
+                // Payload Groq (Solo Texto)
                 res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
                     body: JSON.stringify({
                         model: "llama-3.3-70b-versatile",
-                        messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
+                        messages: [{role: "system", content: currentSysPrompt}, {role: "user", content: finalPrompt}]
                     })
                 });
                 data = await res.json();
                 if(data.error) throw new Error(data.error.message);
-                codeText = data.choices[0].message.content;
+                outputText = data.choices[0].message.content;
                 
             } else {
+                // Payload OpenAI (Soporta Vision en GPT-4o-mini)
+                let userContent = [{ type: "text", text: currentSysPrompt + "\n\n" + finalPrompt }];
+                if (currentVisionImageB64Raw && mode === 'analysis') {
+                    userContent.push({
+                        type: "image_url",
+                        image_url: { url: `data:image/jpeg;base64,${currentVisionImageB64Raw}` }
+                    });
+                }
+                
                 res = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
                     body: JSON.stringify({
                         model: "gpt-4o-mini", 
-                        messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
+                        messages: [
+                            {role: "system", content: "Eres un asistente de IA de NEXUS CAD."}, // OpenAI prefiere el sys prompt aquí
+                            {role: "user", content: userContent}
+                        ]
                     })
                 });
                 data = await res.json();
                 if(data.error) throw new Error(data.error.message);
-                codeText = data.choices[0].message.content;
+                outputText = data.choices[0].message.content;
             }
             
-            // Limpieza robusta de Markdown
-            codeText = codeText.replace(/```javascript/gi, "```").replace(/```js/gi, "```");
-            if (codeText.includes("```")) codeText = codeText.split("```")[1].trim();
+            // Si era generación de código, limpiamos el markdown
+            if (mode === 'code') {
+                outputText = outputText.replace(/```javascript/gi, "```").replace(/```js/gi, "```");
+                if (outputText.includes("```")) outputText = outputText.split("```")[1].trim();
+            }
             
-            document.getElementById('codeOutput').value = codeText;
+            document.getElementById('codeOutput').value = outputText;
         } catch (e) {
             errorBox.innerText = "Error: " + e.message;
             errorBox.style.display = "block";
@@ -141,7 +230,7 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ code: code })
             });
-            if(res.ok) alert("✓ Código enviado a NEXUS con éxito. ¡Vuelve a la App!");
+            if(res.ok) alert("✓ Código enviado a NEXUS con éxito. ¡Vuelve a la pestaña CODE en la App!");
         } catch (e) { alert("❌ Error: No se puede conectar con NEXUS."); }
     }
 </script>

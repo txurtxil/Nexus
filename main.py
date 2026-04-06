@@ -150,10 +150,11 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS PBR STUDIO</title>
+    <title>NEXUS PBR STUDIO PRO</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
     <style>body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} canvas{display:block;} .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px;}</style>
 </head>
 <body>
@@ -183,21 +184,68 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
         scene.background = new THREE.Color(0x0B0E14);
         scene.fog = new THREE.FogExp2(0x0B0E14, 0.002);
 
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0); scene.add(hemiLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); scene.add(dirLight);
-        const backLight = new THREE.DirectionalLight(0x00E5FF, 1.0); backLight.position.set(-50, 50, -50); scene.add(backLight);
-
-        document.getElementById('lightSlider').addEventListener('input', (e) => { dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.6; });
-
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
         camera.position.set(150, 150, 150);
 
         const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.outputEncoding = THREE.sRGBEncoding; 
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        
+        // FASE 1: ACTIVACIÓN DE SOMBRAS SUAVES
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
-        const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+        const controls = new THREE.OrbitControls(camera, renderer.domElement); 
+        controls.enableDamping = true;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // Limitar rotación para no perderse debajo del suelo
+
+        // FASE 1: ENTORNO HDRI PROCEDIMENTAL PARA REFLEJOS REALISTAS
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        scene.environment = pmremGenerator.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+
+        // FASE 1: CONFIGURACIÓN DE LUCES MEJORADA CON CASTSHADOW
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); 
+        scene.add(hemiLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
+        dirLight.position.set(50, 150, 50); 
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048; // Sombra en alta resolución
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 500;
+        const d = 150;
+        dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.bias = -0.0005; // Evita el "shadow acne"
+        scene.add(dirLight);
+
+        const backLight = new THREE.DirectionalLight(0x00E5FF, 0.8); 
+        backLight.position.set(-50, 50, -50); 
+        scene.add(backLight);
+
+        // FASE 1: SUELO QUE ATRAPA SOMBRAS Y GRILLA DE ESTUDIO
+        const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+        const floorMat = new THREE.MeshStandardMaterial({color: 0x0B0E14, roughness: 0.1, metalness: 0.5});
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.5; 
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(500, 50, 0x30363D, 0x161B22);
+        grid.position.y = -0.49;
+        scene.add(grid);
+
+        document.getElementById('lightSlider').addEventListener('input', (e) => { 
+            dirLight.intensity = parseFloat(e.target.value); 
+            hemiLight.intensity = parseFloat(e.target.value) * 0.4;
+            renderer.toneMappingExposure = parseFloat(e.target.value) * 0.8;
+        });
 
         function takeScreenshot() {
             renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
@@ -223,12 +271,12 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         const mats = {
-            pla: new THREE.MeshStandardMaterial({color: 0x666666, roughness: 0.8, metalness: 0.1}),
-            petg: new THREE.MeshPhysicalMaterial({color: 0xddffff, transmission: 0.95, opacity: 1, transparent: true, roughness: 0.05, ior: 1.5, thickness: 3.0}),
-            carbon: new THREE.MeshPhysicalMaterial({color: 0x333333, roughness: 0.6, metalness: 0.5, map: createTex('carbon'), clearcoat: 1.0}),
-            aluminum: new THREE.MeshStandardMaterial({color: 0xb0b0b0, roughness: 0.4, metalness: 0.9, map: createTex('aluminum')}),
-            wood: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.8, map: createTex('wood')}),
-            gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.15, metalness: 1.0})
+            pla: new THREE.MeshStandardMaterial({color: 0x888888, roughness: 0.6, metalness: 0.2}),
+            petg: new THREE.MeshPhysicalMaterial({color: 0xddffff, transmission: 0.95, opacity: 1, transparent: true, roughness: 0.1, ior: 1.5, thickness: 3.0, clearcoat: 1.0}),
+            carbon: new THREE.MeshPhysicalMaterial({color: 0x333333, roughness: 0.4, metalness: 0.6, map: createTex('carbon'), clearcoat: 1.0}),
+            aluminum: new THREE.MeshStandardMaterial({color: 0xb0b0b0, roughness: 0.2, metalness: 1.0, map: createTex('aluminum')}),
+            wood: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.9, map: createTex('wood')}),
+            gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.1, metalness: 1.0})
         };
 
         let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {};
@@ -262,8 +310,18 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
         function addMeshToGroup(geom, x, y, z, matKey, centerCam) {
             let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
             mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y);
+            
+            // FASE 1: CADA PIEZA AHORA PROYECTA Y RECIBE SOMBRAS
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
             currentGroup.add(mesh);
-            if(centerCam) { geom.computeBoundingSphere(); const r = geom.boundingSphere.radius; camera.position.set(r*1.5, r*1.5, r*1.5); controls.target.set(0,0,0); }
+            if(centerCam) { 
+                geom.computeBoundingSphere(); 
+                const r = geom.boundingSphere.radius; 
+                camera.position.set(r*1.5, r*1.2, r*1.5); // Ángulo más natural
+                controls.target.set(0,0,0); 
+            }
         }
 
         document.getElementById('matSelect').addEventListener('change', () => { stateHash = ""; checkState(); });
@@ -272,7 +330,6 @@ PBR_HTML_TEMPLATE = """<!DOCTYPE html>
     </script>
 </body>
 </html>"""
-
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")

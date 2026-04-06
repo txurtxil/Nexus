@@ -32,7 +32,8 @@
         <label>⚙️ MOTOR IA (API)</label>
         <select id="apiSelect">
             <option value="gemini">Google Gemini (Empieza por AIzaSy...)</option>
-            <option value="groq">Groq Llama-3 (Empieza por gsk_...)</option>
+            <option value="openrouter" selected>OpenRouter (openai/gpt-oss-120b)</option>
+            <option value="groq">Groq (llama-3.3-70b-versatile)</option>
             <option value="openai">OpenAI ChatGPT (Empieza por sk-...)</option>
         </select>
     </div>
@@ -60,9 +61,8 @@
 </div>
 
 <script>
-    // Recuperar configuración guardada
     document.getElementById('apiKey').value = localStorage.getItem('nexus_api_key') || '';
-    document.getElementById('apiSelect').value = localStorage.getItem('nexus_api_engine') || 'gemini';
+    document.getElementById('apiSelect').value = localStorage.getItem('nexus_api_engine') || 'openrouter';
     
     const sysPrompt = "Eres un experto en diseño paramétrico 3D usando OpenJSCAD (JS-CSG). Escribe una función 'function main(params)' que construya la pieza solicitada.\nREGLAS CRÍTICAS DEL MOTOR NEXUS CAD:\n1. Usa primitivas clásicas puras: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:r}), CSG.sphere({center:[x,y,z], radius:r}).\n2. Usa operaciones booleanas permitidas: .union(), .subtract(), .intersect().\n3. EL RETORNO ES OBLIGATORIO ASÍ: 'return UTILS.mat(tu_objeto);'.\n4. DEVUELVE SOLO CÓDIGO JS. Sin markdown ni texto extra.";
 
@@ -74,11 +74,9 @@
         
         if(!apiKey || !prompt) {
             errorBox.innerText = "Falta la API Key o el Prompt";
-            errorBox.style.display = "block";
-            return;
+            errorBox.style.display = "block"; return;
         }
         
-        // Guardar para el futuro
         localStorage.setItem('nexus_api_key', apiKey);
         localStorage.setItem('nexus_api_engine', apiType);
         
@@ -87,13 +85,11 @@
         document.getElementById('codeOutput').value = '';
         
         try {
-            let codeText = "";
-            let res, data;
+            let codeText = ""; let res, data;
             
             if (apiType === "gemini") {
                 res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{ text: sysPrompt + "\n\nPieza: " + prompt }] }] })
                 });
                 data = await res.json();
@@ -101,12 +97,23 @@
                 if(!data.candidates) throw new Error("API Key inválida o modelo no disponible.");
                 codeText = data.candidates[0].content.parts[0].text;
                 
+            } else if (apiType === "openrouter") {
+                res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
+                    body: JSON.stringify({
+                        model: "openai/gpt-oss-120b", // El modelo solicitado
+                        messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
+                    })
+                });
+                data = await res.json();
+                if(data.error) throw new Error(data.error.message);
+                codeText = data.choices[0].message.content;
+                
             } else if (apiType === "groq") {
                 res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
                     body: JSON.stringify({
-                        model: "llama3-70b-8192", // Modelo súper rápido y capaz
+                        model: "llama-3.3-70b-versatile", // Reemplazo oficial para Groq
                         messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
                     })
                 });
@@ -115,12 +122,10 @@
                 codeText = data.choices[0].message.content;
                 
             } else {
-                // OpenAI
                 res = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
+                    method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
                     body: JSON.stringify({
-                        model: "gpt-4o-mini", // Cambiado a versión más rápida/barata
+                        model: "gpt-4o-mini", 
                         messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
                     })
                 });
@@ -129,10 +134,9 @@
                 codeText = data.choices[0].message.content;
             }
             
-            // Limpiar Markdown (```javascript ... ```)
-            if (codeText.includes("```javascript")) codeText = codeText.split("```javascript")[1].split("```")[0].trim();
-            else if (codeText.includes("```js")) codeText = codeText.split("```js")[1].split("```")[0].trim();
-            else if (codeText.includes("```")) codeText = codeText.split("```")[1].split("```")[0].trim();
+            // Limpieza robusta de Markdown
+            codeText = codeText.replace(/```javascript/gi, "```").replace(/```js/gi, "```");
+            if (codeText.includes("```")) codeText = codeText.split("```")[1].trim();
             
             document.getElementById('codeOutput').value = codeText;
         } catch (e) {
@@ -145,19 +149,13 @@
     async function injectToNexus() {
         const code = document.getElementById('codeOutput').value.trim();
         if(!code) return alert("No hay código para inyectar.");
-        
         try {
             const res = await fetch('/api/inject_code', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ code: code })
             });
-            if(res.ok) {
-                alert("✓ Código enviado a NEXUS con éxito. ¡Vuelve a la App y lo verás en la pestaña CODE!");
-            }
-        } catch (e) {
-            alert("❌ Error: No se puede conectar con NEXUS. Verifica que la App en Python esté corriendo.");
-        }
+            if(res.ok) alert("✓ Código enviado a NEXUS con éxito. ¡Vuelve a la App!");
+        } catch (e) { alert("❌ Error: No se puede conectar con NEXUS."); }
     }
 </script>
 </body>

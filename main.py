@@ -1,6 +1,6 @@
 import flet as ft
 import os, base64, json, threading, http.server, socketserver, socket, time, warnings, traceback, shutil, struct
-import param_generators # Módulo de geometrías modularizado (Fase 4)
+import param_generators 
 
 try:
     import psutil
@@ -146,7 +146,7 @@ def analyze_stl(filepath):
 DUMMY_VALID_STL = b'NEXUS_DUMMY_STL' + (b'\x00' * 65) + (1).to_bytes(4, 'little') + (b'\x00' * 50)
 
 # =========================================================
-# SERVIDOR HTTP (LOCAL HOSTING) - CORREGIDO MIME TYPES
+# SERVIDOR HTTP LOCAL
 # =========================================================
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def _send_cors(self):
@@ -160,8 +160,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        
-        # Receptor de Código IA
         if parsed.path == '/api/inject_code':
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
@@ -206,24 +204,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 except: pass
             self.send_response(500); self._send_cors(); self.end_headers()
 
-        elif parsed.path == '/api/upload':
-            cl = int(self.headers.get('Content-Length', 0))
-            fn = unquote(self.headers.get('File-Name', 'uploaded_file.stl'))
-            if cl > 0:
-                try:
-                    filepath = os.path.join(EXPORT_DIR, fn)
-                    with open(filepath, 'wb') as f:
-                        bytes_read = 0; chunk_size = 65536
-                        while bytes_read < cl:
-                            chunk = self.rfile.read(min(chunk_size, cl - bytes_read))
-                            if not chunk: break
-                            f.write(chunk); bytes_read += len(chunk)
-                    resp = b'ok'
-                    self.send_response(200); self.send_header("Content-type", "text/plain"); self.send_header("Content-Length", str(len(resp))); self._send_cors(); self.end_headers(); self.wfile.write(resp)
-                    return
-                except: pass
-            self.send_response(500); self._send_cors(); self.end_headers()
-
     def do_GET(self):
         global LATEST_CODE_B64, LATEST_NEEDS_STL, PBR_STATE
         parsed = urlparse(self.path)
@@ -247,7 +227,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                     if sz >= 84:
                         with open(filepath, "rb") as f: data_to_send = f.read()
                 except: pass
-            
             self.send_response(200); self.send_header("Content-type", "model/stl"); self.send_header("Content-Length", str(len(data_to_send))); self.send_header("Cache-Control", "no-cache, no-store, must-revalidate"); self.send_header("Pragma", "no-cache"); self.send_header("Expires", "0"); self._send_cors(); self.end_headers()
             try:
                 chunk_size = 65536
@@ -294,7 +273,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
         else:
             try:
-                # FASE 4: CORRECCIÓN CRÍTICA DE MIME TYPES PARA LOS BOTONES
                 fn = parsed.path.strip("/")
                 filepath = os.path.join(ASSETS_DIR, fn)
                 if os.path.exists(filepath) and os.path.isfile(filepath):
@@ -325,12 +303,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.73.5 TITAN (Arquitectura Modular)"
+        page.title = "NEXUS CAD v20.73.6 TITAN PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.73.5 TITAN | Core Limpio y Servidor Fix Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.73.6 TITAN | Archivos y Renombrado", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -609,7 +587,6 @@ def main(page: ft.Page):
             ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
             ft.Container(height=5),
             ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
-            # Botón con LAN_IP
             ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
         
@@ -697,7 +674,6 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")),
             ft.Container(height=20),
-            # Botón con LAN_IP
             ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{LAN_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
         ], expand=True, horizontal_alignment="center")
 
@@ -705,15 +681,67 @@ def main(page: ft.Page):
         txt_vol = ft.Text("0.0 cm³", color="#FFAB00", weight="bold"); txt_peso = ft.Text("0.0 g", color="#00E676", weight="bold")
         panel_calibre = ft.Container(content=ft.Column([ft.Text("📐 CALIBRE 3D Y PRESUPUESTO (STL ACTUAL)", color="#E6EDF3", weight="bold"), ft.Row([ft.Text("Ancho (X):", color="#8B949E", width=80), txt_dim_x]), ft.Row([ft.Text("Largo (Y):", color="#8B949E", width=80), txt_dim_y]), ft.Row([ft.Text("Alto (Z):", color="#8B949E", width=80), txt_dim_z]), ft.Divider(color="#30363D"), ft.Row([ft.Text("Volumen:", color="#8B949E", width=80), txt_vol]), ft.Row([ft.Text("Peso PLA:", color="#8B949E", width=80), txt_peso])]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#2962FF"))
 
+        # FASE 4: FILE PICKER NATIVO DE FLET
+        def on_file_picked(e: ft.FilePickerResultEvent):
+            if e.files:
+                for f in e.files:
+                    if f.path:
+                        shutil.copy(f.path, os.path.join(EXPORT_DIR, f.name))
+                status.value = f"✓ {len(e.files)} archivo(s) subidos a la BD."; status.color = "#00E676"
+                refresh_nexus_db()
+                page.update()
+
+        file_picker = ft.FilePicker(on_result=on_file_picked)
+        page.overlay.append(file_picker)
+
+        # FASE 4: POPUP PARA RENOMBRAR
+        rename_target = ""
+        tf_rename = ft.TextField(label="Nuevo nombre.stl/.jscad", bgcolor="#161B22", color="#00E5FF")
+        
+        def open_rename_dialog(filename):
+            global rename_target
+            rename_target = filename
+            tf_rename.value = filename
+            dialog_rename.open = True
+            page.update()
+
+        def confirm_rename(e):
+            global rename_target
+            new_name = tf_rename.value.strip()
+            if new_name and new_name != rename_target:
+                # Asegurar extensión
+                if rename_target.lower().endswith(".stl") and not new_name.lower().endswith(".stl"): new_name += ".stl"
+                if rename_target.lower().endswith(".jscad") and not new_name.lower().endswith(".jscad"): new_name += ".jscad"
+                try:
+                    os.rename(os.path.join(EXPORT_DIR, rename_target), os.path.join(EXPORT_DIR, new_name))
+                    status.value = f"✓ Renombrado a {new_name}"; status.color = "#00E676"
+                except Exception as ex:
+                    status.value = f"❌ Error: {ex}"; status.color = "red"
+            dialog_rename.open = False
+            refresh_nexus_db()
+            page.update()
+
+        dialog_rename = ft.AlertDialog(
+            title=ft.Text("Renombrar Archivo", color="#00E5FF"),
+            content=tf_rename,
+            actions=[
+                ft.TextButton("Cancelar", on_click=lambda e: [setattr(dialog_rename, 'open', False), page.update()]),
+                ft.ElevatedButton("Guardar", on_click=confirm_rename, bgcolor="#00E676", color="black")
+            ]
+        )
+        page.overlay.append(dialog_rename)
+
         list_nexus_db = ft.ListView(height=250, spacing=5)
 
         def custom_icon_btn(text, action, tooltip_txt): return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
+        
         def direct_download_file(e, filename):
             try:
                 os.makedirs(DOWNLOAD_DIR, exist_ok=True); shutil.copy(os.path.join(EXPORT_DIR, filename), os.path.join(DOWNLOAD_DIR, filename))
                 status.value = f"✓ {filename} guardado en Descargas."; status.color = "#00E676"
             except Exception as ex: status.value = f"❌ Error guardando: {ex}"; status.color = "#FF5252"
             page.update()
+            
         def export_obj_file(e, filename):
             os.makedirs(DOWNLOAD_DIR, exist_ok=True); success, msg = convert_stl_to_obj(os.path.join(EXPORT_DIR, filename), os.path.join(DOWNLOAD_DIR, filename.replace('.stl', '.obj')))
             status.value = f"✓ OBJ en Descargas." if success else f"❌ Error OBJ: {msg}"; status.color = "#00E5FF" if success else "#FF5252"; page.update()
@@ -726,10 +754,19 @@ def main(page: ft.Page):
                 for f in files:
                     ext = f.lower().split('.')[-1]; p = os.path.join(EXPORT_DIR, f)
                     icon = "🧊" if ext=="stl" else ("🖼️" if ext=="png" else "🧩"); color = "#00E676" if ext=="stl" else ("#C51162" if ext=="png" else "white")
-                    actions = [custom_icon_btn("⬇️", lambda e, fn=f: direct_download_file(e, fn), "Guardar a Download"), custom_icon_btn("🗑️", lambda e, fp=p: [os.remove(fp), refresh_nexus_db()], "Borrar")]
+                    
+                    # Nuevos botones: Lápiz para Editar
+                    actions = [
+                        custom_icon_btn("✏️", lambda e, fn=f: open_rename_dialog(fn), "Renombrar"),
+                        custom_icon_btn("⬇️", lambda e, fn=f: direct_download_file(e, fn), "Guardar a Download"), 
+                        custom_icon_btn("🗑️", lambda e, fp=p: [os.remove(fp), refresh_nexus_db()], "Borrar")
+                    ]
+                    
                     if ext == "stl":
-                        actions.insert(0, custom_icon_btn("📦", lambda e, fn=f: export_obj_file(e, fn), "Exportar OBJ")); actions.insert(0, custom_icon_btn("▶️", lambda e, fp=p: load_file(fp), "Cargar STL"))
+                        actions.insert(0, custom_icon_btn("📦", lambda e, fn=f: export_obj_file(e, fn), "Exportar OBJ"))
+                        actions.insert(0, custom_icon_btn("▶️", lambda e, fp=p: load_file(fp), "Cargar STL"))
                     elif ext == "jscad": actions.insert(0, custom_icon_btn("▶️", lambda e, fp=p: load_file(fp), "Cargar Código"))
+                    
                     list_nexus_db.controls.append(ft.Container(content=ft.Row([ft.Text(icon, size=20), ft.Text(f, color=color, weight="bold", expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)] + actions), bgcolor="#21262D", padding=5, border_radius=5))
             except Exception as e: list_nexus_db.controls.append(ft.Text(f"Error DB: {e}"))
             page.update()
@@ -796,8 +833,7 @@ def main(page: ft.Page):
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                # Botón con LAN_IP
-                ft.ElevatedButton("🚀 INYECTAR ARCHIVO (VÍA PC)", url=f"http://{LAN_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00E676", color="black", width=float('inf')),
+                ft.ElevatedButton("🚀 SUBIR FICHEROS DESDE EL MÓVIL", on_click=lambda _: file_picker.pick_files(allow_multiple=True), bgcolor="#00E676", color="black", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
             ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
@@ -814,7 +850,6 @@ def main(page: ft.Page):
             ft.Text("🤖 AGENTE IA AUTÓNOMO", size=24, color="#B388FF", weight="bold", text_align="center"),
             ft.Text("NEXUS ahora tiene su propio motor de IA integrado vía Web.", color="#E6EDF3", text_align="center"),
             ft.Container(height=30),
-            # Botón con LAN_IP
             ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{LAN_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')),
             ft.Container(height=20),
             ft.Text("💡 Nota: El código generado por la IA se inyectará automáticamente en la pestaña CODE.", color="#8B949E", size=12, text_align="center")

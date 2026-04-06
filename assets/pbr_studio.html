@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEXUS PBR STUDIO PRO</title>
-    <script src="[https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js](https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js](https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js](https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js](https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DragControls.js](https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DragControls.js)"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DragControls.js"></script>
     <style>
         body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} 
         canvas{display:block;} 
@@ -145,21 +145,13 @@
             } else {
                 loader.load(url, geom => { 
                     try {
-                        // Protección anti-cuelgues: Si el STL está vacío o es un DUMMY no hacemos nada.
-                        if(!geom || !geom.attributes || !geom.attributes.position || geom.attributes.position.count === 0) {
-                            console.warn("STL vacío ignorado para evitar cuelgue WebGL");
-                            return; 
-                        }
+                        if(!geom || !geom.attributes || !geom.attributes.position || geom.attributes.position.count === 0) return; 
                         geom.center(); 
                         geom.computeVertexNormals(); 
                         if(!url.includes('?')) geomCache[url] = geom; 
                         addMeshToGroup(geom, x, y, z, matKey, centerCam, isDraggable); 
-                    } catch(e) {
-                        console.warn("Error interno calculando STL:", e);
-                    }
-                }, undefined, err => { 
-                    console.warn("Error HTTP o parseo al descargar STL", err); 
-                });
+                    } catch(e) {}
+                }, undefined, err => {});
             }
         }
 
@@ -177,7 +169,15 @@
                 dragControls.addEventListener('drag', (e) => { snapToClosest(e.object); });
                 dragControls.addEventListener('dragend', () => { controls.enabled = true; });
             }
-            if(centerCam) { geom.computeBoundingSphere(); const r = geom.boundingSphere ? geom.boundingSphere.radius : 50; camera.position.set(r*1.5, r*1.2, r*1.5); controls.target.set(0,0,0); }
+            if(centerCam) { 
+                geom.computeBoundingSphere(); 
+                // PROTECCIÓN CRÍTICA ANTI-CRASH NaN
+                let r = (geom.boundingSphere && geom.boundingSphere.radius > 1) ? geom.boundingSphere.radius : 50; 
+                if (isNaN(r) || !isFinite(r)) r = 50;
+                camera.position.set(r*1.5, r*1.2, r*1.5); 
+                controls.target.set(0,0,0); 
+                controls.update();
+            }
         }
 
         function snapToClosest(movingMesh) {

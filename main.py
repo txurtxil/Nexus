@@ -1,6 +1,6 @@
 import flet as ft
 import os, base64, json, threading, http.server, socketserver, socket, time, warnings, traceback, shutil, struct
-import param_generators # NUEVO: Módulo que contiene toda la lógica de geometrías
+import param_generators # Módulo de geometrías modularizado (Fase 4)
 
 try:
     import psutil
@@ -39,7 +39,7 @@ LAN_IP = "127.0.0.1"
 LOCAL_PORT = 8556
 LATEST_CODE_B64 = ""
 LATEST_NEEDS_STL = False
-INJECTED_CODE_IA = "" # NUEVO: Bandera para inyección asíncrona
+INJECTED_CODE_IA = "" 
 
 MAX_ASSEMBLY_PARTS = 10
 ASSEMBLY_PARTS_STATE = [{"active": False, "file": "", "mat": "pla", "x": 0, "y": 0, "z": 0} for _ in range(MAX_ASSEMBLY_PARTS)]
@@ -97,6 +97,25 @@ def validate_stl(filepath):
             return False, f"STL Incompleto/Roto: Pesa {sz}B, Motor exige {expected}B."
     except Exception as e: return False, f"Error lectura: {e}"
 
+def convert_stl_to_obj(stl_path, obj_path):
+    try:
+        with open(stl_path, 'rb') as f:
+            f.read(80)
+            tris = int.from_bytes(f.read(4), 'little')
+            with open(obj_path, 'w') as out:
+                out.write("# NEXUS CAD Export\no Nexus_Mesh\n")
+                v_idx = 1
+                for _ in range(tris):
+                    data = f.read(50)
+                    if len(data) < 50: break
+                    v1 = struct.unpack('<3f', data[12:24])
+                    v2 = struct.unpack('<3f', data[24:36])
+                    v3 = struct.unpack('<3f', data[36:48])
+                    out.write(f"v {v1[0]} {v1[1]} {v1[2]}\nv {v2[0]} {v2[1]} {v2[2]}\nv {v3[0]} {v3[1]} {v3[2]}\nf {v_idx} {v_idx+1} {v_idx+2}\n")
+                    v_idx += 3
+        return True, "Convertido exitosamente."
+    except Exception as e: return False, str(e)
+
 def analyze_stl(filepath):
     try:
         with open(filepath, 'rb') as f:
@@ -127,7 +146,7 @@ def analyze_stl(filepath):
 DUMMY_VALID_STL = b'NEXUS_DUMMY_STL' + (b'\x00' * 65) + (1).to_bytes(4, 'little') + (b'\x00' * 50)
 
 # =========================================================
-# SERVIDOR HTTP (LOCAL HOSTING)
+# SERVIDOR HTTP (LOCAL HOSTING) - CORREGIDO MIME TYPES
 # =========================================================
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def _send_cors(self):
@@ -142,7 +161,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         
-        # FASE 4: Receptor de Código IA
+        # Receptor de Código IA
         if parsed.path == '/api/inject_code':
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
@@ -275,10 +294,23 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
         else:
             try:
-                fn = self.path.strip("/")
-                with open(os.path.join(ASSETS_DIR, fn), "rb") as f:
-                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(f.read())
-            except: self.send_response(404); self._send_cors(); self.end_headers()
+                # FASE 4: CORRECCIÓN CRÍTICA DE MIME TYPES PARA LOS BOTONES
+                fn = parsed.path.strip("/")
+                filepath = os.path.join(ASSETS_DIR, fn)
+                if os.path.exists(filepath) and os.path.isfile(filepath):
+                    with open(filepath, "rb") as f:
+                        self.send_response(200)
+                        if fn.endswith(".html"): self.send_header("Content-type", "text/html; charset=utf-8")
+                        elif fn.endswith(".js"): self.send_header("Content-type", "application/javascript")
+                        elif fn.endswith(".css"): self.send_header("Content-type", "text/css")
+                        elif fn.endswith(".png"): self.send_header("Content-type", "image/png")
+                        elif fn.endswith(".stl"): self.send_header("Content-type", "model/stl")
+                        else: self.send_header("Content-type", "text/plain")
+                        self._send_cors(); self.end_headers(); self.wfile.write(f.read())
+                else:
+                    self.send_response(404); self._send_cors(); self.end_headers()
+            except Exception as e:
+                self.send_response(500); self._send_cors(); self.end_headers()
             
     def log_message(self, *args): pass
 
@@ -293,19 +325,18 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.73.4 TITAN FORGE (Wasm + AI Pro)"
+        page.title = "NEXUS CAD v20.73.5 TITAN (Arquitectura Modular)"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v20.73.4 TITAN | Modularización Activa", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.73.5 TITAN | Core Limpio y Servidor Fix Activo", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
         ensamble_stack = []; herramienta_actual = "custom"; modo_ensamble = False
 
-        # FASE 4: Loop de detección de Código Inyectado desde la Interfaz IA (Web)
         def check_ia_injection():
             global INJECTED_CODE_IA
             while True:
@@ -488,110 +519,16 @@ def main(page: ft.Page):
         sl_clip_d, r_clip_d = create_slider("Ø Cable", 3, 15, 6, False); sl_clip_w, r_clip_w = create_slider("Ancho Adhesivo", 10, 40, 20, False); col_clip_cable = ft.Column([ft.Text("Clip de Cables (Desk)", color="#00E676"), ft.Container(content=ft.Column([r_clip_d, r_clip_w]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
         sl_vr_s, r_vr_s = create_slider("Tamaño Base", 50, 500, 200, False); col_vr_pedestal = ft.Column([ft.Text("Pedestal de Exhibición (Modo VR)", color="#B388FF"), ft.Container(content=ft.Column([r_vr_s]), bgcolor="#161B22", padding=10, border_radius=8)], visible=False)
 
-        def get_stl_base_js():
-            sc = sl_stl_sc.value / 100.0; tx = sl_stl_x.value; ty = sl_stl_y.value; tz = sl_stl_z.value
-            return f"  var sc = {sc}; var tx = {tx}; var ty = {ty}; var tz = {tz};\n  var dron = null;\n  if (typeof IMPORTED_STL !== 'undefined') {{ var parts = Array.isArray(IMPORTED_STL) ? IMPORTED_STL : [IMPORTED_STL]; for(var i=0; i<parts.length; i++) {{ var p = parts[i]; if(p && p.polygons && typeof p.scale !== 'function') {{ try {{ p = CSG.fromPolygons(p.polygons); }} catch(e) {{}} }} if(p && typeof p.union === 'function') {{ if(!dron) dron = p; else dron = dron.union(p); }} }} }}\n  if(!dron || typeof dron.union !== 'function') {{ return CSG.cube({{radius:[0.01, 0.01, 0.01]}}); }}\n  dron = UTILS.scale(dron, [sc, sc, sc]); dron = UTILS.trans(dron, [tx, ty, tz]);\n"
-
         def generate_param_code():
             h = herramienta_actual
-            code = "function main() {\n"
-            if h == "custom": return # Deja el código libre intacto
+            if h == "custom": return
             
-            # FASE 4: MÓDULO EXTERNO PARA LÓGICA PARAMÉTRICA
-            # Se empacan todos los valores de los sliders en un diccionario
             p_dict = {
-                "sl_las_x": sl_las_x.value, "sl_las_y": sl_las_y.value, "sl_las_z": sl_las_z.value,
-                "sl_alin_f": sl_alin_f.value, "sl_alin_c": sl_alin_c.value, "sl_alin_dx": sl_alin_dx.value, "sl_alin_dy": sl_alin_dy.value, "sl_alin_h": sl_alin_h.value,
-                "sl_apol_n": sl_apol_n.value, "sl_apol_r": sl_apol_r.value, "sl_apol_rp": sl_apol_rp.value, "sl_apol_h": sl_apol_h.value,
-                "sl_loft_w": sl_loft_w.value, "sl_loft_r": sl_loft_r.value, "sl_loft_h": sl_loft_h.value, "sl_loft_g": sl_loft_g.value,
-                "sl_vor_ro": sl_vor_ro.value, "sl_vor_ri": sl_vor_ri.value, "sl_vor_h": sl_vor_h.value, "sl_vor_d": sl_vor_d.value,
-                "sl_evo_d": sl_evo_d.value, "sl_evo_m": sl_evo_m.value, "sl_evo_h": sl_evo_h.value,
-                "sl_crem_d": sl_crem_d.value, "sl_crem_m": sl_crem_m.value, "sl_crem_h": sl_crem_h.value, "sl_crem_w": sl_crem_w.value,
-                "sl_con_d": sl_con_d.value, "sl_con_rb": sl_con_rb.value, "sl_con_rt": sl_con_rt.value, "sl_con_h": sl_con_h.value,
-                "sl_mc_x": sl_mc_x.value, "sl_mc_y": sl_mc_y.value, "sl_mc_z": sl_mc_z.value, "sl_mc_tol": sl_mc_tol.value, "sl_mc_sep": sl_mc_sep.value,
-                "sl_perf_p": sl_perf_p.value, "sl_perf_re": sl_perf_re.value, "sl_perf_ri": sl_perf_ri.value, "sl_perf_h": sl_perf_h.value,
-                "sl_rev_h": sl_rev_h.value, "sl_rev_r1": sl_rev_r1.value, "sl_rev_r2": sl_rev_r2.value, "sl_rev_g": sl_rev_g.value,
-                "sl_c_grosor": sl_c_grosor.value, "sl_p_rint": sl_p_rint.value, "sl_p_lados": sl_p_lados.value,
-                "sl_l_largo": sl_l_largo.value, "sl_l_ancho": sl_l_ancho.value, "sl_l_grosor": sl_l_grosor.value, "sl_l_hueco": sl_l_hueco.value, "sl_l_chaf": sl_l_chaf.value,
-                "sl_e_dientes": sl_e_dientes.value, "sl_e_radio": sl_e_radio.value, "sl_e_grosor": sl_e_grosor.value, "sl_e_eje": sl_e_eje.value,
-                "sl_pcb_x": sl_pcb_x.value, "sl_pcb_y": sl_pcb_y.value, "sl_pcb_h": sl_pcb_h.value, "sl_pcb_t": sl_pcb_t.value, "sl_v_l": sl_v_l.value,
-                "sl_bi_l": sl_bi_l.value, "sl_bi_d": sl_bi_d.value,
-                "sl_clamp_d": sl_clamp_d.value, "sl_clamp_g": sl_clamp_g.value, "sl_clamp_w": sl_clamp_w.value,
-                "sl_fij_m": sl_fij_m.value, "sl_fij_l": sl_fij_l.value,
-                "sl_rod_dint": sl_rod_dint.value, "sl_rod_dext": sl_rod_dext.value, "sl_rod_h": sl_rod_h.value,
-                "sl_plan_rs": sl_plan_rs.value, "sl_plan_rp": sl_plan_rp.value, "sl_plan_h": sl_plan_h.value,
-                "sl_pol_t": sl_pol_t.value, "sl_pol_w": sl_pol_w.value, "sl_pol_d": sl_pol_d.value,
-                "sl_hel_r": sl_hel_r.value, "sl_hel_n": sl_hel_n.value, "sl_hel_p": sl_hel_p.value,
-                "sl_rot_r": sl_rot_r.value, "sl_car_x": sl_car_x.value, "sl_car_y": sl_car_y.value, "sl_car_z": sl_car_z.value, "sl_car_t": sl_car_t.value,
-                "sl_mue_r": sl_mue_r.value, "sl_mue_h": sl_mue_h.value, "sl_mue_v": sl_mue_v.value, "sl_mue_alt": sl_mue_alt.value,
-                "sl_acme_d": sl_acme_d.value, "sl_acme_p": sl_acme_p.value, "sl_acme_l": sl_acme_l.value,
-                "sl_codo_r": sl_codo_r.value, "sl_codo_c": sl_codo_c.value, "sl_codo_a": sl_codo_a.value, "sl_codo_g": sl_codo_g.value,
-                "sl_naca_c": sl_naca_c.value, "sl_naca_g": sl_naca_g.value, "sl_naca_e": sl_naca_e.value,
-                "sl_st_ang": sl_st_ang.value, "sl_st_w": sl_st_w.value, "sl_st_t": sl_st_t.value,
-                "sl_clip_d": sl_clip_d.value, "sl_clip_w": sl_clip_w.value, "sl_vr_s": sl_vr_s.value
+                "sc": sl_stl_sc.value, "tx": sl_stl_x.value, "ty": sl_stl_y.value, "tz": sl_stl_z.value, "stlf_z": sl_stlf_z.value, "stls_axis": dd_stls_axis.value, "stls_pos": sl_stls_pos.value, "stlc_s": sl_stlc_s.value, "stld_axis": dd_stld_axis.value, "stld_r": sl_stld_r.value, "stld_px": sl_stld_px.value, "stld_py": sl_stld_py.value, "stlm_w": sl_stlm_w.value, "stlm_d": sl_stlm_d.value, "stle_r": sl_stle_r.value, "stle_d": sl_stle_d.value, "stlp_sx": sl_stlp_sx.value, "stlp_sy": sl_stlp_sy.value, "stlp_sz": sl_stlp_sz.value, "stlh_r": sl_stlh_r.value, "stlpg_r": sl_stlpg_r.value, "stlpg_t": sl_stlpg_t.value, "stlpg_x": sl_stlpg_x.value, "stlpg_y": sl_stlpg_y.value,
+                "sketch_h": sl_sketch_h.value, "sketch_pts": tf_sketch_pts.value, "txt_input": tf_texto.value, "txt_estilo": dd_txt_estilo.value, "txt_base": dd_txt_base.value, "txt_grabado": sw_txt_grabado.value,
+                "las_x": sl_las_x.value, "las_y": sl_las_y.value, "las_z": sl_las_z.value, "alin_f": sl_alin_f.value, "alin_c": sl_alin_c.value, "alin_dx": sl_alin_dx.value, "alin_dy": sl_alin_dy.value, "alin_h": sl_alin_h.value, "apol_n": sl_apol_n.value, "apol_r": sl_apol_r.value, "apol_rp": sl_apol_rp.value, "apol_h": sl_apol_h.value, "loft_w": sl_loft_w.value, "loft_r": sl_loft_r.value, "loft_h": sl_loft_h.value, "loft_g": sl_loft_g.value, "pan_x": sl_pan_x.value, "pan_y": sl_pan_y.value, "pan_z": sl_pan_z.value, "pan_r": sl_pan_r.value, "vor_ro": sl_vor_ro.value, "vor_ri": sl_vor_ri.value, "vor_h": sl_vor_h.value, "vor_d": sl_vor_d.value, "evo_d": sl_evo_d.value, "evo_m": sl_evo_m.value, "evo_h": sl_evo_h.value, "crem_d": sl_crem_d.value, "crem_m": sl_crem_m.value, "crem_h": sl_crem_h.value, "crem_w": sl_crem_w.value, "con_d": sl_con_d.value, "con_rb": sl_con_rb.value, "con_rt": sl_con_rt.value, "con_h": sl_con_h.value, "mc_x": sl_mc_x.value, "mc_y": sl_mc_y.value, "mc_z": sl_mc_z.value, "mc_tol": sl_mc_tol.value, "mc_sep": sl_mc_sep.value, "perf_p": sl_perf_p.value, "perf_re": sl_perf_re.value, "perf_ri": sl_perf_ri.value, "perf_h": sl_perf_h.value, "rev_h": sl_rev_h.value, "rev_r1": sl_rev_r1.value, "rev_r2": sl_rev_r2.value, "rev_g": sl_rev_g.value, "cubo": sl_cubo.value, "c_grosor": sl_c_grosor.value, "p_rint": sl_p_rint.value, "p_lados": sl_p_lados.value, "l_largo": sl_l_largo.value, "l_ancho": sl_l_ancho.value, "l_grosor": sl_l_grosor.value, "l_hueco": sl_l_hueco.value, "l_chaf": sl_l_chaf.value, "e_dientes": sl_e_dientes.value, "e_radio": sl_e_radio.value, "e_grosor": sl_e_grosor.value, "e_eje": sl_e_eje.value, "pcb_x": sl_pcb_x.value, "pcb_y": sl_pcb_y.value, "pcb_h": sl_pcb_h.value, "pcb_t": sl_pcb_t.value, "v_l": sl_v_l.value, "bi_l": sl_bi_l.value, "bi_d": sl_bi_d.value, "clamp_d": sl_clamp_d.value, "clamp_g": sl_clamp_g.value, "clamp_w": sl_clamp_w.value, "fij_m": sl_fij_m.value, "fij_l": sl_fij_l.value, "rod_dint": sl_rod_dint.value, "rod_dext": sl_rod_dext.value, "rod_h": sl_rod_h.value, "plan_rs": sl_plan_rs.value, "plan_rp": sl_plan_rp.value, "plan_h": sl_plan_h.value, "pol_t": sl_pol_t.value, "pol_w": sl_pol_w.value, "pol_d": sl_pol_d.value, "hel_r": sl_hel_r.value, "hel_n": sl_hel_n.value, "hel_p": sl_hel_p.value, "rot_r": sl_rot_r.value, "car_x": sl_car_x.value, "car_y": sl_car_y.value, "car_z": sl_car_z.value, "car_t": sl_car_t.value, "mue_r": sl_mue_r.value, "mue_h": sl_mue_h.value, "mue_v": sl_mue_v.value, "mue_alt": sl_mue_alt.value, "acme_d": sl_acme_d.value, "acme_p": sl_acme_p.value, "acme_l": sl_acme_l.value, "codo_r": sl_codo_r.value, "codo_c": sl_codo_c.value, "codo_a": sl_codo_a.value, "codo_g": sl_codo_g.value, "naca_c": sl_naca_c.value, "naca_g": sl_naca_g.value, "naca_e": sl_naca_e.value, "st_ang": sl_st_ang.value, "st_w": sl_st_w.value, "st_t": sl_st_t.value, "clip_d": sl_clip_d.value, "clip_w": sl_clip_w.value, "vr_s": sl_vr_s.value
             }
-
-            if h == "sketcher":
-                code += f"  var h_ext = {sl_sketch_h.value};\n  var raw_pts = `{tf_sketch_pts.value.replace(chr(10), '\\n')}`;\n  var lines = raw_pts.split('\\n'); var pts = [];\n  for(var i=0; i<lines.length; i++) {{ var str = lines[i].replace(/[\\[\\]]/g, '').trim(); var coords = str.split(/[,;|\\t ]+/); var coords_filtered = coords.filter(x => x !== ''); if(coords_filtered.length >= 2) pts.push([parseFloat(coords_filtered[0]), parseFloat(coords_filtered[1])]); }}\n  if(pts.length < 3) return CSG.cube({{radius:[0.01,0.01,0.01]}});\n  try {{ return UTILS.mat(CAG.fromPoints(pts).extrude({{offset: [0, 0, h_ext]}})); }} catch(e) {{ return CSG.cube({{radius:[5,5,5]}}); }}\n}}"
-            elif h.startswith("stl"):
-                code += get_stl_base_js()
-                if h == "stl": code += "  return UTILS.mat(dron);\n}"
-                elif h == "stl_flatten": code += f"  return UTILS.mat(dron.subtract(CSG.cube({{center:[0,0,-500+{sl_stlf_z.value}], radius:[1000,1000,500]}})));\n}}"
-                elif h == "stl_split":
-                    ax = dd_stls_axis.value; p = sl_stls_pos.value
-                    cx = p-500 if ax=='X' else 0; cy = p-500 if ax=='Y' else 0; cz = p-500 if ax=='Z' else 0
-                    code += f"  return UTILS.mat(dron.subtract(CSG.cube({{center:[{cx},{cy},{cz}], radius:[1000,1000,1000]}})));\n}}"
-                elif h == "stl_crop": S = sl_stlc_s.value / 2.0; code += f"  return UTILS.mat(dron.intersect(CSG.cube({{center:[0,0,0], radius:[{S},{S},{S}]}})));\n}}"
-                elif h == "stl_drill":
-                    ax = dd_stld_axis.value; R = sl_stld_r.value; p1 = sl_stld_px.value; p2 = sl_stld_py.value
-                    st = f"[-500,{p1},{p2}]" if ax=='X' else (f"[{p1},-500,{p2}]" if ax=='Y' else f"[{p1},{p2},-500]")
-                    en = f"[500,{p1},{p2}]" if ax=='X' else (f"[{p1},500,{p2}]" if ax=='Y' else f"[{p1},{p2},500]")
-                    code += f"  return UTILS.mat(dron.subtract(CSG.cylinder({{start:{st}, end:{en}, radius:{R}}})));\n}}"
-                elif h == "stl_mount":
-                    w = sl_stlm_w.value; d = sl_stlm_d.value
-                    code += f"  var m1 = CSG.cube({{center:[{d/2},0,0], radius:[{w/2},15,3]}}).subtract(CSG.cylinder({{start:[{d/2},0,-5], end:[{d/2},0,5], radius:2.2, slices:16}}));\n"
-                    code += f"  var m2 = CSG.cube({{center:[{-d/2},0,0], radius:[{w/2},15,3]}}).subtract(CSG.cylinder({{start:[{-d/2},0,-5], end:[{-d/2},0,5], radius:2.2, slices:16}}));\n"
-                    code += f"  return UTILS.mat(dron.union(m1).union(m2));\n}}"
-                elif h == "stl_ears":
-                    r = sl_stle_r.value; d = sl_stle_d.value
-                    code += f"  var c1=CSG.cylinder({{start:[{d/2},{d/2},0], end:[{d/2},{d/2},0.4], radius:{r}}}); var c2=CSG.cylinder({{start:[{-d/2},{d/2},0], end:[{-d/2},{d/2},0.4], radius:{r}}});\n"
-                    code += f"  var c3=CSG.cylinder({{start:[{d/2},{-d/2},0], end:[{d/2},{-d/2},0.4], radius:{r}}}); var c4=CSG.cylinder({{start:[{-d/2},{-d/2},0], end:[{-d/2},{-d/2},0.4], radius:{r}}});\n"
-                    code += f"  return UTILS.mat(dron.union(c1).union(c2).union(c3).union(c4));\n}}"
-                elif h == "stl_patch": code += f"  return UTILS.mat(dron.union(CSG.cube({{center:[0,0,0], radius:[{sl_stlp_sx.value/2},{sl_stlp_sy.value/2},{sl_stlp_sz.value/2}]}})));\n}}"
-                elif h == "stl_honeycomb":
-                    hex_r = sl_stlh_r.value
-                    code += f"  var dx = {hex_r}*1.732+2; var dy = {hex_r}*1.5+2; var holes = null;\n"
-                    code += f"  for(var x = -100; x < 100; x += dx) {{ for(var y = -100; y < 100; y += dy) {{\n      var offset = (Math.abs(Math.round(y/dy)) % 2 === 1) ? dx/2 : 0;\n"
-                    code += f"      var hex = CSG.cylinder({{start:[x+offset, y, -500], end:[x+offset, y, 500], radius:{hex_r}, slices:6}});\n      if(!holes) holes = hex; else holes = holes.union(hex);\n  }} }}\n  if(holes) return UTILS.mat(dron.subtract(holes));\n  return UTILS.mat(dron);\n}}"
-                elif h == "stl_propguard":
-                    r = sl_stlpg_r.value; t = sl_stlpg_t.value; px = sl_stlpg_x.value; py = sl_stlpg_y.value
-                    code += f"  var out = CSG.cylinder({{start:[{px},{py},0], end:[{px},{py},10], radius:{r+t}, slices:32}});\n  var inn = CSG.cylinder({{start:[{px},{py},-1], end:[{px},{py},11], radius:{r}, slices:32}});\n"
-                    code += f"  return UTILS.mat(dron.union(out.subtract(inn)));\n}}"
-            elif h == "texto":
-                txt_input = tf_texto.value.upper()[:15]; estilo = dd_txt_estilo.value; base = dd_txt_base.value; grabado = sw_txt_grabado.value
-                if not txt_input: txt_input = " "
-                code += f"  var texto = \"{txt_input}\"; var h = GH;\n"
-                code += f"  var font = {{ 'A':[14,17,31,17,17], 'B':[30,17,30,17,30], 'C':[14,17,16,17,14], 'D':[30,17,17,17,30], 'E':[31,16,30,16,31], 'F':[31,16,30,16,16], 'G':[14,17,23,17,14], 'H':[17,17,31,17,17], 'I':[14,4,4,4,14], 'J':[7,2,2,18,12], 'K':[17,18,28,18,17], 'L':[16,16,16,16,31], 'M':[17,27,21,17,17], 'N':[17,25,21,19,17], 'O':[14,17,17,17,14], 'P':[30,17,30,16,16], 'Q':[14,17,21,18,13], 'R':[30,17,30,18,17], 'S':[14,16,14,1,14], 'T':[31,4,4,4,4], 'U':[17,17,17,17,14], 'V':[17,17,17,10,4], 'W':[17,17,21,27,17], 'X':[17,10,4,10,17], 'Y':[17,10,4,4,4], 'Z':[31,2,4,8,31], ' ':[0,0,0,0,0], '0':[14,17,17,17,14], '1':[4,12,4,4,14], '2':[14,1,14,16,31], '3':[14,1,14,1,14], '4':[18,18,31,2,2], '5':[31,16,14,1,14], '6':[14,16,30,17,14], '7':[31,1,2,4,8], '8':[14,17,14,17,14], '9':[14,17,15,1,14] }};\n"
-                z_start = "h/2" if not grabado else "h - 1"; h_letra = "h/2" if not grabado else "h+2"
-                if "Voxel" in estilo:
-                    es_grueso = "1.1" if "Grueso" in estilo else "2.1"
-                    code += f"  var pText = null; var vSize = 2; var charWidth = 6 * vSize;\n  for(var i=0; i<texto.length; i++) {{ var cMat = font[texto[i]] || font[' ']; var offX = i * charWidth; for(var r=0; r<5; r++) {{ for(var c=0; c<5; c++) {{ if ((cMat[r] >> (4 - c)) & 1) {{ var vox = CSG.cube({{center:[offX+(c*vSize), (4-r)*vSize, {z_start}], radius:[vSize/{es_grueso}, vSize/{es_grueso}, {h_letra}/2]}}); if(!pText) pText = vox; else pText = pText.union(vox); }} }} }} }}\n  var totalL = Math.max(texto.length * charWidth, 10);\n"
-                elif estilo == "Braille":
-                    rad_braille = "1.5" if not grabado else "1.8"
-                    code += f"  var braille = {{ 'A':[1], 'B':[1,2], 'C':[1,4], 'D':[1,4,5], 'E':[1,5], 'F':[1,2,4], 'G':[1,2,4,5], 'H':[1,2,5], 'I':[2,4], 'J':[2,4,5], 'K':[1,3], 'L':[1,2,3], 'M':[1,3,4], 'N':[1,3,4,5], 'O':[1,3,5], 'P':[1,2,3,4], 'Q':[1,2,3,4,5], 'R':[1,2,3,5], 'S':[2,3,4], 'T':[2,3,4,5], 'U':[1,3,6], 'V':[1,2,3,6], 'W':[2,4,5,6], 'X':[1,3,4,6], 'Y':[1,3,4,5,6], 'Z':[1,3,5,6], ' ':[0] }};\n  var pText = null; var stepX = 4; var stepY = 4; var charWidth = 10;\n  for(var i=0; i<texto.length; i++) {{ var dots = braille[texto[i]] || [1]; var offX = i * charWidth; for(var d=0; d<dots.length; d++) {{ var p = dots[d]; if (p === 0) continue; var cx = (p>3) ? stepX : 0; var cy = ((p-1)%3 === 0) ? stepY*2 : (((p-1)%3 === 1) ? stepY : 0); var domo = CSG.sphere({{center:[offX+cx, cy, {z_start}], radius:{rad_braille}, resolution:16}}); if(!pText) pText = domo; else pText = pText.union(domo); }} }}\n  var totalL = Math.max(texto.length * charWidth, 10);\n"
-                code += "  if (!pText) pText = CSG.cube({center:[0,0,0], radius:[0.01, 0.01, 0.01]});\n  var baseObj = null;\n"
-                if base == "Llavero (Anilla)": code += "  var bc = CSG.cube({center:[(totalL/2)-3, 3, h/4], radius:[(totalL/2)+2, 8, h/4]}); var anclaje = CSG.cylinder({start:[totalL, 3, 0], end:[totalL, 3, h/2], radius:6, slices:32}).subtract(CSG.cylinder({start:[totalL, 3, -1], end:[totalL, 3, h/2+1], radius:3, slices:16})); baseObj = bc.union(anclaje);\n"
-                elif base == "Placa Atornillable": code += "  var bc = CSG.cube({center:[totalL/2-3, 3, h/4], radius:[totalL/2+10, 10, h/4]}); var h1 = CSG.cylinder({start:[-8, 3, -1], end:[-8, 3, h], radius:2.5, slices:16}); var h2 = CSG.cylinder({start:[totalL+2, 3, -1], end:[totalL+2, 3, h], radius:2.5, slices:16}); baseObj = bc.subtract(h1).subtract(h2);\n"
-                elif base == "Soporte de Mesa": code += "  var bc = CSG.cube({center:[totalL/2-3, 3, h/4], radius:[totalL/2+2, 5, h/4]}); var pata = CSG.cube({center:[totalL/2-3, -5, h/8], radius:[totalL/2+2, 10, h/8]}); baseObj = bc.union(pata);\n"
-                elif base == "Colgante Militar": code += "  var b_cen = CSG.cube({center:[totalL/2-3, 4, h/4], radius:[totalL/2-1, 10, h/4]}); var b_izq = CSG.cylinder({start:[-4, 4, 0], end:[-4, 4, h/2], radius:10, slices:32}); var b_der = CSG.cylinder({start:[totalL-2, 4, 0], end:[totalL-2, 4, h/2], radius:10, slices:32}); var agujero = CSG.cylinder({start:[-8, 4, -1], end:[-8, 4, h], radius:2.5, slices:16}); baseObj = b_cen.union(b_izq).union(b_der).subtract(agujero);\n"
-                elif base == "Placa Ovalada": code += "  var c1 = CSG.cylinder({start:[-2, 4, 0], end:[-2, 4, h/2], radius:12, slices:64}); var c2 = CSG.cylinder({start:[totalL-4, 4, 0], end:[totalL-4, 4, h/2], radius:12, slices:64}); var p_med = CSG.cube({center:[totalL/2-3, 4, h/4], radius:[totalL/2-1, 12, h/4]}); baseObj = p_med.union(c1).union(c2);\n"
-                code += "  if(baseObj) {\n"
-                if grabado: code += "      return UTILS.mat(baseObj.subtract(pText));\n  } else {\n      return UTILS.mat(pText);\n  }\n}"
-                else: code += "      return UTILS.mat(baseObj.union(pText));\n  } else {\n      return UTILS.mat(pText);\n  }\n}"
-            else:
-                code += param_generators.get_code(h, p_dict)
-
-            txt_code.value = code
+            txt_code.value = param_generators.get_code(h, p_dict)
             txt_code.update()
 
         def select_tool(nombre_herramienta):
@@ -672,10 +609,10 @@ def main(page: ft.Page):
             ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
             ft.Container(height=5),
             ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
-            ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url="[http://127.0.0.1](http://127.0.0.1):" + str(LOCAL_PORT) + "/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
+            # Botón con LAN_IP
+            ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
         
-        # TAB ENSAMBLADOR VISUAL PBR 
         def build_static_assembly_cards():
             cards = []
             for i in range(MAX_ASSEMBLY_PARTS):
@@ -760,7 +697,8 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")),
             ft.Container(height=20),
-            ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url="[http://127.0.0.1](http://127.0.0.1):" + str(LOCAL_PORT) + "/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
+            # Botón con LAN_IP
+            ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{LAN_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
         ], expand=True, horizontal_alignment="center")
 
         txt_dim_x = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_dim_y = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_dim_z = ft.Text("0.0 mm", color="#00E5FF", weight="bold")
@@ -858,7 +796,8 @@ def main(page: ft.Page):
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                ft.ElevatedButton("🚀 INYECTAR ARCHIVO (VÍA PC)", url=f"[http://127.0.0.1](http://127.0.0.1):{LOCAL_PORT}/upload_ui.html", bgcolor="#00E676", color="black", width=float('inf')),
+                # Botón con LAN_IP
+                ft.ElevatedButton("🚀 INYECTAR ARCHIVO (VÍA PC)", url=f"http://{LAN_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00E676", color="black", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
             ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
@@ -870,13 +809,13 @@ def main(page: ft.Page):
             ]), bgcolor="#161B22", padding=10, border_radius=8)
         ], expand=True, scroll="auto")
 
-        # FASE 4: VISTA DE IA DELEGADA AL SERVIDOR WEB
         view_ia = ft.Column([
             ft.Container(height=30),
             ft.Text("🤖 AGENTE IA AUTÓNOMO", size=24, color="#B388FF", weight="bold", text_align="center"),
             ft.Text("NEXUS ahora tiene su propio motor de IA integrado vía Web.", color="#E6EDF3", text_align="center"),
             ft.Container(height=30),
-            ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url="[http://127.0.0.1](http://127.0.0.1):" + str(LOCAL_PORT) + "/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')),
+            # Botón con LAN_IP
+            ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{LAN_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')),
             ft.Container(height=20),
             ft.Text("💡 Nota: El código generado por la IA se inyectará automáticamente en la pestaña CODE.", color="#8B949E", size=12, text_align="center")
         ], expand=True, horizontal_alignment="center")

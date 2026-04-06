@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS AI ASSISTANT</title>
+    <style>
+        body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #B388FF; flex-shrink: 0; }
+        .header h2 { margin: 0; color: #B388FF; font-size: 20px; }
+        .content { padding: 20px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        label { font-size: 12px; color: #8B949E; font-weight: bold; margin-bottom: 5px; display: block; }
+        input, select, textarea { width: 100%; padding: 10px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 5px; box-sizing: border-box; outline: none; }
+        textarea { height: 120px; resize: none; font-family: monospace; }
+        .btn-gen { background-color: #8E24AA; color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
+        .btn-gen:active { background-color: #6A1B9A; }
+        .btn-inject { background-color: #00E676; color: black; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.3s; margin-top: 10px; }
+        .btn-inject:active { background-color: #00C853; }
+        .loader { display: none; text-align: center; color: #FFAB00; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>🤖 AGENTE IA AUTÓNOMO</h2>
+    <p style="margin: 5px 0 0 0; font-size: 11px; color: #8B949E;">Genera e inyecta código directamente a NEXUS</p>
+</div>
+
+<div class="content">
+    <div>
+        <label>⚙️ MOTOR IA (API)</label>
+        <select id="apiSelect">
+            <option value="gemini">Google Gemini (Recomendado)</option>
+            <option value="openai">OpenAI (ChatGPT)</option>
+        </select>
+    </div>
+    
+    <div>
+        <label>🔑 API KEY (Se guarda en tu móvil)</label>
+        <input type="password" id="apiKey" placeholder="Pega tu clave secreta aquí...">
+    </div>
+
+    <div>
+        <label>📝 INSTRUCCIÓN (PROMPT)</label>
+        <textarea id="promptInput" placeholder="Ej: Diseña un engranaje cónico de 15 dientes..." style="height: 80px;"></textarea>
+    </div>
+
+    <button class="btn-gen" onclick="generateCode()">🧠 GENERAR CÓDIGO JS-CSG</button>
+    <div class="loader" id="loader">Conectando con la matriz de la IA... ⏳</div>
+
+    <div>
+        <label>💻 CÓDIGO GENERADO</label>
+        <textarea id="codeOutput" placeholder="El código aparecerá aquí..."></textarea>
+    </div>
+
+    <button class="btn-inject" onclick="injectToNexus()">🚀 INYECTAR EN LA APP NEXUS</button>
+</div>
+
+<script>
+    // Recuperar clave guardada
+    document.getElementById('apiKey').value = localStorage.getItem('nexus_api_key') || '';
+    
+    const sysPrompt = "Eres un experto en diseño paramétrico 3D usando OpenJSCAD (JS-CSG). Escribe una función 'function main(params)' que construya la pieza solicitada.\nREGLAS CRÍTICAS DEL MOTOR NEXUS CAD:\n1. Usa primitivas clásicas puras: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:r}), CSG.sphere({center:[x,y,z], radius:r}).\n2. Usa operaciones booleanas permitidas: .union(), .subtract(), .intersect().\n3. EL RETORNO ES OBLIGATORIO ASÍ: 'return UTILS.mat(tu_objeto);'.\n4. DEVUELVE SOLO CÓDIGO JS. Sin markdown ni texto extra.";
+
+    async function generateCode() {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const prompt = document.getElementById('promptInput').value.trim();
+        const apiType = document.getElementById('apiSelect').value;
+        
+        if(!apiKey || !prompt) return alert("Falta la API Key o el Prompt");
+        localStorage.setItem('nexus_api_key', apiKey); // Guardar
+        
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('codeOutput').value = '';
+        
+        try {
+            let codeText = "";
+            if (apiType === "gemini") {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: sysPrompt + "\n\nPieza: " + prompt }] }]
+                    })
+                });
+                const data = await res.json();
+                codeText = data.candidates[0].content.parts[0].text;
+            } else {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
+                    body: JSON.stringify({
+                        model: "gpt-4o",
+                        messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
+                    })
+                });
+                const data = await res.json();
+                codeText = data.choices[0].message.content;
+            }
+            
+            // Limpiar Markdown
+            if (codeText.includes("```javascript")) codeText = codeText.split("```javascript")[1].split("```")[0].trim();
+            else if (codeText.includes("```js")) codeText = codeText.split("```js")[1].split("```")[0].trim();
+            else if (codeText.includes("```")) codeText = codeText.split("```")[1].split("```")[0].trim();
+            
+            document.getElementById('codeOutput').value = codeText;
+        } catch (e) {
+            alert("Error de conexión IA: " + e.message);
+        }
+        document.getElementById('loader').style.display = 'none';
+    }
+
+    async function injectToNexus() {
+        const code = document.getElementById('codeOutput').value.trim();
+        if(!code) return alert("No hay código para inyectar.");
+        
+        try {
+            const res = await fetch('/api/inject_code', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ code: code })
+            });
+            if(res.ok) {
+                alert("✓ Código enviado a NEXUS. ¡Vuelve a la App!");
+            }
+        } catch (e) {
+            alert("❌ Error: Verifica que NEXUS está corriendo.");
+        }
+    }
+</script>
+</body>
+</html>

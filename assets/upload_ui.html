@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>NEXUS WEB INJECTOR</title>
+</head>
+<body style="background:#0B0E14; color:#E6EDF3; font-family:sans-serif; text-align:center; padding:20px;">
+    <h2 style="color:#00E676;">🚀 INYECCIÓN WEB NEXUS</h2>
+    <div style="background:#161B22; padding:20px; border-radius:8px; border:1px solid #30363D; display:inline-block; width:90%; max-width:400px;">
+        <input type="file" id="f" style="margin-bottom:20px; color:white; width:100%;">
+        <button onclick="up()" style="background:#00E5FF; color:black; padding:15px; width:100%; font-weight:bold; border:none; border-radius:8px; cursor:pointer;">INYECTAR ARCHIVO</button>
+        <div id="pb-container" style="display:none; width:100%; background:#30363D; border-radius:4px; margin-top:20px; height:12px; overflow:hidden;">
+            <div id="pb-fill" style="width:0%; background:#00E5FF; height:100%; transition:width 0.2s;"></div>
+        </div>
+        <p id="s" style="margin-top:15px; font-weight:bold; font-size:15px;"></p>
+    </div>
+    <script>
+        function up() { 
+            var f = document.getElementById('f').files[0]; 
+            if(!f) return; 
+            var s = document.getElementById('s'); 
+            var pbc = document.getElementById('pb-container'); 
+            var pbf = document.getElementById('pb-fill'); 
+            s.style.color = '#FFAB00'; s.innerText = 'Iniciando inyección...'; 
+            pbc.style.display = 'block'; pbf.style.width = '0%'; pbf.style.background = '#00E5FF'; 
+            
+            var xhr = new XMLHttpRequest(); 
+            xhr.open('POST', '/api/upload', true); 
+            xhr.setRequestHeader('File-Name', encodeURIComponent(f.name)); 
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream'); 
+            xhr.upload.onprogress = function(e) { 
+                if (e.lengthComputable) { 
+                    var pc = (e.loaded / e.total) * 100; 
+                    pbf.style.width = pc + '%'; 
+                    s.innerText = 'Inyectando... ' + Math.round(pc) + '%'; 
+                } 
+            }; 
+            xhr.onload = function() { 
+                if (xhr.status == 200) { 
+                    s.style.color = '#00E676'; s.innerText = '✓ ¡ÉXITO! Vuelve a la App y pulsa REFRESCAR.'; 
+                    pbf.style.width = '100%'; pbf.style.background = '#00E676'; 
+                } else { 
+                    s.style.color = '#FF5252'; s.innerText = '❌ Error: ' + xhr.status; pbf.style.background = '#FF5252'; 
+                } 
+            }; 
+            xhr.onerror = function() { s.style.color = '#FF5252'; s.innerText = '❌ Error de red'; pbf.style.background = '#FF5252'; }; 
+            xhr.send(f); 
+        }
+    </script>
+</body>
+</html>

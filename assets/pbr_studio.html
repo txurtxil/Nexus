@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS PBR STUDIO PRO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DragControls.js"></script>
+    <style>
+        body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} 
+        canvas{display:block;} 
+        .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px; transition: transform 0.3s ease, opacity 0.3s ease; z-index: 10;}
+        .panel.collapsed { transform: translateY(-150%); opacity: 0; pointer-events: none; }
+        .fab { position: absolute; bottom: 20px; right: 20px; background: #C51162; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; font-size: 24px; border: none; outline: none; transition: background 0.2s; }
+        .fab:active { background: #FF007F; }
+    </style>
+</head>
+<body>
+    <button class="fab" onclick="togglePanel()" id="fabBtn">⚙️</button>
+    <div class="panel" id="uiPanel">
+        <h3 style="margin:0 0 10px 0;color:#FF007F;font-size:16px;">🎨 PBR STUDIO PRO</h3>
+        <div id="singleMatContainer">
+            <select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;">
+                <option value="carbon">Fibra de Carbono</option>
+                <option value="wood">Madera Bambú</option>
+                <option value="petg">PETG Translúcido</option>
+                <option value="aluminum">Aluminio</option>
+                <option value="gold">Oro Puro</option>
+                <option value="pla" selected>PLA Gris</option>
+            </select>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="color:#00E676;font-size:12px;font-weight:bold;">💡 Intensidad Luz</label>
+            <input type="range" id="lightSlider" min="0.1" max="4.0" step="0.1" value="1.5" style="width:100%;">
+        </div>
+        <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
+        <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
+        <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
+    </div>
+    
+    <script>
+        function togglePanel() { document.getElementById('uiPanel').classList.toggle('collapsed'); }
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0B0E14);
+        scene.fog = new THREE.FogExp2(0x0B0E14, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
+        camera.position.set(150, 150, 150);
+
+        const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding; 
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement); 
+        controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 + 0.1; 
+        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        scene.environment = pmremGenerator.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); scene.add(hemiLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
+        dirLight.position.set(50, 150, 50); dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 500;
+        const d = 150; dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d; dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d; dirLight.shadow.bias = -0.0005; 
+        scene.add(dirLight);
+
+        const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+        const floorMat = new THREE.MeshStandardMaterial({color: 0x0B0E14, roughness: 0.1, metalness: 0.5});
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2; floor.position.y = -0.5; floor.receiveShadow = true; scene.add(floor);
+
+        const grid = new THREE.GridHelper(500, 50, 0x30363D, 0x161B22); grid.position.y = -0.49; scene.add(grid);
+
+        document.getElementById('lightSlider').addEventListener('input', (e) => { 
+            dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.4; renderer.toneMappingExposure = parseFloat(e.target.value) * 0.8;
+        });
+
+        function takeScreenshot() {
+            renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
+            fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => r.json()).then(d => {
+                const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+            });
+        }
+
+        function createTex(type) {
+            const c = document.createElement('canvas'); c.width=256; c.height=256; const ctx = c.getContext('2d');
+            if(type==='carbon') {
+                ctx.fillStyle='#111'; ctx.fillRect(0,0,256,256); ctx.fillStyle='#2a2a2a'; ctx.fillRect(0,0,128,128); ctx.fillRect(128,128,128,128);
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(16,16); return tex;
+            } else if(type==='aluminum') {
+                ctx.fillStyle='#999'; ctx.fillRect(0,0,256,256);
+                for(let i=0;i<1000;i++){ ctx.fillStyle=Math.random()>0.5?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)'; ctx.fillRect(0,Math.random()*256,256,2); }
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(4,4); return tex;
+            } else {
+                ctx.fillStyle='#dcb68a'; ctx.fillRect(0,0,256,256);
+                for(let i=0;i<500;i++){ ctx.fillStyle='rgba(139,69,19,0.1)'; ctx.fillRect(Math.random()*256,0,2,256); }
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; return tex;
+            }
+        }
+
+        const mats = {
+            pla: new THREE.MeshStandardMaterial({color: 0x888888, roughness: 0.6, metalness: 0.2}),
+            petg: new THREE.MeshPhysicalMaterial({color: 0xddffff, transmission: 0.95, opacity: 1, transparent: true, roughness: 0.1, ior: 1.5, thickness: 3.0, clearcoat: 1.0}),
+            carbon: new THREE.MeshPhysicalMaterial({color: 0x333333, roughness: 0.4, metalness: 0.6, map: createTex('carbon'), clearcoat: 1.0}),
+            aluminum: new THREE.MeshStandardMaterial({color: 0xb0b0b0, roughness: 0.2, metalness: 1.0, map: createTex('aluminum')}),
+            wood: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.9, map: createTex('wood')}),
+            gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.1, metalness: 1.0})
+        };
+
+        let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {};
+        let dragControls = null; let interactableMeshes = [];
+
+        function checkState() {
+            fetch('/api/assembly_state.json?t=' + Date.now()).then(r => r.json()).then(state => {
+                let newHash = JSON.stringify(state); if(newHash !== stateHash) { stateHash = newHash; buildScene(state); }
+            }).catch(()=>{});
+        }
+        setInterval(checkState, 1000);
+
+        function buildScene(state) {
+            if(currentGroup) scene.remove(currentGroup); currentGroup = new THREE.Group(); scene.add(currentGroup); interactableMeshes = [];
+            if(state.mode === 'single') {
+                document.getElementById('singleMatContainer').style.display = 'block'; document.getElementById('modeText').innerText = "Modo: Pieza Única";
+                let matKey = document.getElementById('matSelect').value; loadStlFile('/imported.stl?t='+Date.now(), 0, 0, 0, matKey, true, false);
+            } else {
+                document.getElementById('singleMatContainer').style.display = 'none'; document.getElementById('modeText').innerText = "Modo Ensamblaje (Arrastra las piezas)";
+                state.parts.forEach(p => { if(p.file) loadStlFile('/descargar/' + encodeURIComponent(p.file), p.x, p.y, p.z, p.mat, false, true); });
+            }
+        }
+
+        function loadStlFile(url, x, y, z, matKey, centerCam, isDraggable) {
+            if(geomCache[url] && !url.includes('?')) addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam, isDraggable);
+            else loader.load(url, geom => { geom.center(); geom.computeVertexNormals(); if(!url.includes('?')) geomCache[url] = geom; addMeshToGroup(geom, x, y, z, matKey, centerCam, isDraggable); });
+        }
+
+        function addMeshToGroup(geom, x, y, z, matKey, centerCam, isDraggable) {
+            let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
+            mesh.material = mesh.material.clone(); mesh.material.flatShading = false;
+            mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y); mesh.castShadow = true; mesh.receiveShadow = true; currentGroup.add(mesh);
+            
+            if(isDraggable) {
+                interactableMeshes.push(mesh); if(dragControls) dragControls.dispose();
+                dragControls = new THREE.DragControls(interactableMeshes, camera, renderer.domElement);
+                dragControls.addEventListener('hoveron', (e) => { e.object.material.emissive.setHex(0x222222); });
+                dragControls.addEventListener('hoveroff', (e) => { e.object.material.emissive.setHex(0x000000); });
+                dragControls.addEventListener('dragstart', () => { controls.enabled = false; });
+                dragControls.addEventListener('drag', (e) => { snapToClosest(e.object); });
+                dragControls.addEventListener('dragend', () => { controls.enabled = true; });
+            }
+            if(centerCam) { geom.computeBoundingSphere(); const r = geom.boundingSphere.radius; camera.position.set(r*1.5, r*1.2, r*1.5); controls.target.set(0,0,0); }
+        }
+
+        function snapToClosest(movingMesh) {
+            movingMesh.updateMatrixWorld(); movingMesh.geometry.computeBoundingBox(); const mBox = movingMesh.geometry.boundingBox.clone().applyMatrix4(movingMesh.matrixWorld); const snapDist = 6.0;
+            for(let other of interactableMeshes) {
+                if(other === movingMesh) continue;
+                other.updateMatrixWorld(); other.geometry.computeBoundingBox(); const oBox = other.geometry.boundingBox.clone().applyMatrix4(other.matrixWorld);
+                const dx1 = mBox.max.x - oBox.min.x; const dx2 = mBox.min.x - oBox.max.x; const dy1 = mBox.max.y - oBox.min.y; const dy2 = mBox.min.y - oBox.max.y; const dz1 = mBox.max.z - oBox.min.z; const dz2 = mBox.min.z - oBox.max.z;
+                if(Math.abs(dx1) < snapDist) { movingMesh.position.x -= dx1; break; } if(Math.abs(dx2) < snapDist) { movingMesh.position.x -= dx2; break; }
+                if(Math.abs(dy1) < snapDist) { movingMesh.position.y -= dy1; break; } if(Math.abs(dy2) < snapDist) { movingMesh.position.y -= dy2; break; }
+                if(Math.abs(dz1) < snapDist) { movingMesh.position.z -= dz1; break; } if(Math.abs(dz2) < snapDist) { movingMesh.position.z -= dz2; break; }
+            }
+        }
+
+        document.getElementById('matSelect').addEventListener('change', () => { stateHash = ""; checkState(); });
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    </script>
+</body>
+</html>

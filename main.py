@@ -8,6 +8,7 @@ except ImportError:
     HAS_PSUTIL = False
 
 from urllib.parse import urlparse, unquote
+
 warnings.simplefilter("ignore", DeprecationWarning)
 
 # =========================================================
@@ -145,36 +146,139 @@ def analyze_stl(filepath):
 DUMMY_VALID_STL = b'NEXUS_DUMMY_STL' + (b'\x00' * 65) + (1).to_bytes(4, 'little') + (b'\x00' * 50)
 
 PBR_HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>NEXUS PBR STUDIO</title><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script><style>body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} canvas{display:block;} .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px;}</style></head>
-<body><div class="panel"><h3 style="margin:0 0 10px 0;color:#FF007F;font-size:16px;">🎨 PBR STUDIO PRO</h3><div id="singleMatContainer"><select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;"><option value="carbon">Fibra de Carbono</option><option value="wood">Madera Bambú</option><option value="petg">PETG Translúcido</option><option value="aluminum">Aluminio</option><option value="gold">Oro Puro</option><option value="pla" selected>PLA Gris</option></select></div><div style="margin-bottom:10px;"><label style="color:#00E676;font-size:12px;font-weight:bold;">💡 Intensidad Luz</label><input type="range" id="lightSlider" min="0.1" max="4.0" step="0.1" value="1.5" style="width:100%;"></div><button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button><div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div><p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p></div>
-<script>
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0B0E14); scene.fog = new THREE.FogExp2(0x0B0E14, 0.002);
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0); scene.add(hemiLight);
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); scene.add(dirLight);
-const backLight = new THREE.DirectionalLight(0x00E5FF, 1.0); backLight.position.set(-50, 50, -50); scene.add(backLight);
-document.getElementById('lightSlider').addEventListener('input', (e) => { dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.6; });
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000); camera.position.set(150, 150, 150);
-const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true}); renderer.setSize(window.innerWidth, window.innerHeight); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(renderer.domElement);
-const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
-function takeScreenshot() { renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png"); fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => r.json()).then(d => { const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }); }
-function createTex(type) { const c = document.createElement('canvas'); c.width=256; c.height=256; const ctx = c.getContext('2d'); if(type==='carbon') { ctx.fillStyle='#111'; ctx.fillRect(0,0,256,256); ctx.fillStyle='#2a2a2a'; ctx.fillRect(0,0,128,128); ctx.fillRect(128,128,128,128); const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(16,16); return tex; } else if(type==='aluminum') { ctx.fillStyle='#999'; ctx.fillRect(0,0,256,256); for(let i=0;i<1000;i++){ ctx.fillStyle=Math.random()>0.5?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)'; ctx.fillRect(0,Math.random()*256,256,2); } const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(4,4); return tex; } else { ctx.fillStyle='#dcb68a'; ctx.fillRect(0,0,256,256); for(let i=0;i<500;i++){ ctx.fillStyle='rgba(139,69,19,0.1)'; ctx.fillRect(Math.random()*256,0,2,256); } const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; return tex; } }
-const mats = { pla: new THREE.MeshStandardMaterial({color: 0x666666, roughness: 0.8, metalness: 0.1}), petg: new THREE.MeshPhysicalMaterial({color: 0xddffff, transmission: 0.95, opacity: 1, transparent: true, roughness: 0.05, ior: 1.5, thickness: 3.0}), carbon: new THREE.MeshPhysicalMaterial({color: 0x333333, roughness: 0.6, metalness: 0.5, map: createTex('carbon'), clearcoat: 1.0}), aluminum: new THREE.MeshStandardMaterial({color: 0xb0b0b0, roughness: 0.4, metalness: 0.9, map: createTex('aluminum')}), wood: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.8, map: createTex('wood')}), gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.15, metalness: 1.0}) };
-let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {};
-function checkState() { fetch('/api/assembly_state.json?t=' + Date.now()).then(r => r.json()).then(state => { let newHash = JSON.stringify(state); if(newHash !== stateHash) { stateHash = newHash; buildScene(state); } }).catch(()=>{}); } setInterval(checkState, 1000);
-function buildScene(state) { if(currentGroup) scene.remove(currentGroup); currentGroup = new THREE.Group(); scene.add(currentGroup); if(state.mode === 'single') { document.getElementById('singleMatContainer').style.display = 'block'; document.getElementById('modeText').innerText = "Modo: Pieza Única"; let matKey = document.getElementById('matSelect').value; loadStlFile('/imported.stl?t='+Date.now(), 0, 0, 0, matKey, true); } else { document.getElementById('singleMatContainer').style.display = 'none'; document.getElementById('modeText').innerText = "Modo: Mesa Ensamblaje"; state.parts.forEach(p => { if(p.file) loadStlFile('/descargar/' + encodeURIComponent(p.file), p.x, p.y, p.z, p.mat, false); }); } }
-function loadStlFile(url, x, y, z, matKey, centerCam) { if(geomCache[url] && !url.includes('?')) addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam); else loader.load(url, geom => { geom.center(); geom.computeVertexNormals(); if(!url.includes('?')) geomCache[url] = geom; addMeshToGroup(geom, x, y, z, matKey, centerCam); }); }
-function addMeshToGroup(geom, x, y, z, matKey, centerCam) { let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla); mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y); currentGroup.add(mesh); if(centerCam) { geom.computeBoundingSphere(); const r = geom.boundingSphere.radius; camera.position.set(r*1.5, r*1.5, r*1.5); controls.target.set(0,0,0); } }
-document.getElementById('matSelect').addEventListener('change', () => { stateHash = ""; checkState(); });
-function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
-window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
-</script></body></html>"""
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS PBR STUDIO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <style>body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} canvas{display:block;} .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px;}</style>
+</head>
+<body>
+    <div class="panel">
+        <h3 style="margin:0 0 10px 0;color:#FF007F;font-size:16px;">🎨 PBR STUDIO PRO</h3>
+        <div id="singleMatContainer">
+            <select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;">
+                <option value="carbon">Fibra de Carbono</option>
+                <option value="wood">Madera Bambú</option>
+                <option value="petg">PETG Translúcido</option>
+                <option value="aluminum">Aluminio</option>
+                <option value="gold">Oro Puro</option>
+                <option value="pla" selected>PLA Gris</option>
+            </select>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="color:#00E676;font-size:12px;font-weight:bold;">💡 Intensidad Luz</label>
+            <input type="range" id="lightSlider" min="0.1" max="4.0" step="0.1" value="1.5" style="width:100%;">
+        </div>
+        <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
+        <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
+        <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
+    </div>
+    
+    <script>
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0B0E14);
+        scene.fog = new THREE.FogExp2(0x0B0E14, 0.002);
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0); scene.add(hemiLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); scene.add(dirLight);
+        const backLight = new THREE.DirectionalLight(0x00E5FF, 1.0); backLight.position.set(-50, 50, -50); scene.add(backLight);
+
+        document.getElementById('lightSlider').addEventListener('input', (e) => { dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.6; });
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
+        camera.position.set(150, 150, 150);
+
+        const renderer = new THREE.WebGLRenderer({antialias: true, preserveDrawingBuffer: true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+
+        function takeScreenshot() {
+            renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
+            fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => r.json()).then(d => {
+                const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+            });
+        }
+
+        function createTex(type) {
+            const c = document.createElement('canvas'); c.width=256; c.height=256; const ctx = c.getContext('2d');
+            if(type==='carbon') {
+                ctx.fillStyle='#111'; ctx.fillRect(0,0,256,256); ctx.fillStyle='#2a2a2a'; ctx.fillRect(0,0,128,128); ctx.fillRect(128,128,128,128);
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(16,16); return tex;
+            } else if(type==='aluminum') {
+                ctx.fillStyle='#999'; ctx.fillRect(0,0,256,256);
+                for(let i=0;i<1000;i++){ ctx.fillStyle=Math.random()>0.5?'rgba(255,255,255,0.1)':'rgba(0,0,0,0.1)'; ctx.fillRect(0,Math.random()*256,256,2); }
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(4,4); return tex;
+            } else {
+                ctx.fillStyle='#dcb68a'; ctx.fillRect(0,0,256,256);
+                for(let i=0;i<500;i++){ ctx.fillStyle='rgba(139,69,19,0.1)'; ctx.fillRect(Math.random()*256,0,2,256); }
+                const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; return tex;
+            }
+        }
+
+        const mats = {
+            pla: new THREE.MeshStandardMaterial({color: 0x666666, roughness: 0.8, metalness: 0.1}),
+            petg: new THREE.MeshPhysicalMaterial({color: 0xddffff, transmission: 0.95, opacity: 1, transparent: true, roughness: 0.05, ior: 1.5, thickness: 3.0}),
+            carbon: new THREE.MeshPhysicalMaterial({color: 0x333333, roughness: 0.6, metalness: 0.5, map: createTex('carbon'), clearcoat: 1.0}),
+            aluminum: new THREE.MeshStandardMaterial({color: 0xb0b0b0, roughness: 0.4, metalness: 0.9, map: createTex('aluminum')}),
+            wood: new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.8, map: createTex('wood')}),
+            gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.15, metalness: 1.0})
+        };
+
+        let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {};
+
+        function checkState() {
+            fetch('/api/assembly_state.json?t=' + Date.now()).then(r => r.json()).then(state => {
+                let newHash = JSON.stringify(state);
+                if(newHash !== stateHash) { stateHash = newHash; buildScene(state); }
+            }).catch(()=>{});
+        }
+        setInterval(checkState, 1000);
+
+        function buildScene(state) {
+            if(currentGroup) scene.remove(currentGroup);
+            currentGroup = new THREE.Group(); scene.add(currentGroup);
+            if(state.mode === 'single') {
+                document.getElementById('singleMatContainer').style.display = 'block'; document.getElementById('modeText').innerText = "Modo: Pieza Única";
+                let matKey = document.getElementById('matSelect').value;
+                loadStlFile('/imported.stl?t='+Date.now(), 0, 0, 0, matKey, true);
+            } else {
+                document.getElementById('singleMatContainer').style.display = 'none'; document.getElementById('modeText').innerText = "Modo: Mesa Ensamblaje";
+                state.parts.forEach(p => { if(p.file) loadStlFile('/descargar/' + encodeURIComponent(p.file), p.x, p.y, p.z, p.mat, false); });
+            }
+        }
+
+        function loadStlFile(url, x, y, z, matKey, centerCam) {
+            if(geomCache[url] && !url.includes('?')) addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam);
+            else loader.load(url, geom => { geom.center(); geom.computeVertexNormals(); if(!url.includes('?')) geomCache[url] = geom; addMeshToGroup(geom, x, y, z, matKey, centerCam); });
+        }
+
+        function addMeshToGroup(geom, x, y, z, matKey, centerCam) {
+            let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
+            mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y);
+            currentGroup.add(mesh);
+            if(centerCam) { geom.computeBoundingSphere(); const r = geom.boundingSphere.radius; camera.position.set(r*1.5, r*1.5, r*1.5); controls.target.set(0,0,0); }
+        }
+
+        document.getElementById('matSelect').addEventListener('change', () => { stateHash = ""; checkState(); });
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    </script>
+</body>
+</html>"""
 
 class NexusHandler(http.server.BaseHTTPRequestHandler):
     def _send_cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, File-Name")
-        self.send_header("Connection", "keep-alive") 
+        self.send_header("Connection", "close") 
 
     def do_OPTIONS(self):
         self.send_response(200); self._send_cors(); self.end_headers()
@@ -370,12 +474,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v20.72 TITAN FORGE"
+        page.title = "NEXUS CAD v20.68 TITAN FORGE"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text(f"NEXUS v20.72 TITAN | Servidor en {LAN_IP}:{LOCAL_PORT}", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v20.68 TITAN | Web Worker Bypass Activo", color="#00E676", weight="bold")
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
@@ -1017,18 +1121,12 @@ def main(page: ft.Page):
 
         threading.Thread(target=hw_monitor_loop, daemon=True).start()
 
-        def open_visor_browser(e):
-            page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/openscad_engine.html")
-
-        def open_pbr_browser(e):
-            page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/pbr_studio.html")
-
         view_visor = ft.Column([
             ft.Container(height=5), hw_panel, ft.Container(height=5),
             ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
             ft.Container(height=5),
             ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
-            ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", on_click=open_visor_browser, bgcolor="#00E676", color="black", height=60, width=float('inf')),
+            ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
         
         # =========================================================
@@ -1147,8 +1245,7 @@ def main(page: ft.Page):
             ft.Container(height=20),
             ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")),
             ft.Container(height=20),
-            ft.ElevatedButton("🚀 ABRIR PBR STUDIO", on_click=open_pbr_browser, bgcolor="#C51162", color="white", height=80, width=float('inf')),
-            ft.Text("🔗 Si no se abre, entra a: http://127.0.0.1:" + str(LOCAL_PORT) + "/pbr_studio.html", size=10, color="#8B949E")
+            ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url="http://127.0.0.1:" + str(LOCAL_PORT) + "/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))
         ], expand=True, horizontal_alignment="center")
 
         # PANEL CALIBRE 3D
@@ -1288,7 +1385,7 @@ def main(page: ft.Page):
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                ft.ElevatedButton("🚀 INYECTAR ARCHIVO (VÍA PC)", on_click=lambda _: page.launch_url(f"http://127.0.0.1:{LOCAL_PORT}/upload_ui"), bgcolor="#00E676", color="black", width=float('inf')),
+                ft.ElevatedButton("🚀 INYECTAR ARCHIVO (VÍA PC)", url=f"http://127.0.0.1:{LOCAL_PORT}/upload_ui", bgcolor="#00E676", color="black", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
             ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
@@ -1301,14 +1398,15 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         # =========================================================
-        # TAB 6: IA ASSISTANT 
+        # TAB 6: IA ASSISTANT (MEJORADA SIN PORTAPAPELES)
         # =========================================================
-        tf_ia_prompt = ft.TextField(label="¿Qué pieza 3D exacta quieres que diseñe?", value="una caja 10x10x10 con un agujero en el centro", bgcolor="#161B22", border_color="#00E5FF", color="white", expand=True)
+        tf_ia_prompt = ft.TextField(label="¿Qué pieza 3D exacta quieres que diseñe?", value="una caja 10x10x10", bgcolor="#161B22", border_color="#00E5FF", color="white", expand=True)
         tf_ia_codigo = ft.TextField(label="Pega aquí el código Javascript que te dio la IA", multiline=True, height=200, bgcolor="#161B22", border_color="#B388FF", color="#58A6FF", text_size=12, expand=True)
         
-        tf_prompt_generado = ft.TextField(label="Prompt Generado (Copia manual si falla el botón)", multiline=True, height=150, bgcolor="#0B0E14", color="#00E676", visible=False, read_only=True, text_size=11)
+        # Nueva caja de texto de solo lectura para mostrar el prompt final
+        tf_prompt_generado = ft.TextField(label="Prompt Generado (Selecciona el texto y cópialo)", multiline=True, height=180, bgcolor="#0B0E14", color="#00E676", visible=False, read_only=True, text_size=11)
 
-        def copiar_prompt_ia(e):
+        def generar_prompt_ia(e):
             prompt_completo = (
                 f"Eres un experto en diseño paramétrico 3D usando OpenJSCAD (JS-CSG).\n"
                 f"Escribe una función 'function main(params)' que construya esta pieza: {tf_ia_prompt.value}\n\n"
@@ -1322,15 +1420,8 @@ def main(page: ft.Page):
             
             tf_prompt_generado.value = prompt_completo
             tf_prompt_generado.visible = True
-            
-            try:
-                page.set_clipboard(prompt_completo)
-                status.value = "✓ Prompt copiado al portapapeles. ¡Pégalo en ChatGPT!"
-                status.color = "#00E5FF"
-            except Exception as ex:
-                status.value = "⚠️ Flet en Termux puede fallar al copiar. Usa la caja verde debajo para copiar el texto manualmente."
-                status.color = "#FFAB00"
-            
+            status.value = "✓ Prompt generado. Cópialo manualmente de la caja verde."
+            status.color = "#00E5FF"
             page.update()
 
         def inyectar_codigo_ia(e):
@@ -1341,35 +1432,33 @@ def main(page: ft.Page):
                 return
             
             codigo = tf_ia_codigo.value
-            
-            mk = chr(96) * 3
-            if f"{mk}javascript" in codigo: codigo = codigo.split(f"{mk}javascript")[1].split(mk)[0].strip()
-            elif f"{mk}js" in codigo: codigo = codigo.split(f"{mk}js")[1].split(mk)[0].strip()
-            elif mk in codigo: codigo = codigo.split(mk)[1].split(mk)[0].strip()
-            
-            if "function main" in codigo and not codigo.startswith("function main"):
-                codigo = "function main" + codigo.split("function main")[1]
+            if "```javascript" in codigo:
+                codigo = codigo.split("```javascript")[1].split("```")[0].strip()
+            elif "```js" in codigo:
+                codigo = codigo.split("```js")[1].split("```")[0].strip()
+            elif "```" in codigo:
+                codigo = codigo.split("```")[1].split("```")[0].strip()
                 
             txt_code.value = codigo
             set_tab(0)
-            status.value = "✓ Código IA inyectado. Revisa la pestaña CODE y renderiza."
+            status.value = "✓ Código IA inyectado. Listo para renderizar."
             status.color = "#B388FF"
             page.update()
 
         view_ia = ft.Column([
             ft.Text("🤖 ASISTENTE IA NEXUS (PASO A PASO)", size=18, color="#B388FF", weight="bold"),
-            ft.Text("Genera Prompts ultra-compatibles con el motor Nexus JS-CSG.", color="#8B949E", size=11),
+            ft.Text("Dado que la app no tiene API Integrada, yo te ayudo a crear el código perfecto:", color="#8B949E", size=11),
             
-            ft.Container(height=5),
+            ft.Container(height=10),
             
             ft.Container(content=ft.Column([
                 ft.Text("PASO 1: CREAR INSTRUCCIÓN PARA LA IA", color="#00E5FF", weight="bold", size=13),
                 ft.Row([tf_ia_prompt]),
-                ft.ElevatedButton("1️⃣ COPIAR PROMPT AL PORTAPAPELES", on_click=copiar_prompt_ia, bgcolor="#00E5FF", color="black", width=float('inf')),
+                ft.ElevatedButton("1️⃣ GENERAR PROMPT PARA COPIAR", on_click=generar_prompt_ia, bgcolor="#00E5FF", color="black", width=float('inf')),
                 tf_prompt_generado
             ]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#00E5FF")),
             
-            ft.Container(height=5),
+            ft.Container(height=10),
             
             ft.Container(content=ft.Column([
                 ft.Text("PASO 2: PEGA LA RESPUESTA Y RENDERIZA", color="#B388FF", weight="bold", size=13),

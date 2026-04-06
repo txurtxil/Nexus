@@ -12,10 +12,15 @@
     <style>
         body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} 
         canvas{display:block;} 
-        .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px; transition: transform 0.3s ease, opacity 0.3s ease; z-index: 10;}
+        .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px; transition: transform 0.3s ease, opacity 0.3s ease; z-index: 10; max-height: 95vh; overflow-y: auto;}
         .panel.collapsed { transform: translateY(-150%); opacity: 0; pointer-events: none; }
         .fab { position: absolute; bottom: 20px; right: 20px; background: #C51162; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; font-size: 24px; border: none; outline: none; transition: background 0.2s; }
         .fab:active { background: #FF007F; }
+        
+        /* Estilos para los deslizadores (Sliders) */
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #30363D; border-radius: 2px; }
     </style>
 </head>
 <body>
@@ -41,6 +46,19 @@
         <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
         <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
         <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
+
+        <div id="transformControls" style="margin-top:15px; border-top:1px solid #30363D; padding-top:15px;">
+            <h4 style="margin:0 0 10px 0;color:#E6EDF3;font-size:12px;text-align:center;">🕹️ Transformación (Levantar / Escalar)</h4>
+            
+            <label style="color:#00E5FF;font-size:11px;font-weight:bold;">🔍 Escala: <span id="scaleVal">1.0</span>x</label>
+            <input type="range" id="scaleSlider" min="0.01" max="10" step="0.05" value="1" style="margin-bottom:10px;">
+            
+            <label style="color:#00E5FF;font-size:11px;font-weight:bold;">↕️ Altura Z (Suelo): <span id="posYVal">0</span> mm</label>
+            <input type="range" id="posYSlider" min="-500" max="500" step="1" value="0" style="margin-bottom:10px;">
+
+            <label style="color:#00E5FF;font-size:11px;font-weight:bold;">↔️ Mover X: <span id="posXVal">0</span> mm</label>
+            <input type="range" id="posXSlider" min="-500" max="500" step="1" value="0">
+        </div>
     </div>
     
     <script>
@@ -48,9 +66,8 @@
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x0B0E14);
-        scene.fog = new THREE.FogExp2(0x0B0E14, 0.001); // Niebla un poco menos densa para modelos grandes
+        scene.fog = new THREE.FogExp2(0x0B0E14, 0.001);
 
-        // CORRECCIÓN CLIPPING: near muy pequeño (0.01), far gigantesco (100000)
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 100000);
         camera.position.set(150, 150, 150);
 
@@ -74,13 +91,12 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
         dirLight.position.set(50, 150, 50); dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 2000; // Sombra hasta más lejos
-        const d = 400; // Rango de sombra mucho más amplio para piezas grandes
+        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 2000; 
+        const d = 400; 
         dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d; dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d; 
         dirLight.shadow.bias = -0.0005; 
         scene.add(dirLight);
 
-        // Suelo extra grande
         const floorGeo = new THREE.PlaneGeometry(5000, 5000);
         const floorMat = new THREE.MeshStandardMaterial({color: 0x0B0E14, roughness: 0.1, metalness: 0.5});
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -91,6 +107,25 @@
         document.getElementById('lightSlider').addEventListener('input', (e) => { 
             dirLight.intensity = parseFloat(e.target.value); hemiLight.intensity = parseFloat(e.target.value) * 0.4; renderer.toneMappingExposure = parseFloat(e.target.value) * 0.8;
         });
+
+        // --- GESTIÓN DE TRANSFORMACIONES MANUALES (Sliders) ---
+        function applyTransforms() {
+            if(!currentGroup) return;
+            const s = parseFloat(document.getElementById('scaleSlider').value);
+            const y = parseFloat(document.getElementById('posYSlider').value);
+            const x = parseFloat(document.getElementById('posXSlider').value);
+            
+            currentGroup.scale.set(s, s, s);
+            currentGroup.position.set(x, y, 0);
+
+            document.getElementById('scaleVal').innerText = s.toFixed(2);
+            document.getElementById('posYVal').innerText = y;
+            document.getElementById('posXVal').innerText = x;
+        }
+
+        document.getElementById('scaleSlider').addEventListener('input', applyTransforms);
+        document.getElementById('posYSlider').addEventListener('input', applyTransforms);
+        document.getElementById('posXSlider').addEventListener('input', applyTransforms);
 
         function takeScreenshot() {
             renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
@@ -109,10 +144,9 @@
                 for(let i=0;i<2000;i++){ ctx.fillStyle=Math.random()>0.5?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'; ctx.fillRect(0,Math.random()*512,512,2); }
                 const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(4,4); return tex;
             } else if(type==='copper') {
-                // Procedural Patina
                 ctx.fillStyle='#b87333'; ctx.fillRect(0,0,512,512);
                 for(let i=0;i<5000;i++){
-                    ctx.fillStyle=Math.random()>0.7?'rgba(46,139,87,0.3)':'rgba(60,30,10,0.2)'; // Verdigris / Dirt
+                    ctx.fillStyle=Math.random()>0.7?'rgba(46,139,87,0.3)':'rgba(60,30,10,0.2)';
                     ctx.beginPath(); ctx.arc(Math.random()*512, Math.random()*512, Math.random()*15, 0, Math.PI*2); ctx.fill();
                 }
                 const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2,2); return tex;
@@ -147,6 +181,10 @@
 
         function buildScene(state) {
             if(currentGroup) scene.remove(currentGroup); currentGroup = new THREE.Group(); scene.add(currentGroup); interactableMeshes = [];
+            
+            // Reaplicar transformaciones seleccionadas en la UI inmediatamente al grupo nuevo
+            applyTransforms();
+
             if(state.mode === 'single') {
                 document.getElementById('singleMatContainer').style.display = 'block'; document.getElementById('modeText').innerText = "Modo: Pieza Única";
                 let matKey = document.getElementById('matSelect').value; loadStlFile('/imported.stl?t='+Date.now(), 0, 0, 0, matKey, true, false);
@@ -175,7 +213,12 @@
         function addMeshToGroup(geom, x, y, z, matKey, centerCam, isDraggable) {
             let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
             mesh.material = mesh.material.clone(); mesh.material.flatShading = false;
-            mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y); mesh.castShadow = true; mesh.receiveShadow = true; currentGroup.add(mesh);
+            
+            // La rotación inicial convierte Y en Z (Típico en STL 3D)
+            mesh.rotation.x = -Math.PI / 2; 
+            mesh.position.set(x, z, -y); 
+            mesh.castShadow = true; mesh.receiveShadow = true; 
+            currentGroup.add(mesh);
             
             if(isDraggable) {
                 interactableMeshes.push(mesh); if(dragControls) dragControls.dispose();
@@ -188,8 +231,9 @@
             }
             if(centerCam) { 
                 geom.computeBoundingSphere(); 
-                let r = (geom.boundingSphere && geom.boundingSphere.radius > 1) ? geom.boundingSphere.radius : 50; 
-                if (isNaN(r) || !isFinite(r)) r = 50;
+                let r = geom.boundingSphere.radius; 
+                if (isNaN(r) || r <= 0) r = 50;
+                
                 camera.position.set(r*1.5, r*1.2, r*1.5); 
                 controls.target.set(0,0,0); 
                 controls.update();

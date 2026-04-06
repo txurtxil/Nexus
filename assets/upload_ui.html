@@ -8,108 +8,59 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    
     <style>
-        /* Animación personalizada para el estado de carga */
-        @keyframes pulse-border {
-            0% { border-color: #3b82f6; }
-            50% { border-color: #60a5fa; }
-            100% { border-color: #3b82f6; }
-        }
-        .drag-active {
-            border-color: #3b82f6 !important;
-            background-color: rgba(59, 130, 246, 0.1);
-            animation: pulse-border 1.5s infinite;
-        }
-        #viewer-container {
-            cursor: grab;
-        }
-        #viewer-container:active {
-            cursor: grabbing;
-        }
+        @keyframes pulse-border { 0% { border-color: #3b82f6; } 50% { border-color: #60a5fa; } 100% { border-color: #3b82f6; } }
+        .drag-active { border-color: #3b82f6 !important; background-color: rgba(59, 130, 246, 0.1); animation: pulse-border 1.5s infinite; }
+        #viewer-container { cursor: grab; } #viewer-container:active { cursor: grabbing; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans min-h-screen flex flex-col p-4 md:p-8">
 
     <div class="max-w-6xl w-full mx-auto flex flex-col h-full gap-6 flex-1">
-        
         <header class="flex items-center justify-between bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
             <div>
                 <h1 class="text-2xl font-bold text-white flex items-center gap-3">
-                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                    </svg>
+                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     Inyector de Archivos STL
                 </h1>
                 <p class="text-gray-400 mt-1 text-sm">Método de navegador web optimizado para ficheros grandes</p>
             </div>
             <div id="file-status-badge" class="hidden px-4 py-2 bg-blue-900/50 text-blue-300 rounded-full border border-blue-700/50 text-sm font-semibold items-center gap-2">
-                <span class="relative flex h-3 w-3">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                </span>
+                <span class="relative flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span></span>
                 Archivo cargado
             </div>
         </header>
 
         <div class="flex flex-col md:flex-row gap-6 flex-1 h-full">
-            
             <div class="w-full md:w-1/3 flex flex-col gap-6">
-                
                 <div id="drop-zone" class="border-2 border-dashed border-gray-600 rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all duration-300 hover:border-gray-500 hover:bg-gray-800/50 bg-gray-800 cursor-pointer min-h-[250px] relative overflow-hidden group">
-                    
                     <input type="file" id="file-input" accept=".stl" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                    
-                    <svg class="w-16 h-16 text-gray-500 mb-4 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
+                    <svg class="w-16 h-16 text-gray-500 mb-4 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <h3 class="text-lg font-semibold text-white mb-2">Selecciona o arrastra tu STL</h3>
                     <p class="text-gray-400 text-sm">Compatible con archivos de gran tamaño.</p>
-                    <button class="mt-6 bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg text-sm font-medium transition-colors pointer-events-none">
-                        Examinar Archivos
-                    </button>
+                    <button class="mt-6 bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-lg text-sm font-medium transition-colors pointer-events-none">Examinar Archivos</button>
                 </div>
 
                 <div id="file-details" class="bg-gray-800 rounded-xl p-6 border border-gray-700 opacity-50 pointer-events-none transition-opacity">
                     <h3 class="text-white font-semibold mb-4 border-b border-gray-700 pb-2">Detalles del Archivo</h3>
                     <div class="space-y-3 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Nombre:</span>
-                            <span id="detail-name" class="text-white truncate max-w-[150px]">-</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Tamaño:</span>
-                            <span id="detail-size" class="text-white">-</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Tipo:</span>
-                            <span class="text-white">STL 3D Model</span>
-                        </div>
+                        <div class="flex justify-between"><span class="text-gray-400">Nombre:</span><span id="detail-name" class="text-white truncate max-w-[150px]">-</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Tamaño:</span><span id="detail-size" class="text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Tipo:</span><span class="text-white">STL 3D Model</span></div>
                     </div>
-
                     <button id="inject-btn" class="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled>
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        Inyectar al Sistema
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Inyectar al Sistema
                     </button>
                 </div>
             </div>
 
             <div class="w-full md:w-2/3 bg-gray-800 rounded-xl border border-gray-700 overflow-hidden relative flex flex-col min-h-[400px]">
-                
                 <div id="loading-overlay" class="absolute inset-0 bg-gray-900/80 z-20 hidden flex-col items-center justify-center backdrop-blur-sm">
-                    <svg class="animate-spin -ml-1 mr-3 h-12 w-12 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <svg class="animate-spin -ml-1 mr-3 h-12 w-12 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     <p class="text-blue-400 font-semibold animate-pulse">Procesando archivo grande...</p>
                 </div>
-
-                <div class="absolute top-4 left-4 z-10 bg-gray-900/60 backdrop-blur px-3 py-1.5 rounded-lg border border-gray-700/50 text-xs text-gray-300">
-                    Visor 3D (Usa ratón/toque para rotar)
-                </div>
-                
+                <div class="absolute top-4 left-4 z-10 bg-gray-900/60 backdrop-blur px-3 py-1.5 rounded-lg border border-gray-700/50 text-xs text-gray-300">Visor 3D (Usa ratón/toque para rotar)</div>
                 <div id="viewer-container" class="w-full h-full flex-1 outline-none"></div>
-                
                 <div id="empty-viewer-msg" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 pointer-events-none">
                     <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"></path></svg>
                     <p>Esperando archivo STL...</p>
@@ -119,7 +70,6 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN DE THREE.JS ---
         const container = document.getElementById('viewer-container');
         const emptyMsg = document.getElementById('empty-viewer-msg');
         const loadingOverlay = document.getElementById('loading-overlay');
@@ -130,7 +80,8 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x1f2937); 
 
-            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            // ¡CORRECCIÓN! Límite de visión ampliado al máximo (100000) para objetos gigantes
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 100000);
             camera.position.set(0, 0, 100);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -143,10 +94,10 @@
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
 
-            const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
             scene.add(ambientLight);
 
-            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.2);
             directionalLight1.position.set(1, 1, 1).normalize();
             scene.add(directionalLight1);
 
@@ -160,7 +111,6 @@
                 renderer.render(scene, camera);
             }
             animate();
-
             window.addEventListener('resize', onWindowResize, false);
         }
 
@@ -173,52 +123,31 @@
 
         init3DViewer();
 
-        // --- LÓGICA DE GESTIÓN DE ARCHIVOS ---
         const fileInput = document.getElementById('file-input');
         const dropZone = document.getElementById('drop-zone');
         const detailsPanel = document.getElementById('file-details');
         const injectBtn = document.getElementById('inject-btn');
         let activeFile = null;
 
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-active');
-        });
-
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-active');
-        });
-
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('drag-active'); });
         dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-active');
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                handleFile(e.dataTransfer.files[0]);
-            }
+            e.preventDefault(); dropZone.classList.remove('drag-active');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
-
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
+            if (e.target.files && e.target.files.length > 0) handleFile(e.target.files[0]);
         });
 
         function formatBytes(bytes, decimals = 2) {
             if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const dm = decimals < 0 ? 0 : decimals;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const k = 1024; const dm = decimals < 0 ? 0 : decimals; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         }
 
         function handleFile(file) {
-            if (!file.name.toLowerCase().endsWith('.stl')) {
-                alert('Por favor, selecciona un archivo válido con extensión .stl');
-                return;
-            }
-
+            if (!file.name.toLowerCase().endsWith('.stl')) { alert('Por favor, selecciona un archivo válido con extensión .stl'); return; }
             activeFile = file;
 
             document.getElementById('detail-name').textContent = file.name;
@@ -240,45 +169,26 @@
             loader.load(
                 objectUrl,
                 function (geometry) {
-                    if (currentMesh) {
-                        scene.remove(currentMesh);
-                        currentMesh.geometry.dispose();
-                        currentMesh.material.dispose();
-                    }
+                    if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); currentMesh.material.dispose(); }
 
-                    const material = new THREE.MeshPhongMaterial({ 
-                        color: 0x3b82f6, 
-                        specular: 0x111111, 
-                        shininess: 50 
-                    });
-                    
-                    currentMesh = new THREE.Mesh(geometry, material);
-
-                    geometry.computeBoundingBox();
+                    // Centrado inteligente y cálculo de tamaño
+                    geometry.center();
                     geometry.computeBoundingSphere();
-                    
-                    const center = geometry.boundingSphere.center;
-                    const radius = geometry.boundingSphere.radius;
-                    
-                    currentMesh.position.x = -center.x;
-                    currentMesh.position.y = -center.y;
-                    currentMesh.position.z = -center.z;
+                    let radius = geometry.boundingSphere.radius;
+                    if (isNaN(radius) || radius <= 0) radius = 50;
 
-                    const maxDim = radius * 2;
-                    const fov = camera.fov * (Math.PI / 180);
-                    let cameraZ = Math.abs(maxDim / 2 * Math.tan(fov * 2));
-                    cameraZ *= 1.5; 
-                    
-                    camera.position.set(0, 0, cameraZ);
+                    const material = new THREE.MeshPhongMaterial({ color: 0x3b82f6, specular: 0x111111, shininess: 50 });
+                    currentMesh = new THREE.Mesh(geometry, material);
+                    scene.add(currentMesh);
+
+                    // Auto-ajuste de cámara dinámico
+                    camera.position.set(radius * 1.5, radius * 1.2, radius * 1.5);
                     camera.lookAt(0, 0, 0);
                     controls.target.set(0, 0, 0);
                     controls.update();
 
-                    scene.add(currentMesh);
-
                     loadingOverlay.classList.remove('flex');
                     loadingOverlay.classList.add('hidden');
-                    
                     URL.revokeObjectURL(objectUrl);
                 },
                 function (xhr) {},
@@ -292,31 +202,22 @@
             );
         }
 
-        // Lógica de inyección (Backend) - ¡Ahora es real y optimizada!
         injectBtn.addEventListener('click', async () => {
             if (!activeFile) return;
-
             const originalText = injectBtn.innerHTML;
             injectBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Inyectando...`;
             injectBtn.disabled = true;
 
             try {
-                // Leer el archivo como ArrayBuffer (Mucho más ligero que Base64)
                 const arrayBuffer = await activeFile.arrayBuffer();
-
-                // Enviar al nuevo endpoint optimizado en Python
                 const response = await fetch('/api/upload_raw', {
                     method: 'POST',
-                    headers: {
-                        'File-Name': encodeURIComponent(activeFile.name),
-                        'Content-Type': 'application/octet-stream' // Binario puro
-                    },
+                    headers: { 'File-Name': encodeURIComponent(activeFile.name), 'Content-Type': 'application/octet-stream' },
                     body: arrayBuffer
                 });
 
                 if (!response.ok) throw new Error('Error en el servidor');
 
-                // Mostrar éxito
                 injectBtn.classList.replace('bg-blue-600', 'bg-green-600');
                 injectBtn.classList.replace('hover:bg-blue-500', 'hover:bg-green-500');
                 injectBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Inyección Completada`;

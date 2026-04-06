@@ -681,8 +681,8 @@ def main(page: ft.Page):
         txt_vol = ft.Text("0.0 cm³", color="#FFAB00", weight="bold"); txt_peso = ft.Text("0.0 g", color="#00E676", weight="bold")
         panel_calibre = ft.Container(content=ft.Column([ft.Text("📐 CALIBRE 3D Y PRESUPUESTO (STL ACTUAL)", color="#E6EDF3", weight="bold"), ft.Row([ft.Text("Ancho (X):", color="#8B949E", width=80), txt_dim_x]), ft.Row([ft.Text("Largo (Y):", color="#8B949E", width=80), txt_dim_y]), ft.Row([ft.Text("Alto (Z):", color="#8B949E", width=80), txt_dim_z]), ft.Divider(color="#30363D"), ft.Row([ft.Text("Volumen:", color="#8B949E", width=80), txt_vol]), ft.Row([ft.Text("Peso PLA:", color="#8B949E", width=80), txt_peso])]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#2962FF"))
 
-        # FASE 4: FILE PICKER NATIVO DE FLET
-        def on_file_picked(e: ft.FilePickerResultEvent):
+        # FASE 4: FIX DEL CRASH (SIN TIPADO ESTRICTO DE FLET)
+        def on_file_picked(e):
             if e.files:
                 for f in e.files:
                     if f.path:
@@ -709,7 +709,6 @@ def main(page: ft.Page):
             global rename_target
             new_name = tf_rename.value.strip()
             if new_name and new_name != rename_target:
-                # Asegurar extensión
                 if rename_target.lower().endswith(".stl") and not new_name.lower().endswith(".stl"): new_name += ".stl"
                 if rename_target.lower().endswith(".jscad") and not new_name.lower().endswith(".jscad"): new_name += ".jscad"
                 try:
@@ -755,7 +754,6 @@ def main(page: ft.Page):
                     ext = f.lower().split('.')[-1]; p = os.path.join(EXPORT_DIR, f)
                     icon = "🧊" if ext=="stl" else ("🖼️" if ext=="png" else "🧩"); color = "#00E676" if ext=="stl" else ("#C51162" if ext=="png" else "white")
                     
-                    # Nuevos botones: Lápiz para Editar
                     actions = [
                         custom_icon_btn("✏️", lambda e, fn=f: open_rename_dialog(fn), "Renombrar"),
                         custom_icon_btn("⬇️", lambda e, fn=f: direct_download_file(e, fn), "Guardar a Download"), 

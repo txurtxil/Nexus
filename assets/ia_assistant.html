@@ -32,8 +32,7 @@
         <label>⚙️ MOTOR IA (API)</label>
         <select id="apiSelect">
             <option value="gemini">Google Gemini (Empieza por AIzaSy...)</option>
-            <option value="openrouter" selected>OpenRouter (openai/gpt-oss-120b)</option>
-            <option value="groq">Groq (llama-3.3-70b-versatile)</option>
+            <option value="groq" selected>Groq Llama-3.3 (Empieza por gsk_...)</option>
             <option value="openai">OpenAI ChatGPT (Empieza por sk-...)</option>
         </select>
     </div>
@@ -62,7 +61,7 @@
 
 <script>
     document.getElementById('apiKey').value = localStorage.getItem('nexus_api_key') || '';
-    document.getElementById('apiSelect').value = localStorage.getItem('nexus_api_engine') || 'openrouter';
+    document.getElementById('apiSelect').value = localStorage.getItem('nexus_api_engine') || 'groq';
     
     const sysPrompt = "Eres un experto en diseño paramétrico 3D usando OpenJSCAD (JS-CSG). Escribe una función 'function main(params)' que construya la pieza solicitada.\nREGLAS CRÍTICAS DEL MOTOR NEXUS CAD:\n1. Usa primitivas clásicas puras: CSG.cube({center:[x,y,z], radius:[x,y,z]}), CSG.cylinder({start:[x,y,z], end:[x,y,z], radius:r}), CSG.sphere({center:[x,y,z], radius:r}).\n2. Usa operaciones booleanas permitidas: .union(), .subtract(), .intersect().\n3. EL RETORNO ES OBLIGATORIO ASÍ: 'return UTILS.mat(tu_objeto);'.\n4. DEVUELVE SOLO CÓDIGO JS. Sin markdown ni texto extra.";
 
@@ -96,18 +95,6 @@
                 if(data.error) throw new Error(data.error.message);
                 if(!data.candidates) throw new Error("API Key inválida o modelo no disponible.");
                 codeText = data.candidates[0].content.parts[0].text;
-                
-            } else if (apiType === "openrouter") {
-                res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
-                    body: JSON.stringify({
-                        model: "openai/gpt-oss-120b", // El modelo solicitado
-                        messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
-                    })
-                });
-                data = await res.json();
-                if(data.error) throw new Error(data.error.message);
-                codeText = data.choices[0].message.content;
                 
             } else if (apiType === "groq") {
                 res = await fetch('https://api.groq.com/openai/v1/chat/completions', {

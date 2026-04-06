@@ -851,13 +851,16 @@ def main(page: ft.Page):
             with open(os.path.join(EXPORT_DIR, fname), "w") as f: f.write(txt_code.value)
             status.value = f"✓ Guardado en DB Interna: {fname}"; page.update()
 
+        def abrir_upload_ui(e):
+            page.launch_url(f"http://{LAN_IP}:{LOCAL_PORT}/upload_ui.html")
+
         row_quick_paths = ft.Row([ft.ElevatedButton("🏠 Android", on_click=lambda _: nav_to("/storage/emulated/0"), bgcolor="#21262D", color="white"), ft.ElevatedButton("📥 Descargas", on_click=lambda _: nav_to("/storage/emulated/0/Download"), bgcolor="#21262D", color="white"), ft.ElevatedButton("📁 Nexus DB", on_click=lambda _: nav_to(EXPORT_DIR), bgcolor="#1B5E20", color="white")], scroll="auto")
 
         view_archivos = ft.Column([
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                ft.ElevatedButton("⬇️ USAR EL EXPLORADOR DE ABAJO PARA IMPORTAR ⬇️", disabled=True, bgcolor="#1B5E20", color="white", width=float('inf')),
+                ft.ElevatedButton("🌐 ABRIR INYECTOR WEB STL", on_click=abrir_upload_ui, bgcolor="#00B0FF", color="white", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
             ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),

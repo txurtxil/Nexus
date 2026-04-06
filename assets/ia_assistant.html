@@ -100,7 +100,7 @@
                 res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`},
                     body: JSON.stringify({
-                        model: "llama-3.3-70b-versatile", // Reemplazo oficial para Groq
+                        model: "llama-3.3-70b-versatile",
                         messages: [{role: "system", content: sysPrompt}, {role: "user", content: prompt}]
                     })
                 });

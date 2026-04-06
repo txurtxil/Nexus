@@ -310,6 +310,9 @@ def main(page: ft.Page):
         
         status = ft.Text("NEXUS v20.73.6 TITAN | Archivos y Renombrado", color="#00E676", weight="bold")
 
+        def custom_icon_btn(text, action, tooltip_txt): 
+            return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
+
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
         txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
@@ -681,20 +684,7 @@ def main(page: ft.Page):
         txt_vol = ft.Text("0.0 cm³", color="#FFAB00", weight="bold"); txt_peso = ft.Text("0.0 g", color="#00E676", weight="bold")
         panel_calibre = ft.Container(content=ft.Column([ft.Text("📐 CALIBRE 3D Y PRESUPUESTO (STL ACTUAL)", color="#E6EDF3", weight="bold"), ft.Row([ft.Text("Ancho (X):", color="#8B949E", width=80), txt_dim_x]), ft.Row([ft.Text("Largo (Y):", color="#8B949E", width=80), txt_dim_y]), ft.Row([ft.Text("Alto (Z):", color="#8B949E", width=80), txt_dim_z]), ft.Divider(color="#30363D"), ft.Row([ft.Text("Volumen:", color="#8B949E", width=80), txt_vol]), ft.Row([ft.Text("Peso PLA:", color="#8B949E", width=80), txt_peso])]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#2962FF"))
 
-        # FASE 4: FIX DEL CRASH (SIN TIPADO ESTRICTO DE FLET)
-        def on_file_picked(e):
-            if e.files:
-                for f in e.files:
-                    if f.path:
-                        shutil.copy(f.path, os.path.join(EXPORT_DIR, f.name))
-                status.value = f"✓ {len(e.files)} archivo(s) subidos a la BD."; status.color = "#00E676"
-                refresh_nexus_db()
-                page.update()
-
-        file_picker = ft.FilePicker(on_result=on_file_picked)
-        page.overlay.append(file_picker)
-
-        # FASE 4: POPUP PARA RENOMBRAR
+        # POPUP PARA RENOMBRAR (Se mantiene)
         rename_target = ""
         tf_rename = ft.TextField(label="Nuevo nombre.stl/.jscad", bgcolor="#161B22", color="#00E5FF")
         
@@ -732,8 +722,6 @@ def main(page: ft.Page):
 
         list_nexus_db = ft.ListView(height=250, spacing=5)
 
-        def custom_icon_btn(text, action, tooltip_txt): return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
-        
         def direct_download_file(e, filename):
             try:
                 os.makedirs(DOWNLOAD_DIR, exist_ok=True); shutil.copy(os.path.join(EXPORT_DIR, filename), os.path.join(DOWNLOAD_DIR, filename))
@@ -791,20 +779,58 @@ def main(page: ft.Page):
             if ext in ["stl", "jscad"]: load_file(filepath)
             else: status.value = f"⚠️ Formato .{ext} no soportado."; status.color = "#FFAB00"; page.update()
 
+        # NUEVA FUNCIÓN PARA IMPORTAR A LA DB SIN DEPENDER DEL FILEPICKER
+        def copy_to_db(e, filepath, filename):
+            try:
+                shutil.copy(filepath, os.path.join(EXPORT_DIR, filename))
+                status.value = f"✓ {filename} importado a NEXUS DB."
+                status.color = "#00E676"
+                refresh_nexus_db()
+            except Exception as ex:
+                status.value = f"❌ Error importando: {ex}"
+                status.color = "red"
+            page.update()
+
         def refresh_explorer(path):
             list_android.controls.clear()
             try:
                 items = os.listdir(path); dirs = [d for d in items if os.path.isdir(os.path.join(path, d))]; files = [f for f in items if os.path.isfile(os.path.join(path, f))]; dirs.sort(); files.sort()
+                
                 if path != "/" and path != "/storage" and path != "/storage/emulated":
-                    list_android.controls.append(ft.ListTile(leading=ft.Text("⬆️", size=24), title=ft.Text(".. (Subir nivel)", color="white"), on_click=lambda e: nav_to(os.path.dirname(path))))
+                    list_android.controls.append(
+                        ft.Container(
+                            content=ft.Row([ft.Text("⬆️", size=20), ft.Text(".. (Subir nivel)", color="white", expand=True)]),
+                            bgcolor="#30363D", padding=5, border_radius=5, on_click=lambda e: nav_to(os.path.dirname(path)), ink=True
+                        )
+                    )
+                    
                 for d in dirs:
-                    if not d.startswith('.'): list_android.controls.append(ft.ListTile(leading=ft.Text("📁", size=24), title=ft.Text(d, color="#E6EDF3"), on_click=lambda e, p=os.path.join(path, d): nav_to(p)))
+                    if not d.startswith('.'):
+                        list_android.controls.append(
+                            ft.Container(
+                                content=ft.Row([ft.Text("📁", size=20), ft.Text(d, color="#E6EDF3", expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), custom_icon_btn("➡️", lambda e, p=os.path.join(path, d): nav_to(p), "Entrar")]),
+                                bgcolor="#161B22", padding=5, border_radius=5, on_click=lambda e, p=os.path.join(path, d): nav_to(p), ink=True
+                            )
+                        )
+                        
                 for f in files:
                     ext = f.lower().split('.')[-1] if '.' in f else ''; icon = "📄"; color = "#8B949E"
                     if ext == "stl": icon = "🧊"; color = "#00E676"
                     elif ext == "jscad": icon = "🧩"; color = "#00E5FF"
                     elif ext == "png": icon = "🖼️"; color = "#C51162"
-                    list_android.controls.append(ft.ListTile(leading=ft.Text(icon, size=24), title=ft.Text(f, color=color), subtitle=ft.Text(f"{os.path.getsize(os.path.join(path, f)) // 1024} KB", size=10), on_click=lambda e, p=os.path.join(path, f): file_action(p)))
+                    
+                    p = os.path.join(path, f)
+                    # Botón exclusivo para importar
+                    actions = [
+                        custom_icon_btn("▶️", lambda e, fp=p: file_action(fp), "Cargar directamente"),
+                        custom_icon_btn("📥", lambda e, fp=p, fn=f: copy_to_db(e, fp, fn), "Importar archivo a la DB")
+                    ]
+                    list_android.controls.append(
+                        ft.Container(
+                            content=ft.Row([ft.Text(icon, size=20), ft.Text(f, color=color, expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), ft.Text(f"{os.path.getsize(p) // 1024} KB", size=10, color="#8B949E")] + actions),
+                            bgcolor="#21262D", padding=5, border_radius=5
+                        )
+                    )
             except PermissionError: list_android.controls.append(ft.Text("❌ Permiso Denegado.", color="red", weight="bold"))
             except Exception as ex: list_android.controls.append(ft.Text(f"Error: {ex}", color="red"))
             tf_path.value = path; page.update()
@@ -831,12 +857,12 @@ def main(page: ft.Page):
             panel_calibre,
             ft.Container(content=ft.Column([
                 ft.Text("🌐 INYECCIÓN WEB & NEXUS DB", color="#00E676", weight="bold"),
-                ft.ElevatedButton("🚀 SUBIR FICHEROS DESDE EL MÓVIL", on_click=lambda _: file_picker.pick_files(allow_multiple=True), bgcolor="#00E676", color="black", width=float('inf')),
+                ft.ElevatedButton("⬇️ USAR EL EXPLORADOR DE ABAJO PARA IMPORTAR ⬇️", disabled=True, bgcolor="#1B5E20", color="white", width=float('inf')),
                 ft.Row([ft.Text("Archivos y Renders listos:", color="#E6EDF3", size=11), ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"),
                 ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)
             ]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
             ft.Container(content=ft.Column([
-                ft.Text("📱 EXPLORADOR NATIVO ANDROID", color="#00E5FF", weight="bold"),
+                ft.Text("📱 EXPLORADOR NATIVO ANDROID (Busca e Importa 📥)", color="#00E5FF", weight="bold"),
                 row_quick_paths, ft.Row([tf_path, ft.ElevatedButton("Ir", on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00", color="black")]),
                 ft.ElevatedButton("💾 GUARDAR CÓDIGO AQUÍ", on_click=save_to_android, bgcolor="#0D47A1", color="white", width=float('inf')),
                 ft.Container(content=list_android, bgcolor="#0B0E14", border_radius=5, padding=5)

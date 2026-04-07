@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS PBR STUDIO PRO</title>
+    <title>NEXUS PBR STUDIO v21.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
@@ -12,20 +12,24 @@
     <style>
         body{margin:0;overflow:hidden;background:#0B0E14;font-family:sans-serif;} 
         canvas{display:block;} 
-        .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #C51162;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px; transition: transform 0.3s ease, opacity 0.3s ease; z-index: 10; max-height: 95vh; overflow-y: auto;}
+        .panel{position:absolute;top:10px;left:10px;background:rgba(22,27,34,0.85);padding:15px;border-radius:10px;border:1px solid #00E5FF;box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(5px); width:220px; transition: transform 0.3s ease, opacity 0.3s ease; z-index: 10; max-height: 95vh; overflow-y: auto;}
         .panel.collapsed { transform: translateY(-150%); opacity: 0; pointer-events: none; }
-        .fab { position: absolute; bottom: 20px; right: 20px; background: #C51162; color: white; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; font-size: 24px; border: none; outline: none; transition: background 0.2s; }
-        .fab:active { background: #FF007F; }
+        .fab { position: absolute; bottom: 20px; right: 20px; background: #00E5FF; color: black; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; font-size: 24px; border: none; outline: none; }
         
+        /* Banner de Error IA */
+        #errorBanner { display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#B71C1C; color:white; padding:15px 25px; border-radius:30px; font-weight:bold; z-index:10000; border:2px solid #FF5252; box-shadow:0 0 20px rgba(255,0,0,0.5); cursor:pointer; }
+
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #30363D; border-radius: 2px; }
     </style>
 </head>
 <body>
+    <div id="errorBanner" onclick="sendErrorToIA()">⚠️ ERROR DETECTADO. TOCAR PARA ARREGLAR CON IA</div>
+
     <button class="fab" onclick="togglePanel()" id="fabBtn">⚙️</button>
     <div class="panel" id="uiPanel">
-        <h3 style="margin:0 0 10px 0;color:#FF007F;font-size:16px;">🎨 PBR STUDIO PRO</h3>
+        <h3 style="margin:0 0 10px 0;color:#00E5FF;font-size:16px;">🎨 PBR STUDIO v21.1</h3>
         <div id="singleMatContainer">
             <select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;">
                 <option value="carbon">Fibra de Carbono</option>
@@ -44,27 +48,38 @@
         </div>
         
         <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
-        
-        <button onclick="analyzeWithIA(event)" style="width:100%;background:#8E24AA;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">🤖 ANALIZAR ESTRUCTURA</button>
+        <button onclick="analyzeWithIA(event)" style="width:100%;background:#8E24AA;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">🤖 ANALIZAR CON IA</button>
 
         <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
         <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
 
         <div id="transformControls" style="margin-top:15px; border-top:1px solid #30363D; padding-top:15px;">
-            <h4 style="margin:0 0 10px 0;color:#E6EDF3;font-size:12px;text-align:center;">🕹️ Transformación (Levantar / Escalar)</h4>
-            
             <label style="color:#00E5FF;font-size:11px;font-weight:bold;">🔍 Escala: <span id="scaleVal">1.0</span>x</label>
             <input type="range" id="scaleSlider" min="0.01" max="10" step="0.05" value="1" style="margin-bottom:10px;">
-            
             <label style="color:#00E5FF;font-size:11px;font-weight:bold;">↕️ Altura Z (Suelo): <span id="posYVal">0</span> mm</label>
             <input type="range" id="posYSlider" min="-500" max="500" step="1" value="0" style="margin-bottom:10px;">
-
             <label style="color:#00E5FF;font-size:11px;font-weight:bold;">↔️ Mover X: <span id="posXVal">0</span> mm</label>
             <input type="range" id="posXSlider" min="-500" max="500" step="1" value="0">
         </div>
     </div>
     
     <script>
+        // --- AUTO FIX IA v21.1 ---
+        let lastErrorMsg = "";
+        window.onerror = function(msg, url, line, col, error) {
+            lastErrorMsg = `Mensaje: ${msg} en línea ${line}:${col}`;
+            document.getElementById('errorBanner').style.display = 'block';
+            return false;
+        };
+
+        function sendErrorToIA() {
+            fetch('/api/report_error', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ error: lastErrorMsg }) })
+            .then(() => {
+                alert("✓ Error envidado. Vuelve a la App, abre la IA y te lo arreglará.");
+                document.getElementById('errorBanner').style.display = 'none';
+            });
+        }
+
         function togglePanel() { document.getElementById('uiPanel').classList.toggle('collapsed'); }
 
         const scene = new THREE.Scene();
@@ -84,7 +99,6 @@
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement); 
         controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 + 0.1; 
-        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
         const pmremGenerator = new THREE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
@@ -94,17 +108,12 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); 
         dirLight.position.set(50, 150, 50); dirLight.castShadow = true;
         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 2000; 
         const d = 400; 
         dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d; dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d; 
-        dirLight.shadow.bias = -0.0005; 
         scene.add(dirLight);
 
-        const floorGeo = new THREE.PlaneGeometry(5000, 5000);
-        const floorMat = new THREE.MeshStandardMaterial({color: 0x0B0E14, roughness: 0.1, metalness: 0.5});
-        const floor = new THREE.Mesh(floorGeo, floorMat);
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), new THREE.MeshStandardMaterial({color: 0x0B0E14, roughness: 0.1, metalness: 0.5}));
         floor.rotation.x = -Math.PI / 2; floor.position.y = -0.5; floor.receiveShadow = true; scene.add(floor);
-
         const grid = new THREE.GridHelper(2000, 100, 0x30363D, 0x161B22); grid.position.y = -0.49; scene.add(grid);
 
         document.getElementById('lightSlider').addEventListener('input', (e) => { 
@@ -116,13 +125,8 @@
             const s = parseFloat(document.getElementById('scaleSlider').value);
             const y = parseFloat(document.getElementById('posYSlider').value);
             const x = parseFloat(document.getElementById('posXSlider').value);
-            
-            currentGroup.scale.set(s, s, s);
-            currentGroup.position.set(x, y, 0);
-
-            document.getElementById('scaleVal').innerText = s.toFixed(2);
-            document.getElementById('posYVal').innerText = y;
-            document.getElementById('posXVal').innerText = x;
+            currentGroup.scale.set(s, s, s); currentGroup.position.set(x, y, 0);
+            document.getElementById('scaleVal').innerText = s.toFixed(2); document.getElementById('posYVal').innerText = y; document.getElementById('posXVal').innerText = x;
         }
 
         document.getElementById('scaleSlider').addEventListener('input', applyTransforms);
@@ -131,37 +135,17 @@
 
         function takeScreenshot() {
             renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
-            fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => r.json()).then(d => {
+            fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => {
                 const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
             });
         }
 
-        // NUEVA FUNCIÓN: Envía el render comprimido a Python para análisis de IA
         function analyzeWithIA(event) {
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "⏳ Capturando...";
-            renderer.render(scene, camera); 
-            // Usamos JPEG para no sobrecargar el payload HTTP hacia Python
-            const dataURL = renderer.domElement.toDataURL("image/jpeg", 0.8);
-            
-            fetch('/api/send_vision', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({image: dataURL}) 
-            }).then(r => r.json()).then(d => {
-                btn.innerText = "✅ ¡ENVIADO A IA!";
-                btn.style.background = "#00E676";
-                btn.style.color = "#000";
-                setTimeout(() => {
-                    btn.innerText = originalText;
-                    btn.style.background = "#8E24AA";
-                    btn.style.color = "#fff";
-                }, 3000);
-            }).catch(e => {
-                btn.innerText = "❌ ERROR AL ENVIAR";
-                setTimeout(() => { btn.innerText = originalText; }, 3000);
-            });
+            const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Capturando...";
+            renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/jpeg", 0.8);
+            fetch('/api/send_vision', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({image: dataURL}) })
+            .then(() => { btn.innerText = "✅ ENVIADO"; btn.style.background = "#00E676"; btn.style.color = "#000"; setTimeout(() => { btn.innerText = originalText; btn.style.background = "#8E24AA"; btn.style.color = "#fff"; }, 3000); })
+            .catch(() => { btn.innerText = "❌ ERROR"; setTimeout(() => { btn.innerText = originalText; }, 3000); });
         }
 
         function createTex(type) {
@@ -175,10 +159,7 @@
                 const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(4,4); return tex;
             } else if(type==='copper') {
                 ctx.fillStyle='#b87333'; ctx.fillRect(0,0,512,512);
-                for(let i=0;i<5000;i++){
-                    ctx.fillStyle=Math.random()>0.7?'rgba(46,139,87,0.3)':'rgba(60,30,10,0.2)';
-                    ctx.beginPath(); ctx.arc(Math.random()*512, Math.random()*512, Math.random()*15, 0, Math.PI*2); ctx.fill();
-                }
+                for(let i=0;i<5000;i++){ ctx.fillStyle=Math.random()>0.7?'rgba(46,139,87,0.3)':'rgba(60,30,10,0.2)'; ctx.beginPath(); ctx.arc(Math.random()*512, Math.random()*512, Math.random()*15, 0, Math.PI*2); ctx.fill(); }
                 const tex = new THREE.CanvasTexture(c); tex.wrapS=THREE.RepeatWrapping; tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(2,2); return tex;
             } else {
                 ctx.fillStyle='#dcb68a'; ctx.fillRect(0,0,512,512);
@@ -199,8 +180,7 @@
             gold: new THREE.MeshStandardMaterial({color: 0xffd700, roughness: 0.1, metalness: 1.0})
         };
 
-        let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {};
-        let dragControls = null; let interactableMeshes = [];
+        let currentGroup = null; let stateHash = ""; const loader = new THREE.STLLoader(); let geomCache = {}; let dragControls = null; let interactableMeshes = [];
 
         function checkState() {
             fetch('/api/assembly_state.json?t=' + Date.now()).then(r => r.json()).then(state => {
@@ -211,9 +191,7 @@
 
         function buildScene(state) {
             if(currentGroup) scene.remove(currentGroup); currentGroup = new THREE.Group(); scene.add(currentGroup); interactableMeshes = [];
-            
             applyTransforms();
-
             if(state.mode === 'single') {
                 document.getElementById('singleMatContainer').style.display = 'block'; document.getElementById('modeText').innerText = "Modo: Pieza Única";
                 let matKey = document.getElementById('matSelect').value; loadStlFile('/imported.stl?t='+Date.now(), 0, 0, 0, matKey, true, false);
@@ -224,14 +202,12 @@
         }
 
         function loadStlFile(url, x, y, z, matKey, centerCam, isDraggable) {
-            if(geomCache[url] && !url.includes('?')) {
-                addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam, isDraggable);
-            } else {
+            if(geomCache[url] && !url.includes('?')) { addMeshToGroup(geomCache[url], x, y, z, matKey, centerCam, isDraggable); } 
+            else {
                 loader.load(url, geom => { 
                     try {
                         if(!geom || !geom.attributes || !geom.attributes.position || geom.attributes.position.count === 0) return; 
-                        geom.center(); 
-                        geom.computeVertexNormals(); 
+                        geom.center(); geom.computeVertexNormals(); 
                         if(!url.includes('?')) geomCache[url] = geom; 
                         addMeshToGroup(geom, x, y, z, matKey, centerCam, isDraggable); 
                     } catch(e) {}
@@ -240,13 +216,8 @@
         }
 
         function addMeshToGroup(geom, x, y, z, matKey, centerCam, isDraggable) {
-            let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla);
-            mesh.material = mesh.material.clone(); mesh.material.flatShading = false;
-            
-            mesh.rotation.x = -Math.PI / 2; 
-            mesh.position.set(x, z, -y); 
-            mesh.castShadow = true; mesh.receiveShadow = true; 
-            currentGroup.add(mesh);
+            let mesh = new THREE.Mesh(geom, mats[matKey] || mats.pla); mesh.material = mesh.material.clone(); mesh.material.flatShading = false;
+            mesh.rotation.x = -Math.PI / 2; mesh.position.set(x, z, -y); mesh.castShadow = true; mesh.receiveShadow = true; currentGroup.add(mesh);
             
             if(isDraggable) {
                 interactableMeshes.push(mesh); if(dragControls) dragControls.dispose();
@@ -258,13 +229,8 @@
                 dragControls.addEventListener('dragend', () => { controls.enabled = true; });
             }
             if(centerCam) { 
-                geom.computeBoundingSphere(); 
-                let r = geom.boundingSphere.radius; 
-                if (isNaN(r) || r <= 0) r = 50;
-                
-                camera.position.set(r*1.5, r*1.2, r*1.5); 
-                controls.target.set(0,0,0); 
-                controls.update();
+                geom.computeBoundingSphere(); let r = geom.boundingSphere.radius; if (isNaN(r) || r <= 0) r = 50;
+                camera.position.set(r*1.5, r*1.2, r*1.5); controls.target.set(0,0,0); controls.update();
             }
         }
 

@@ -1,5 +1,6 @@
 import flet as ft
 import os, base64, json, threading, http.server, socketserver, socket, time, warnings, traceback, shutil, struct
+import importlib  # <-- AÑADIDO: Motor para recarga en caliente
 import param_generators
 import nexus_ui_tools
 
@@ -500,6 +501,12 @@ def main(page: ft.Page):
         tools_lib = nexus_ui_tools.NexusTools(create_slider, update_code_wrapper, set_tab_wrapper, select_tool)
 
         def generate_param_code():
+            # <--- AÑADIDO: Recarga dinámica de módulos (Hot Reload)
+            try:
+                importlib.reload(param_generators)
+            except Exception as e:
+                print(f"Error recargando param_generators: {e}")
+                
             h = herramienta_actual
             if h == "custom": return
             p_dict = tools_lib.get_p_dict()

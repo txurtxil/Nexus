@@ -398,13 +398,13 @@ def get_code(h, p):
         code += f"  return UTILS.mat(UTILS.rotZ(base1.union(base2).union(pillar).union(top), KINE_T));\n}}"
         
     # -----------------------------------------
-    # 4. KIT AEROESPACIAL: DRON PARAMÉTRICO
+    # 4. KIT AEROESPACIAL: DRON PARAMÉTRICO (CORREGIDO)
     # -----------------------------------------
     elif h == "dron_frame":
         code += f"  var size = {p.get('drn_size', 150)}; var thick = {p.get('drn_thk', 5)}; var center_r = {p.get('drn_cr', 30)}; var arm_w = {p.get('drn_aw', 15)};\n"
         code += f"  var core = CSG.cylinder({{start: [0,0,0], end: [0,0,thick], radius: center_r}});\n"
-        code += f"  var arm1 = CSG.cube({{center: [0,0,thick/2], radius: [size/2, arm_w/2, thick/2]}}).rotateZ(45);\n"
-        code += f"  var arm2 = CSG.cube({{center: [0,0,thick/2], radius: [size/2, arm_w/2, thick/2]}}).rotateZ(-45);\n"
+        code += f"  var arm1 = UTILS.rotZ(CSG.cube({{center: [0,0,thick/2], radius: [size/2, arm_w/2, thick/2]}}), 45);\n"
+        code += f"  var arm2 = UTILS.rotZ(CSG.cube({{center: [0,0,thick/2], radius: [size/2, arm_w/2, thick/2]}}), -45);\n"
         code += f"  var frame = core.union(arm1).union(arm2);\n"
         code += f"  var hole = CSG.cylinder({{start: [0,0,-1], end: [0,0,thick+1], radius: center_r * 0.6}});\n"
         code += f"  frame = frame.subtract(hole);\n"
@@ -419,8 +419,64 @@ def get_code(h, p):
         code += f"  var hub = CSG.cylinder({{start: [0,0,0], end: [0,0,h], radius: 6}}).subtract(CSG.cylinder({{start: [0,0,-1], end: [0,0,h+1], radius: 2.5}}));\n"
         code += f"  var prop = hub;\n"
         code += f"  for(var i=0; i<blades; i++) {{\n      var angle = (360 / blades) * i;\n"
-        code += f"      var blade = CSG.cube({{center: [r/2, 0, h/2], radius: [r/2, 5, 0.8]}}).rotateX(pitch).translate([4, 0, 0]).rotateZ(angle);\n"
+        code += f"      var blade_base = CSG.cube({{center: [r/2, 0, h/2], radius: [r/2, 5, 0.8]}});\n"
+        code += f"      var blade = UTILS.rotZ(UTILS.trans(UTILS.rotX(blade_base, pitch), [4, 0, 0]), angle);\n"
         code += f"      prop = prop.union(blade);\n  }}\n  return UTILS.mat(prop);\n}}"
+
+    # -----------------------------------------
+    # 5. DEMOSTRACIÓN DE MOTOR: PLANETARIOS Y ESPACIO
+    # -----------------------------------------
+    elif h == "solar":
+        code += f"  var num_planetas = {int(p.get('sol_p', 6))}; var scale = {p.get('sol_s', 50)} / 50;\n"
+        code += f"  var sol = CSG.sphere({{center:[0,0,0], radius: 18 * scale, resolution: 32}});\n"
+        code += f"  var system = sol;\n"
+        code += f"  var velocidades = [2.0, 1.5, 1.0, 0.8, 0.4, 0.3, 0.2, 0.1];\n"
+        code += f"  var distancias = [30, 45, 65, 85, 120, 160, 200, 240];\n"
+        code += f"  var tamanos = [3, 4.5, 5, 4.2, 12, 10, 7, 7];\n"
+        code += f"  for(var i=0; i<num_planetas; i++) {{\n"
+        code += f"      var d = distancias[i] * scale; var r = tamanos[i] * scale;\n"
+        code += f"      var a = (KINE_T * velocidades[i]) % 360;\n"
+        code += f"      var px = Math.cos(a * Math.PI/180) * d; var py = Math.sin(a * Math.PI/180) * d;\n"
+        code += f"      var planeta = CSG.sphere({{center:[px, py, 0], radius: Math.max(1, r), resolution: 16}});\n"
+        code += f"      if (i === 5) {{ // Generar Anillos de Saturno\n"
+        code += f"          var anillo = CSG.cylinder({{start:[px, py, -0.5], end:[px, py, 0.5], radius: r * 2.2, slices: 32}}).subtract(CSG.cylinder({{start:[px, py, -1], end:[px, py, 1], radius: r * 1.4, slices: 32}}));\n"
+        code += f"          planeta = planeta.union(UTILS.rotX(anillo, 20));\n"
+        code += f"      }}\n"
+        code += f"      system = system.union(planeta);\n"
+        code += f"      var orbita = CSG.cylinder({{start:[0,0,-0.2], end:[0,0,0.2], radius: d, slices: 64}}).subtract(CSG.cylinder({{start:[0,0,-1], end:[0,0,1], radius: d - 0.5, slices: 64}}));\n"
+        code += f"      system = system.union(orbita);\n"
+        code += f"  }}\n  return UTILS.mat(system);\n}}"
+
+    elif h == "tierra":
+        code += f"  var r_tierra = {p.get('ear_r', 40)}; var d_luna = {p.get('ear_d', 80)};\n"
+        code += f"  var tierra = CSG.sphere({{center:[0,0,0], radius: r_tierra, resolution: 64}});\n"
+        code += f"  var a = KINE_T % 360;\n"
+        code += f"  var px = Math.cos(a * Math.PI/180) * d_luna; var py = Math.sin(a * Math.PI/180) * d_luna;\n"
+        code += f"  var luna = CSG.sphere({{center:[px, py, 0], radius: r_tierra * 0.27, resolution: 32}});\n"
+        code += f"  var a_sat = (KINE_T * 5) % 360;\n"
+        code += f"  var sx = Math.cos(a_sat * Math.PI/180) * (r_tierra * 1.5); var sz = Math.sin(a_sat * Math.PI/180) * (r_tierra * 1.5);\n"
+        code += f"  var sat_body = CSG.cylinder({{start:[sx, 0, sz - 2], end:[sx, 0, sz + 2], radius: 2, slices: 8}});\n"
+        code += f"  var panel = UTILS.rotZ(CSG.cube({{center:[sx, 0, sz], radius:[1, 8, 1]}}), a_sat);\n"
+        code += f"  return UTILS.mat(tierra.union(luna).union(sat_body.union(panel)));\n}}"
+
+    elif h == "station":
+        code += f"  var r = {p.get('ss_r', 60)}; var mods = {int(p.get('ss_n', 6))};\n"
+        code += f"  var core = CSG.cylinder({{start:[0,0,-30], end:[0,0,30], radius: 10, slices: 32}});\n"
+        code += f"  var ring = CSG.cylinder({{start:[0,0,-4], end:[0,0,4], radius: r, slices: 64}}).subtract(CSG.cylinder({{start:[0,0,-5], end:[0,0,5], radius: r - 6, slices: 64}}));\n"
+        code += f"  var station = core.union(ring);\n"
+        code += f"  for(var i=0; i<mods; i++) {{\n"
+        code += f"      var a = (i * Math.PI * 2) / mods;\n"
+        code += f"      var px = Math.cos(a) * (r/2); var py = Math.sin(a) * (r/2);\n"
+        code += f"      var spoke = CSG.cylinder({{start:[0,0,0], end:[px*2, py*2, 0], radius: 3, slices: 8}});\n"
+        code += f"      station = station.union(spoke);\n"
+        code += f"      var mod_px = Math.cos(a) * r; var mod_py = Math.sin(a) * r;\n"
+        code += f"      var modulo = CSG.sphere({{center:[mod_px, mod_py, 0], radius: 8, resolution: 16}});\n"
+        code += f"      station = station.union(modulo);\n"
+        code += f"  }}\n"
+        code += f"  var panel1 = CSG.cube({{center:[0, 30, 20], radius:[5, 20, 0.5]}});\n"
+        code += f"  var panel2 = CSG.cube({{center:[0, -30, 20], radius:[5, 20, 0.5]}});\n"
+        code += f"  station = station.union(panel1).union(panel2);\n"
+        code += f"  return UTILS.mat(UTILS.rotZ(UTILS.rotX(station, 15), KINE_T/2));\n}}"
 
     else:
         code += f"  return CSG.cube({{radius:[10,10,10]}});\n}}"

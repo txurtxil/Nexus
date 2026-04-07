@@ -23,7 +23,7 @@
 <body>
 
 <div class="header">
-    <h2>👁️ NEXUS AI v21.1 (Gemini Core)</h2>
+    <h2>👁️ NEXUS AI v21.1 (Gemini 3 Flash Core)</h2>
 </div>
 
 <div class="content">
@@ -34,7 +34,7 @@
     </div>
 
     <div>
-        <label>🔑 API KEY GEMINI</label>
+        <label>🔑 API KEY GEMINI (v3 / v2.5)</label>
         <input type="password" id="apiKey" placeholder="Pega tu clave AIzaSy... aquí">
     </div>
 
@@ -48,7 +48,7 @@
         <button class="btn purple" onclick="process('vision')">🔍 ANALIZAR VISIÓN</button>
     </div>
 
-    <div class="loader" id="loader">Gemini está pensando... ⏳</div>
+    <div class="loader" id="loader">Gemini 3 está pensando... ⏳</div>
 
     <div>
         <label>💻 RESULTADO DE LA IA</label>
@@ -67,14 +67,12 @@
             const res = await fetch('/api/get_vision.json');
             const data = await res.json();
             
-            // Recoger imagen si existe
             if (data.image_b64) {
                 currentVisionB64 = data.image_b64.split(',')[1];
                 document.getElementById('visionPreview').src = data.image_b64;
                 document.getElementById('visionContainer').style.display = 'block';
             }
             
-            // Recoger error si existe y auto-rellenar el prompt
             if (data.last_error && data.last_error.trim() !== "") {
                 const promptBox = document.getElementById('promptInput');
                 promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido que solucione esto.";
@@ -82,7 +80,6 @@
         } catch(e) {}
     }
     
-    // Comprobar cada vez que la IA recupera el foco
     window.onload = checkDataBridge;
     window.onfocus = checkDataBridge;
 
@@ -94,6 +91,7 @@
         if(!key) return alert("Falta API Key de Gemini");
         localStorage.setItem('nexus_api_key', key);
         document.getElementById('loader').style.display = 'block';
+        document.getElementById('codeOutput').value = '';
 
         let sysPrompt = "Eres un ingeniero experto en diseño paramétrico 3D OpenJSCAD (JS-CSG).\n";
         sysPrompt += "REGLAS:\n1. Usa primitivas: CSG.cube, CSG.cylinder, CSG.sphere, CSG.polygon.\n2. Operaciones: .union(), .subtract(), .intersect().\n3. Retorna 'return UTILS.mat(objeto);'.\n4. Solo código JS. Sin texto markdown.\n";
@@ -108,18 +106,36 @@
             const parts = [{ text: sysPrompt + "\n\nSolicitud del usuario: " + prompt }];
             if(currentVisionB64) parts.push({ inlineData: { mimeType: "image/jpeg", data: currentVisionB64 } });
 
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+            // NUEVO ENDPOINT ACTUALIZADO A 2026: gemini-3-flash-preview (o 2.5-flash)
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts }] })
             });
             const data = await res.json();
-            if(data.error) throw new Error(data.error.message);
+            
+            if(data.error) {
+                // Si el modelo 3 falla por alguna razón de despliegue local, hacemos fallback al 2.5-flash
+                if(data.error.code === 404 || data.error.message.includes("not found")) {
+                    console.log("Fallback a gemini-2.5-flash");
+                    const resFb = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ contents: [{ parts }] })
+                    });
+                    const dataFb = await resFb.json();
+                    if(dataFb.error) throw new Error(dataFb.error.message);
+                    data.candidates = dataFb.candidates;
+                } else {
+                    throw new Error(data.error.message);
+                }
+            }
             
             let text = data.candidates[0].content.parts[0].text;
-            // Limpieza robusta de Markdown
             if(text.includes("```")) text = text.split("```")[1].replace(/^javascript/i, "").replace(/^js/i, "").trim();
             document.getElementById('codeOutput').value = text;
-        } catch(e) { alert("Error: " + e.message); }
+        } catch(e) { 
+            alert("Error de API: " + e.message); 
+            document.getElementById('codeOutput').value = "ERROR DETALLADO:\n" + e.message;
+        }
         document.getElementById('loader').style.display = 'none';
     }
 

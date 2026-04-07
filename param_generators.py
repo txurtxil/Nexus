@@ -1,5 +1,5 @@
 # param_generators.py
-# Módulo de Geometría Procedural NEXUS CAD v20.73.4
+# Módulo de Geometría Procedural NEXUS CAD v21.1
 
 def get_stl_base(sc, tx, ty, tz):
     return f"  var sc = {sc/100.0}; var tx = {tx}; var ty = {ty}; var tz = {tz};\n  var dron = null;\n  if (typeof IMPORTED_STL !== 'undefined') {{ var parts = Array.isArray(IMPORTED_STL) ? IMPORTED_STL : [IMPORTED_STL]; for(var i=0; i<parts.length; i++) {{ var p = parts[i]; if(p && p.polygons && typeof p.scale !== 'function') {{ try {{ p = CSG.fromPolygons(p.polygons); }} catch(e) {{}} }} if(p && typeof p.union === 'function') {{ if(!dron) dron = p; else dron = dron.union(p); }} }} }}\n  if(!dron || typeof dron.union !== 'function') {{ return CSG.cube({{radius:[0.01, 0.01, 0.01]}}); }}\n  dron = UTILS.scale(dron, [sc, sc, sc]); dron = UTILS.trans(dron, [tx, ty, tz]);\n"
@@ -183,7 +183,7 @@ def get_code(h, p):
         code += f"      if(!solido) solido = capa; else solido = solido.union(capa);\n"
         code += f"      if (grosor > 0 && z > grosor) {{\n         var r_int = Math.max(0.1, rad - grosor);\n"
         code += f"         var capa_h = CSG.cylinder({{start:[0,0,z], end:[0,0,z+dz+0.1], radius:r_int, slices:32}});\n"
-        code += f"         if(!hueco) hueco = capa_h; else hueco = hueco.union(capa_h);\n      }}\n  }}\n"
+        code += f"         if(!hueco) hueco = hueco.union(capa_h);\n      }}\n  }}\n"
         code += f"  if(grosor > 0 && hueco) solido = solido.subtract(hueco);\n  return UTILS.mat(solido);\n}}"
     elif h == "cubo":
         g = p['c_grosor']
@@ -396,6 +396,32 @@ def get_code(h, p):
         code += f"  var pillar = CSG.cylinder({{start:[0,0,40], end:[0,0,150], radius: s/4, slices:32}});\n"
         code += f"  var top = CSG.cylinder({{start:[0,0,150], end:[0,0,160], radius: (s/4)+10, slices:32}});\n"
         code += f"  return UTILS.mat(UTILS.rotZ(base1.union(base2).union(pillar).union(top), KINE_T));\n}}"
+        
+    # -----------------------------------------
+    # 4. KIT AEROESPACIAL: DRON PARAMÉTRICO
+    # -----------------------------------------
+    elif h == "dron_frame":
+        code += f"  var size = {p.get('drn_size', 150)}; var thick = {p.get('drn_thk', 5)}; var center_r = {p.get('drn_cr', 30)}; var arm_w = {p.get('drn_aw', 15)};\n"
+        code += f"  var core = CSG.cylinder({{start: [0,0,0], end: [0,0,thick], radius: center_r}});\n"
+        code += f"  var arm1 = CSG.cube({{center: [0,0,thick/2], radius: [size/2, arm_w/2, thick/2]}}).rotateZ(45);\n"
+        code += f"  var arm2 = CSG.cube({{center: [0,0,thick/2], radius: [size/2, arm_w/2, thick/2]}}).rotateZ(-45);\n"
+        code += f"  var frame = core.union(arm1).union(arm2);\n"
+        code += f"  var hole = CSG.cylinder({{start: [0,0,-1], end: [0,0,thick+1], radius: center_r * 0.6}});\n"
+        code += f"  frame = frame.subtract(hole);\n"
+        code += f"  var m_pad_r = arm_w * 0.8; var dist = size/2; var angles = [45, 135, -45, -135];\n"
+        code += f"  for(var i=0; i<4; i++) {{\n      var rad = angles[i] * Math.PI / 180; var px = dist * Math.cos(rad); var py = dist * Math.sin(rad);\n"
+        code += f"      var pad = CSG.cylinder({{start: [px, py, 0], end: [px, py, thick], radius: m_pad_r}});\n"
+        code += f"      var m_hole = CSG.cylinder({{start: [px, py, -1], end: [px, py, thick+1], radius: m_pad_r * 0.3}});\n"
+        code += f"      frame = frame.union(pad).subtract(m_hole);\n  }}\n  return UTILS.mat(frame);\n}}"
+    
+    elif h == "dron_propeller":
+        code += f"  var r = {p.get('drn_pr', 65)}; var blades = {p.get('drn_pb', 3)}; var pitch = {p.get('drn_pp', 30)}; var h = 6;\n"
+        code += f"  var hub = CSG.cylinder({{start: [0,0,0], end: [0,0,h], radius: 6}}).subtract(CSG.cylinder({{start: [0,0,-1], end: [0,0,h+1], radius: 2.5}}));\n"
+        code += f"  var prop = hub;\n"
+        code += f"  for(var i=0; i<blades; i++) {{\n      var angle = (360 / blades) * i;\n"
+        code += f"      var blade = CSG.cube({{center: [r/2, 0, h/2], radius: [r/2, 5, 0.8]}}).rotateX(pitch).translate([4, 0, 0]).rotateZ(angle);\n"
+        code += f"      prop = prop.union(blade);\n  }}\n  return UTILS.mat(prop);\n}}"
+
     else:
         code += f"  return CSG.cube({{radius:[10,10,10]}});\n}}"
 

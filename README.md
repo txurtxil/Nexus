@@ -51,7 +51,7 @@ termux-setup-storage
 ### 2. Clonar Proyecto y Entorno Virtual
 ```bash
 # Clonar el repositorio
-git clone [https://github.com/txurtxil/Nexus-CAD-App](https://github.com/txurtxil/Nexus-CAD-App) ~/nexus_app
+git clone https://github.com/txurtxil/Nexus-CAD-App ~/nexus_app
 
 # Crear y activar entorno virtual
 cd ~/nexus_app

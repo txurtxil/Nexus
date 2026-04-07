@@ -1,5 +1,5 @@
 
-```markdown
+
 # 🌌 NEXUS CAD TITAN AI (v21.2)
 
 ![Versión](https://img.shields.io/badge/Versi%C3%B3n-21.2_TITAN_AI-00E676?style=for-the-badge)
@@ -141,4 +141,4 @@ git add .
 git commit -m "Nexus v21.2 TITAN AI - Actualizacion de README y despliegue de entorno Termux"
 git push origin main
 
-```
+

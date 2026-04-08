@@ -188,3 +188,10 @@ Modo de ejecución: Dado que es Termux, la app se previsualiza mediante ft.app(t
 No sugieras pip install estándar para librerías que requieran compilación en C/Rust sin verificar primero la compatibilidad con Termux.
 Prioriza soluciones ligeras y eficientes en memoria.
 Si sugieres cambios en el código, ten en cuenta la estructura de archivos en ~/nexus_app.
+
+para salvar tu cuenta github en local:
+(venv) ~/nexus_app $ git config --global credential.helper store
+(venv) ~/nexus_app $ git push                           Username for 'https://github.com': txurtxil
+Password for 'https://txurtxil@github.com':
+Everything up-to-date
+(venv) ~/nexus_app $

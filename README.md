@@ -54,17 +54,22 @@ termux-setup-storage
 git clone https://github.com/txurtxil/Nexus-CAD-App ~/nexus_app
 
 # Crear y activar entorno virtual
-export ANDROID_API_LEVEL=24
-pip install pydantic-core
 pkg update
-pkg install python-psutil python-pydantic clang rust -y
+pkg install rust clang binutils make python-psutil -y
 
+# 1. Enter your app folder
 cd ~/nexus_app
-python -m venv venv
+python -m venv venv --system-site-packages
 source venv/bin/activate
 
-# Instalar librerías de Python
-pip install flet flet-web
+# 3. Tell the compiler which Android version we are on (just in case)
+export ANDROID_API_LEVEL=24
+
+# 4. Install the pre-built pydantic-core (Saves 20 minutes and avoids the Rust error!)
+pip install pydantic-core --extra-index-url https://eutalix.github.io/android-pydantic-core/
+
+# 5. Install everything else
+pip install flet flet-web pydantic
 
 # Probamos que ha ido bien la instalación 
 
@@ -152,3 +157,34 @@ git push origin main
 
 # para subir a github y compilar directamente:
  subir "Nexus version xxx..."
+
+# Cambio en README.md, para sincronizar:
+git pull
+
+🚀 Prompt de Continuidad: Nexus CAD App
+Instrucciones para la IA:
+Actúa como un desarrollador senior experto en Python, Flet y desarrollo en entornos restringidos (Termux/Android). Vamos a continuar con el desarrollo de Nexus CAD App, una aplicación de diseño asistido por computadora construida con el framework Flet.
+1. Contexto del Entorno (CRÍTICO):
+Host: Android (vía Termux).
+Editor: Acode (acceso vía SAF).
+Lenguaje: Python 3.13.
+Gestión de Paquetes: Usamos un entorno virtual (venv) creado con el flag --system-site-packages.
+Dependencias Especiales:
+psutil: Instalado vía pkg install python-psutil (la versión de PyPI falla en Android).
+pydantic-core: Requiere compilación Rust o wheels pre-construidos para arquitectura ARM64/Android.
+flet y flet-web: Instalados vía pip dentro del venv.
+2. Estado Actual del Proyecto:
+El entorno de desarrollo ya está configurado y las dependencias críticas (psutil, flet, pydantic) están operativas tras superar errores de compilación de Rust y bloqueos de plataforma de psutil.
+El flujo de Git está configurado, aunque se han manejado conflictos de sincronización previos (fetch/rebase).
+El objetivo es desarrollar una herramienta CAD funcional en dispositivos móviles.
+3. Arquitectura de la App:
+Frontend: Flet (Python-based Flutter).
+Modo de ejecución: Dado que es Termux, la app se previsualiza mediante ft.app(target=main, view=ft.AppView.WEB_BROWSER) o mediante el Flet Viewer.
+4. Objetivos Inmediatos:
+[ ] Implementar/Refinar la lógica del lienzo (Canvas) para dibujo técnico.
+[ ] Optimizar la interfaz para uso táctil en móviles.
+[ ] (Añadir aquí tu siguiente tarea específica, ej: "Diseñar el sistema de capas" o "Importación de DXF").
+5. Reglas de Interacción:
+No sugieras pip install estándar para librerías que requieran compilación en C/Rust sin verificar primero la compatibilidad con Termux.
+Prioriza soluciones ligeras y eficientes en memoria.
+Si sugieres cambios en el código, ten en cuenta la estructura de archivos en ~/nexus_app.

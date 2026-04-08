@@ -159,6 +159,25 @@
             CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
             CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             
+            // --- PARCHE SENIOR: HACK PARA SOPORTAR ARRAYS EN CSG ---
+            const origUnion = CSG.prototype.union;
+            const origSubtract = CSG.prototype.subtract;
+            const origIntersect = CSG.prototype.intersect;
+            
+            CSG.prototype.union = function(obj) {
+                if(Array.isArray(obj)) { let r = this; for(let i=0; i<obj.length; i++) r = origUnion.call(r, obj[i]); return r; }
+                return origUnion.call(this, obj);
+            };
+            CSG.prototype.subtract = function(obj) {
+                if(Array.isArray(obj)) { let r = this; for(let i=0; i<obj.length; i++) r = origSubtract.call(r, obj[i]); return r; }
+                return origSubtract.call(this, obj);
+            };
+            CSG.prototype.intersect = function(obj) {
+                if(Array.isArray(obj)) { let r = this; for(let i=0; i<obj.length; i++) r = origIntersect.call(r, obj[i]); return r; }
+                return origIntersect.call(this, obj);
+            };
+            // -------------------------------------------------------
+
             let IMPORTED_STL = CSG.cube({radius:[0.01, 0.01, 0.01]});
 
             self.onmessage = function(e) {
@@ -275,7 +294,6 @@
                 document.getElementById('loader-txt').innerText = "WORKER PROCESANDO BOLEANAS...";
             }
 
-            // CORRECCIÓN VITAL: Inyectar roundedBox al INICIO absoluto del script como función global
             let filletHelper = "function roundedBox(w, d, h, r) {\n" +
                 "var res = " + currentSlices + ";\n" +
                 "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
@@ -289,7 +307,6 @@
                 "return b1.union([b2, c1, c2, c3, c4]);\n" +
             "}\n\n";
             
-            // Simplemente concatenamos el helper arriba de tu código
             optimizedCode = filletHelper + optimizedCode;
 
             document.getElementById('loader').style.display = 'flex';

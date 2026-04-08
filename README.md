@@ -150,4 +150,5 @@ git add .
 git commit -m "Nexus v21.2 TITAN AI - Actualizacion de README y despliegue de entorno Termux"
 git push origin main
 
-
+# para subir a github y compilar directamente:
+ subir "Nexus version xxx..."

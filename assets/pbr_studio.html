@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS PBR STUDIO v21.1</title>
+    <title>NEXUS PBR STUDIO v21.2 - AI AUTO-MATE</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
@@ -29,7 +29,7 @@
 
     <button class="fab" onclick="togglePanel()" id="fabBtn">⚙️</button>
     <div class="panel" id="uiPanel">
-        <h3 style="margin:0 0 10px 0;color:#00E5FF;font-size:16px;">🎨 PBR STUDIO v21.1</h3>
+        <h3 style="margin:0 0 10px 0;color:#00E5FF;font-size:16px;">🎨 PBR STUDIO v21.2</h3>
         <div id="singleMatContainer">
             <select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;">
                 <option value="carbon">Fibra de Carbono</option>
@@ -225,7 +225,10 @@
                 dragControls.addEventListener('hoveron', (e) => { e.object.material.emissive.setHex(0x222222); });
                 dragControls.addEventListener('hoveroff', (e) => { e.object.material.emissive.setHex(0x000000); });
                 dragControls.addEventListener('dragstart', () => { controls.enabled = false; });
+                
+                // --- CONEXIÓN AL NUEVO MOTOR AUTO-MATE ---
                 dragControls.addEventListener('drag', (e) => { snapToClosest(e.object); });
+                
                 dragControls.addEventListener('dragend', () => { controls.enabled = true; });
             }
             if(centerCam) { 
@@ -234,15 +237,56 @@
             }
         }
 
+        // --- CEREBRO AUTO-MATE (SNAPPING SEMÁNTICO MAGNÉTICO) ---
         function snapToClosest(movingMesh) {
-            movingMesh.updateMatrixWorld(); movingMesh.geometry.computeBoundingBox(); const mBox = movingMesh.geometry.boundingBox.clone().applyMatrix4(movingMesh.matrixWorld); const snapDist = 6.0;
+            movingMesh.updateMatrixWorld();
+
+            // 1. Calcular el Bounding Box global y el Centro de la pieza que movemos
+            const mBox = new THREE.Box3().setFromObject(movingMesh);
+            const mCenter = new THREE.Vector3();
+            mBox.getCenter(mCenter);
+
+            const snapDistXZ = 8.0; // Distancia magnética para alinear centros (agujeros/ejes)
+            const snapDistY = 3.0;  // Distancia magnética para apilar caras (planos)
+
             for(let other of interactableMeshes) {
                 if(other === movingMesh) continue;
-                other.updateMatrixWorld(); other.geometry.computeBoundingBox(); const oBox = other.geometry.boundingBox.clone().applyMatrix4(other.matrixWorld);
-                const dx1 = mBox.max.x - oBox.min.x; const dx2 = mBox.min.x - oBox.max.x; const dy1 = mBox.max.y - oBox.min.y; const dy2 = mBox.min.y - oBox.max.y; const dz1 = mBox.max.z - oBox.min.z; const dz2 = mBox.min.z - oBox.max.z;
-                if(Math.abs(dx1) < snapDist) { movingMesh.position.x -= dx1; break; } if(Math.abs(dx2) < snapDist) { movingMesh.position.x -= dx2; break; }
-                if(Math.abs(dy1) < snapDist) { movingMesh.position.y -= dy1; break; } if(Math.abs(dy2) < snapDist) { movingMesh.position.y -= dy2; break; }
-                if(Math.abs(dz1) < snapDist) { movingMesh.position.z -= dz1; break; } if(Math.abs(dz2) < snapDist) { movingMesh.position.z -= dz2; break; }
+
+                other.updateMatrixWorld();
+                const oBox = new THREE.Box3().setFromObject(other);
+                const oCenter = new THREE.Vector3();
+                oBox.getCenter(oCenter);
+
+                // 2. Verificar proximidad en el plano XZ (Alineación de ejes/cilindros)
+                const distXZ = Math.hypot(mCenter.x - oCenter.x, mCenter.z - oCenter.z);
+
+                if(distXZ < snapDistXZ) {
+                    // SNAP DE EJES (Magnético XZ)
+                    movingMesh.position.x -= (mCenter.x - oCenter.x);
+                    movingMesh.position.z -= (mCenter.z - oCenter.z);
+
+                    // Recalcular caja tras mover XZ
+                    movingMesh.updateMatrixWorld();
+                    mBox.setFromObject(movingMesh);
+
+                    // 3. SNAP DE CARAS (Apilamiento en Y)
+                    if (Math.abs(mBox.min.y - oBox.max.y) < snapDistY) {
+                        // Lo apilamos encima
+                        movingMesh.position.y += (oBox.max.y - mBox.min.y);
+                    } else if (Math.abs(mBox.max.y - oBox.max.y) < snapDistY) {
+                        // Lo metemos a ras (superficies alineadas por arriba)
+                        movingMesh.position.y += (oBox.max.y - mBox.max.y);
+                    }
+
+                    // Efecto visual de "Enganche"
+                    const origEmissive = other.material.emissive ? other.material.emissive.getHex() : 0x000000;
+                    other.material.emissive.setHex(0x005533); // Destello verde oscuro de confirmación
+                    setTimeout(() => { 
+                        if(other.material) other.material.emissive.setHex(origEmissive); 
+                    }, 200);
+                    
+                    break; // Solo encajamos con una pieza a la vez
+                }
             }
         }
 

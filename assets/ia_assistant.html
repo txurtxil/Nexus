@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v21.2 - VISION & AGENTIC UI</title>
+    <title>NEXUS AI v21.2 - VISION, AGENTIC & BRIDGE</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #00E676; }
@@ -58,9 +58,9 @@
     </div>
 
     <div>
-        <label>Visión Artificial (Bocetos/Planos):</label>
+        <label>Visión Artificial (Planos / PBR Studio):</label>
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
-        <button class="btn-camera" onclick="document.getElementById('imageInput').click()">📷 Adjuntar Foto o Plano</button>
+        <button class="btn-camera" onclick="document.getElementById('imageInput').click()">📷 Adjuntar Foto Local</button>
         
         <div class="preview-container" id="previewContainer">
             <img id="imagePreview" src="">
@@ -69,7 +69,7 @@
     </div>
 
     <div>
-        <label>Instrucción para la IA:</label>
+        <label>Instrucción / Log de Errores:</label>
         <textarea id="promptInput" placeholder="Ej Copiloto: Haz un cubo hueco...&#10;Ej Agentic: Haz un engranaje planetario de 45 dientes..."></textarea>
     </div>
 
@@ -88,15 +88,51 @@
     let currentB64 = null;
     let currentMimeType = null;
 
+    // --- PUENTE DE DATOS (AUTO-CAPTURA PBR Y ERRORES) ---
+    async function checkDataBridge() {
+        try {
+            const res = await fetch('/api/get_vision.json');
+            const data = await res.json();
+            
+            // Si hay una imagen enviada desde PBR Studio
+            if (data.image_b64 && data.image_b64.trim() !== "") {
+                document.getElementById('imagePreview').src = data.image_b64;
+                document.getElementById('previewContainer').style.display = 'block';
+                currentB64 = data.image_b64.split(',')[1];
+                currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
+                
+                // Sugerir prompt visual
+                if (document.getElementById('promptInput').value === "") {
+                    document.getElementById('promptInput').value = "Analiza esta captura del visor 3D y descríbeme qué mejoras geométricas le harías o genera el código para replicarla.";
+                }
+            }
+            
+            // Si hay un error capturado del Web Worker
+            if (data.last_error && data.last_error.trim() !== "") {
+                const promptBox = document.getElementById('promptInput');
+                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido que solucione esto manteniendo la estructura.";
+                // Forzar modo Copiloto para arreglar código
+                document.getElementById('aiMode').value = "copilot";
+                document.getElementById('memoryContainer').style.display = 'flex';
+                document.getElementById('useMemory').checked = true;
+            }
+        } catch(e) {}
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         const savedKey = localStorage.getItem('nexus_gemini_key');
         if(savedKey) document.getElementById('apiKey').value = savedKey;
         
-        // Ocultar memoria si estamos en Agentic UI
         document.getElementById('aiMode').addEventListener('change', (e) => {
             document.getElementById('memoryContainer').style.display = e.target.value === 'agentic' ? 'none' : 'flex';
         });
+
+        // Revisar si hay datos pendientes al abrir la pestaña
+        checkDataBridge();
     });
+
+    // Revisar si hay nuevos datos cuando la pestaña recupera el foco
+    window.addEventListener('focus', checkDataBridge);
 
     document.getElementById('imageInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -167,13 +203,12 @@ Si el usuario adjunta una imagen (boceto, croquis o plano), extrae las medidas e
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura de la pieza actual. Añade o modifica según pida el usuario o muestre el plano.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura de la pieza actual. Añade o modifica según pida el usuario, los errores reportados, o lo que muestre el plano.`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }
         }
 
-        // Construir el Payload Multimodal (soporta imagen para AMBOS modos)
         let payloadParts = [{ text: systemInstruction + "\n\n" + finalPrompt }];
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
@@ -224,6 +259,12 @@ Si el usuario adjunta una imagen (boceto, croquis o plano), extrae las medidas e
             alert("Error: " + error.message); btn.innerHTML = "❌ ERROR"; btn.style.backgroundColor = "#D50000";
         } finally {
             setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "#B388FF"; }, 2500);
+            
+            // Limpiar la imagen y el error una vez inyectado exitosamente para no repetir el bucle
+            removeImage();
+            if(document.getElementById('promptInput').value.includes("He recibido este error")) {
+                document.getElementById('promptInput').value = "";
+            }
         }
     }
 </script>

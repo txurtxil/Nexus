@@ -3,12 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - Motor LOD & HD Export</title>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
-    
+    <title>NEXUS CAD PRO - Motor Web Worker & Híbrido STL</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #0B0E14; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -16,30 +11,49 @@
         
         .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        #toolbar { top: 15px; left: 15px; display: flex; gap: 10px; }
-        #loader { bottom: 15px; right: 15px; display: none; font-weight: bold; color: var(--nexus-cyan); border-color: var(--nexus-cyan); }
+        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; }
+        #toolbar button { background: #161B22; color: var(--nexus-cyan); border: 1px solid var(--nexus-cyan); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
+        #toolbar button:active { background: var(--nexus-cyan); color: #000; }
         
-        button.btn-hd { background: var(--nexus-purple); color: #000; font-weight: bold; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; transition: 0.2s; text-transform: uppercase; font-size: 12px; }
-        button.btn-hd:hover { background: #9575CD; transform: translateY(-2px); }
-        button.btn-hd:active { transform: translateY(0); }
+        #console { bottom: 15px; left: 15px; width: 350px; max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px; display: none; }
+        .log-error { color: #FF5252; } .log-success { color: var(--nexus-green); } .log-warn { color: #FFD54F; }
+        
+        #loader { bottom: 15px; right: 15px; display: none; font-weight: bold; color: var(--nexus-cyan); border-color: var(--nexus-cyan); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 229, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); } }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 </head>
 <body>
     <div id="canvas-container"></div>
     
     <div id="toolbar" class="nexus-panel">
-        <button class="btn-hd" onclick="triggerHDExport()">💎 Exportar STL (HD)</button>
+        <button onclick="exportSTL()">💾 Descargar STL (Pantalla)</button>
+        <button onclick="triggerHDExport()" style="background: var(--nexus-purple); color: #000; border: none;">💎 Exportar STL (HD)</button>
+        <button onclick="document.getElementById('console').style.display='none'">🧹 Limpiar Log</button>
     </div>
     
+    <div id="console" class="nexus-panel"></div>
     <div id="loader" class="nexus-panel">⚙️ Compilando Malla...</div>
 
     <script>
-        // --- VARIABLES GLOBALES DEL MOTOR ---
+        function log(msg) {
+            const c = document.getElementById('console');
+            c.style.display = 'block';
+            c.innerHTML += `<div>${msg}</div>`;
+            c.scrollTop = c.scrollHeight;
+        }
+
+        // --- VARIABLES GLOBALES Y LÓGICA DE LOD ---
         let scene, camera, renderer, controls, currentMesh;
+        let importedSTLPolygons = null; // Guardará el STL convertido a polígonos CSG
+        let isImportingSTL = false;
+        
+        // Variables añadidas para el motor HD
         window.NEXUS_HD_EXPORT = false;
-        let isExportingProcess = false; 
-        let lastCode = "";
-        let currentStlHash = "";
+        let isExportingProcess = false;
 
         // --- INICIALIZACIÓN THREE.JS ---
         function initWebGL() {
@@ -47,11 +61,10 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0B0E14);
             
-            // Grid y Luces
             const gridHelper = new THREE.GridHelper(200, 50, 0x30363D, 0x161B22);
+            gridHelper.position.y = -0.1;
             scene.add(gridHelper);
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight.position.set(50, 200, 100);
             scene.add(dirLight);
@@ -71,29 +84,124 @@
             animate();
         }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
-        }
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
 
-        // --- SISTEMA DYNAMIC LOD Y REPARACIÓN ---
+        // --- DEFINICIÓN DEL WEB WORKER (CSG ASÍNCRONO) ---
+        const workerCode = `
+            importScripts('https://cdn.jsdelivr.net/npm/@jscad/csg@0.7.1/csg.js');
+            
+            // Extender CSG con funciones de utilidad
+            const UTILS = {
+                trans: function(obj, coords) { return obj.translate(coords); },
+                rot: function(obj, angles) { return obj.rotateX(angles[0]).rotateY(angles[1]).rotateZ(angles[2]); },
+                scale: function(obj, s) { 
+                    if(Array.isArray(s)) return obj.scale(s);
+                    return obj.scale([s,s,s]);
+                }
+            };
+
+            let IMPORTED_STL = null;
+
+            self.onmessage = function(e) {
+                if(e.data.type === 'load_stl') {
+                    IMPORTED_STL = e.data.polygons;
+                    self.postMessage({status: 'stl_loaded'});
+                    return;
+                }
+
+                if(e.data.type === 'process_csg') {
+                    try {
+                        const startTime = Date.now();
+                        const func = new Function('CSG', 'UTILS', 'IMPORTED_STL', e.data.code + "\\nreturn main();");
+                        const resultCSG = func(CSG, UTILS, IMPORTED_STL);
+                        
+                        if (!resultCSG || !resultCSG.polygons) throw new Error("La función main() no retornó un objeto CSG válido.");
+
+                        const positions = []; const normals = [];
+                        resultCSG.polygons.forEach(p => {
+                            for (let i = 2; i < p.vertices.length; i++) {
+                                let v0 = p.vertices[0].pos, v1 = p.vertices[i-1].pos, v2 = p.vertices[i].pos;
+                                let n0 = p.vertices[0].normal, n1 = p.vertices[i-1].normal, n2 = p.vertices[i].normal;
+                                
+                                positions.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+                                if(n0 && n1 && n2) normals.push(n0.x, n0.y, n0.z, n1.x, n1.y, n1.z, n2.x, n2.y, n2.z);
+                            }
+                        });
+
+                        self.postMessage({ status: 'success', positions: new Float32Array(positions), normals: new Float32Array(normals), time: Date.now() - startTime }, [new Float32Array(positions).buffer, new Float32Array(normals).buffer]);
+                    } catch (error) {
+                        self.postMessage({ status: 'error', message: error.toString() });
+                    }
+                }
+            };
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const worker = new Worker(URL.createObjectURL(blob));
+
+        worker.onmessage = function(e) {
+            if (e.data.status === 'stl_loaded') {
+                log("<span class='log-success'>✓ STL transferido al Worker. Compilando híbrido...</span>");
+                isImportingSTL = false;
+                executeCSGCode(lastCode); // Ejecutar código con el STL ya cargado
+            }
+            else if (e.data.status === 'success') {
+                if (currentMesh) scene.remove(currentMesh);
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(e.data.positions, 3));
+                if (e.data.normals.length > 0) geometry.setAttribute('normal', new THREE.BufferAttribute(e.data.normals, 3));
+                else geometry.computeVertexNormals();
+
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: 0x00E5FF, roughness: 0.4, metalness: 0.1,
+                    side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
+                });
+
+                currentMesh = new THREE.Mesh(geometry, material);
+                
+                // Bordes para mejor visualización
+                const edges = new THREE.EdgesGeometry(geometry);
+                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
+                currentMesh.add(line);
+
+                scene.add(currentMesh);
+                log("<span class='log-success'>✓ Malla generada en " + e.data.time + "ms</span>");
+                
+                // HOOK DE EXPORTACIÓN HD AÑADIDO
+                if (isExportingProcess) {
+                    setTimeout(() => {
+                        exportSTL(); 
+                        isExportingProcess = false;
+                        window.NEXUS_HD_EXPORT = false;
+                        log("<span class='log-success'>> Guardado. Volviendo a LOD...</span>");
+                        executeCSGCode(lastCode); 
+                    }, 500);
+                }
+
+            } else {
+                log("<span class='log-error'>❌ ERROR: " + e.data.message + "</span>");
+            }
+            document.getElementById('loader').style.display = 'none';
+        };
+
+        // --- SISTEMA DE INYECCIÓN MODIFICADO (LOD + FILLET) ---
         function executeCSGCode(rawCode) {
             if (!rawCode) return;
             document.getElementById('loader').style.display = 'block';
             
             let optimizedCode = rawCode;
-            
-            // 1. INYECCIÓN LOD POR REGEX 
+
+            // 1. INYECCIÓN LOD POR REGEX
             if (window.NEXUS_HD_EXPORT) {
-                optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 128'); 
-                document.getElementById('loader').innerHTML = "💎 Renderizando HD (128 slices)...";
+                optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 128');
+                log("<span class='log-warn'>> 💎 Renderizando HD (128 slices)...</span>");
             } else {
-                optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 24'); 
-                document.getElementById('loader').innerHTML = "⚡ Renderizando Modo Rápido...";
+                optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 24');
+                log(">> ⚡ Renderizando Modo Rápido (LOD)");
             }
 
-            // 2. INYECCIÓN DEL MÓDULO FILLET (Chaflanes Suaves)
+            // 2. INYECCIÓN DEL MÓDULO FILLET
             const filletHelper = `
             // Helper inyectado para generar cajas con bordes redondeados
             function roundedBox(w, d, h, r) {
@@ -111,17 +219,10 @@
             `;
             optimizedCode = optimizedCode.replace("function main() {", "function main() {\n" + filletHelper);
 
-            try {
-                // Lógica del worker o evaluador CSG
-                // ...
-                setTimeout(() => { onMeshGenerated(); }, 500); 
-            } catch (e) {
-                console.error("Error en motor JS-CSG:", e);
-                document.getElementById('loader').style.display = 'none';
-            }
+            worker.postMessage({ type: 'process_csg', code: optimizedCode });
         }
 
-        // --- LÓGICA DE EXPORTACIÓN HD ---
+        // --- TRIGGER EXPORTACIÓN HD AÑADIDO ---
         function triggerHDExport() {
             if(!lastCode) return alert("No hay geometría para exportar.");
             isExportingProcess = true;
@@ -129,37 +230,82 @@
             executeCSGCode(lastCode); 
         }
 
-        function onMeshGenerated() {
-            document.getElementById('loader').style.display = 'none';
+        // --- EXPORTACIÓN STL NORMAL ---
+        function exportSTL() {
+            if (!currentMesh) { alert("No hay malla para exportar"); return; }
+            const exporter = new THREE.STLExporter();
+            const stlString = exporter.parse(scene);
+            const blob = new Blob([stlString], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'nexus_part_' + Date.now() + '.stl';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // --- LÓGICA DE IMPORTACIÓN STL A CSG (EXPERIMENTAL) ---
+        function loadAndSendSTL(url) {
+            isImportingSTL = true;
+            document.getElementById('loader').style.display = 'block';
+            log(">> Descargando STL inyectado...");
             
-            if (isExportingProcess) {
-                const exporter = new THREE.STLExporter();
-                // AQUI: const stlString = exporter.parse( currentMesh ); 
-                alert("✓ Pieza calculada en HD. (Falta enganchar tu malla final al STLExporter)");
+            const loader = new THREE.STLLoader();
+            loader.load(url, function (geometry) {
+                log(">> STL cargado. Convirtiendo a polígonos CSG...");
+                // Truco: Convertir BufferGeometry a un array plano que el Worker pueda leer
+                const pos = geometry.attributes.position.array;
+                const polygons = [];
                 
-                isExportingProcess = false;
-                window.NEXUS_HD_EXPORT = false;
-                executeCSGCode(lastCode); 
-            }
+                // Procesar de 3 en 3 vértices (triángulos)
+                for(let i=0; i<pos.length; i+=9) {
+                    polygons.push({
+                        vertices: [
+                            {pos: {x: pos[i], y: pos[i+1], z: pos[i+2]}},
+                            {pos: {x: pos[i+3], y: pos[i+4], z: pos[i+5]}},
+                            {pos: {x: pos[i+6], y: pos[i+7], z: pos[i+8]}}
+                        ]
+                    });
+                }
+                
+                log(">> Enviando " + polygons.length + " polígonos al Worker...");
+                worker.postMessage({ type: 'load_stl', polygons: polygons });
+
+            }, undefined, function (error) {
+                log("<span class='log-error'>❌ Error al cargar STL: " + error + "</span>");
+                isImportingSTL = false;
+                document.getElementById('loader').style.display = 'none';
+            });
         }
 
         // --- POLLING LOCALHOST ---
+        let lastCode = "";
+        let currentStlHash = "";
+
         function checkServer() {
             fetch(window.location.origin + '/api/get_code_b64.json')
                 .then(r => r.json())
                 .then(data => {
-                    if (data && data.code_b64) {
+                    // Detectar si el backend subió un nuevo STL
+                    if (data.stl_hash && data.stl_hash !== currentStlHash) {
+                        currentStlHash = data.stl_hash;
+                        log("<span class='log-warn'>> Nuevo STL detectado, iniciando flujo híbrido...</span>");
+                        document.getElementById('console').style.display = 'block';
+                        // Burlar caché añadiendo timestamp al final
+                        loadAndSendSTL(window.location.origin + '/exports/imported.stl?t=' + Date.now());
+                    }
+
+                    if (data && data.code_b64 && data.code_b64 !== "") {
                         let decoded = atob(data.code_b64);
-                        if (decoded !== lastCode && !isExportingProcess) { 
+                        if (decoded !== lastCode) { 
                             lastCode = decoded; 
-                            executeCSGCode(lastCode); 
+                            if (!isImportingSTL) executeCSGCode(lastCode); 
                         }
                     }
                 }).catch(e => {});
         }
         
         window.onload = () => { initWebGL(); setInterval(checkServer, 1000); };
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>

@@ -60,7 +60,7 @@ source venv/bin/activate
 
 # Instalar librerías de Python
 pip install flet psutil
-
+pip install flet
 ```
 ### 3. Configurar Alias y Atajos de Desarrollo Senior
 Vamos a inyectar tus comandos personalizados para que programar desde el móvil sea ultrarrápido.
@@ -132,7 +132,7 @@ source ~/.bashrc
 ¡Listo! Ya puedes escribir simplemente nxrun para lanzar el servidor y la app, o nxs "Tu mensaje" para subir cambios a GitHub automáticamente.
 ```
 
-```bash
+
 # 1. Limpiar caché
 find . -type d -name "__pycache__" -exec rm -r {} +
 

@@ -54,13 +54,22 @@ termux-setup-storage
 git clone https://github.com/txurtxil/Nexus-CAD-App ~/nexus_app
 
 # Crear y activar entorno virtual
+export ANDROID_API_LEVEL=24
+pip install pydantic-core
+pkg update
+pkg install python-psutil python-pydantic clang rust -y
+
 cd ~/nexus_app
 python -m venv venv
 source venv/bin/activate
 
 # Instalar librerías de Python
-pip install flet psutil
-pip install flet
+pip install flet flet-web
+
+# Probamos que ha ido bien la instalación 
+
+python -c "import flet; import psutil; print('🚀 Success! Components loaded.')"
+
 ```
 ### 3. Configurar Alias y Atajos de Desarrollo Senior
 Vamos a inyectar tus comandos personalizados para que programar desde el móvil sea ultrarrápido.

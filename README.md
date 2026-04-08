@@ -54,17 +54,22 @@ termux-setup-storage
 git clone https://github.com/txurtxil/Nexus-CAD-App ~/nexus_app
 
 # Crear y activar entorno virtual
-export ANDROID_API_LEVEL=24
-pip install pydantic-core
 pkg update
-pkg install python-psutil python-pydantic clang rust -y
+pkg install rust clang binutils make python-psutil -y
 
+# 1. Enter your app folder
 cd ~/nexus_app
-python -m venv venv
+python -m venv venv --system-site-packages
 source venv/bin/activate
 
-# Instalar librerías de Python
-pip install flet flet-web
+# 3. Tell the compiler which Android version we are on (just in case)
+export ANDROID_API_LEVEL=24
+
+# 4. Install the pre-built pydantic-core (Saves 20 minutes and avoids the Rust error!)
+pip install pydantic-core --extra-index-url https://eutalix.github.io/android-pydantic-core/
+
+# 5. Install everything else
+pip install flet flet-web pydantic
 
 # Probamos que ha ido bien la instalación 
 

@@ -11,196 +11,275 @@
         
         .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; }
-        #toolbar button { background: #161B22; color: var(--nexus-cyan); border: 1px solid var(--nexus-cyan); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
-        #toolbar button:active { background: var(--nexus-cyan); color: #000; }
+        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; width: 140px; }
+        .btn { background: #21262D; border: 1px solid var(--nexus-border); color: #fff; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-transform: uppercase; text-align: left; display: flex; justify-content: space-between; transition: all 0.2s; }
+        .btn:hover { background: #30363D; }
+        .btn:active { transform: scale(0.95); }
         
-        #console { bottom: 15px; left: 15px; width: 350px; max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px; display: none; }
-        .log-error { color: #FF5252; } .log-success { color: var(--nexus-green); } .log-warn { color: #FFD54F; }
+        #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); }
+        .hud-section-title { color: var(--nexus-cyan); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--nexus-border); letter-spacing: 1px; }
+        .hud-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .hud-label { color: #8B949E; }
+        .hud-value { color: #fff; font-family: 'Courier New', monospace; text-align: right; }
+        .hud-value.highlight { color: var(--nexus-green); font-weight: bold; }
+        .hud-value.purple { color: var(--nexus-purple); font-weight: bold; }
         
-        #loader { bottom: 15px; right: 15px; display: none; font-weight: bold; color: var(--nexus-cyan); border-color: var(--nexus-cyan); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0, 229, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); } }
+        #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; }
+        .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
+        
+        #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
+        .spinner { border: 2px solid rgba(0, 229, 255, 0.2); border-top: 2px solid var(--nexus-cyan); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #VRButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 </head>
 <body>
+
     <div id="canvas-container"></div>
     
     <div id="toolbar" class="nexus-panel">
-        <button onclick="exportSTL()">💾 Descargar STL (Pantalla)</button>
-        <button onclick="triggerHDExport()" style="background: var(--nexus-purple); color: #000; border: none;">💎 Exportar STL (HD)</button>
-        <button onclick="document.getElementById('console').style.display='none'">🧹 Limpiar Log</button>
+        <button class="btn" style="border-left: 3px solid #00E676;" onclick="toggleAutoRotate()">Rotar <span>🔄</span></button>
+        <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
+        <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura <span>🎨</span></button>
+        <button class="btn" style="border-left: 3px solid #D50000;" onclick="exportFile('stl')">Guardar STL <span>🧊</span></button>
+        <button class="btn" style="border-left: 3px solid #C51162;" onclick="exportFile('obj')">Guardar OBJ <span>📦</span></button>
+        <button class="btn" style="border-left: 3px solid var(--nexus-purple);" onclick="triggerHDExport()">Guardar HD <span>💎</span></button>
+        <button class="btn" style="border-left: 3px solid #00B0FF;" onclick="toggleConsole()">Motor Logs <span>🖥️</span></button>
     </div>
-    
-    <div id="console" class="nexus-panel"></div>
-    <div id="loader" class="nexus-panel">⚙️ Compilando Malla...</div>
 
-    <script>
-        function log(msg) {
-            const c = document.getElementById('console');
-            c.style.display = 'block';
-            c.innerHTML += `<div>${msg}</div>`;
-            c.scrollTop = c.scrollHeight;
-        }
+    <div id="hud-panel" class="nexus-panel">
+        <div class="hud-section-title">🔌 Telemetría Cliente</div>
+        <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
+        <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
+        <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
+        <div class="hud-row"><span class="hud-label">Batería:</span> <span class="hud-value" id="hw-bat">🔌 AC</span></div>
+        <div class="hud-row"><span class="hud-label">Red / Conexión:</span> <span class="hud-value" id="hw-net">Local</span></div>
+        <div style="height: 10px;"></div>
+        <div class="hud-section-title">📐 Análisis de Geometría</div>
+        <div class="hud-row"><span class="hud-label">Eje X (Ancho):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Eje Y (Largo):</span> <span class="hud-value" id="geo-y">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Eje Z (Alto):</span> <span class="hud-value" id="geo-z">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Polígonos:</span> <span class="hud-value highlight" id="geo-poly">0</span></div>
+        <div class="hud-row"><span class="hud-label">Tiempo Render:</span> <span class="hud-value" id="geo-time">0 ms</span></div>
+    </div>
 
-        // --- VARIABLES GLOBALES ---
-        let scene, camera, renderer, controls, currentMesh;
-        let importedSTLPolygons = null;
-        let isImportingSTL = false;
+    <div id="console" class="nexus-panel">
+        <div class="log-sys">> Inicializando Worker Multi-hilo...</div>
+        <div id="log-content"></div>
+    </div>
 
-        // --- VARIABLES AÑADIDAS PARA HD EXPORT ---
+    <div id="loader" style="display:none;">
+        <div class="spinner"></div>
+        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold;">WORKER PROCESANDO...</div>
+    </div>
+
+    <script type="module">
+        import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/VRButton.js';
+
+        // VARIABLES DE SISTEMA HD EXPORT AÑADIDAS AL SCOPE DEL MODULO
         window.NEXUS_HD_EXPORT = false;
         window.IS_EXPORTING_HD = false;
 
-        // --- INICIALIZACIÓN THREE.JS ---
-        function initWebGL() {
-            const container = document.getElementById('canvas-container');
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0B0E14);
-            
-            const gridHelper = new THREE.GridHelper(200, 50, 0x30363D, 0x161B22);
-            gridHelper.position.y = -0.1;
-            scene.add(gridHelper);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(50, 200, 100);
-            scene.add(dirLight);
+        window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
+        window.changeMaterial = () => { if(currentMesh) { matIndex = (matIndex + 1) % materials.length; currentMesh.material = materials[matIndex]; } };
+        window.toggleCamera = () => { camera.fov = camera.fov === 45 ? 10 : 45; camera.position.multiplyScalar(camera.fov === 10 ? 4 : 0.25); camera.updateProjectionMatrix(); };
+        window.toggleConsole = () => { const c = document.getElementById('console'); c.style.display = c.style.display === 'none' || c.style.display === '' ? 'block' : 'none'; };
+        window.exportFile = exportFile;
 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-            camera.position.set(50, 50, 50);
+        // NUEVA FUNCIÓN EXPUESTA AL WINDOW
+        window.triggerHDExport = () => {
+            if(!lastCode) { log("<span class='log-err'>No hay geometría para exportar.</span>"); document.getElementById('console').style.display = 'block'; return; }
+            window.IS_EXPORTING_HD = true;
+            window.NEXUS_HD_EXPORT = true;
+            executeCSGCode(lastCode); 
+        };
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            container.appendChild(renderer.domElement);
-
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.1;
-
-            animate();
+        // HW DETECT
+        document.getElementById('hw-cpu').innerText = (navigator.hardwareConcurrency || '?') + ' Cores';
+        if (navigator.deviceMemory) document.getElementById('hw-ram').innerText = navigator.deviceMemory + ' GB+';
+        if (navigator.connection && navigator.connection.effectiveType) document.getElementById('hw-net').innerText = navigator.connection.effectiveType.toUpperCase();
+        
+        if (navigator.getBattery) {
+            navigator.getBattery().then(bat => {
+                const updateBat = () => {
+                    let level = Math.round(bat.level * 100);
+                    let icon = bat.charging ? "⚡" : (level < 20 ? "🪫" : "🔋");
+                    document.getElementById('hw-bat').innerText = `${level}% ${icon}`;
+                };
+                updateBat(); bat.addEventListener('levelchange', updateBat); bat.addEventListener('chargingchange', updateBat);
+            });
         }
 
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+        try {
+            const gl = document.createElement('canvas').getContext('webgl');
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            document.getElementById('hw-gpu').innerText = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).split(',')[0].replace('ANGLE (', '').substring(0, 18);
+        } catch (e) { document.getElementById('hw-gpu').innerText = "Bloqueado/Oculto"; }
 
-        // --- DEFINICIÓN DEL WEB WORKER (CSG ASÍNCRONO) ---
+        function log(msg) {
+            const div = document.getElementById('log-content');
+            div.innerHTML += `<div>${msg}</div>`; div.parentElement.scrollTop = div.parentElement.scrollHeight;
+        }
+
+        // --- 3D SCENE & VR ---
+        let scene, camera, renderer, controls, currentMesh = null;
+        let matIndex = 0;
+        const materials = [
+            new THREE.MeshStandardMaterial({ color: 0xFFAB00, roughness: 0.3, metalness: 0.9 }), 
+            new THREE.MeshStandardMaterial({ color: 0x00E5FF, roughness: 0.2, metalness: 0.8 }), 
+            new THREE.MeshNormalMaterial(), 
+            new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }), 
+            new THREE.MeshStandardMaterial({ color: 0x1A1A1A, roughness: 0.8, metalness: 0.1 })  
+        ];
+
+        function initWebGL() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene(); 
+            const grid = new THREE.GridHelper(400, 80, 0x30363D, 0x161B22); grid.position.y = -0.5; scene.add(grid);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(50, 100, 50); scene.add(dl);
+            const bl = new THREE.DirectionalLight(0xB388FF, 0.5); bl.position.set(-50, 50, -50); scene.add(bl); 
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000); camera.position.set(80, 50, 80);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true; document.body.appendChild( VRButton.createButton( renderer ) );
+            container.appendChild(renderer.domElement);
+            controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+            renderer.setAnimationLoop( function () { controls.update(); renderer.render(scene, camera); });
+        }
+
+        // --- WORKER JS-CSG ---
         const workerCode = `
-            importScripts('https://cdn.jsdelivr.net/npm/@jscad/csg@0.7.1/csg.js');
+            importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
+            CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
+            CSG.prototype.scale = function(v) { if(typeof v === 'number') v = [v,v,v]; return this.transform(CSG.Matrix4x4.scaling(v)); };
+            CSG.prototype.rotateX = function(deg) { return this.transform(CSG.Matrix4x4.rotationX(deg)); };
+            CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
+            CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             
-            const UTILS = {
-                trans: function(obj, coords) { return obj.translate(coords); },
-                rot: function(obj, angles) { return obj.rotateX(angles[0]).rotateY(angles[1]).rotateZ(angles[2]); },
-                scale: function(obj, s) { 
-                    if(Array.isArray(s)) return obj.scale(s);
-                    return obj.scale([s,s,s]);
-                }
-            };
-
-            let IMPORTED_STL = null;
+            let IMPORTED_STL = CSG.cube({radius:[0.01, 0.01, 0.01]});
 
             self.onmessage = function(e) {
-                if(e.data.type === 'load_stl') {
-                    IMPORTED_STL = e.data.polygons;
-                    self.postMessage({status: 'stl_loaded'});
-                    return;
-                }
-
-                if(e.data.type === 'process_csg') {
+                if (e.data.type === 'set_import') {
                     try {
-                        const startTime = Date.now();
-                        const func = new Function('CSG', 'UTILS', 'IMPORTED_STL', e.data.code + "\\nreturn main();");
-                        const resultCSG = func(CSG, UTILS, IMPORTED_STL);
-                        
-                        if (!resultCSG || !resultCSG.polygons) throw new Error("La función main() no retornó un objeto CSG válido.");
-
-                        const positions = []; const normals = [];
-                        resultCSG.polygons.forEach(p => {
-                            for (let i = 2; i < p.vertices.length; i++) {
-                                let v0 = p.vertices[0].pos, v1 = p.vertices[i-1].pos, v2 = p.vertices[i].pos;
-                                let n0 = p.vertices[0].normal, n1 = p.vertices[i-1].normal, n2 = p.vertices[i].normal;
-                                
-                                positions.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
-                                if(n0 && n1 && n2) normals.push(n0.x, n0.y, n0.z, n1.x, n1.y, n1.z, n2.x, n2.y, n2.z);
-                            }
-                        });
-
-                        self.postMessage({ status: 'success', positions: new Float32Array(positions), normals: new Float32Array(normals), time: Date.now() - startTime }, [new Float32Array(positions).buffer, new Float32Array(normals).buffer]);
-                    } catch (error) {
-                        self.postMessage({ status: 'error', message: error.toString() });
+                        let pos = e.data.positions; let polys = [];
+                        for(let i=0; i<pos.length; i+=9) {
+                            let v1 = new CSG.Vertex(new CSG.Vector(pos[i], pos[i+1], pos[i+2]), new CSG.Vector(0,0,1));
+                            let v2 = new CSG.Vertex(new CSG.Vector(pos[i+3], pos[i+4], pos[i+5]), new CSG.Vector(0,0,1));
+                            let v3 = new CSG.Vertex(new CSG.Vector(pos[i+6], pos[i+7], pos[i+8]), new CSG.Vector(0,0,1));
+                            polys.push(new CSG.Polygon([v1, v2, v3])); 
+                        }
+                        IMPORTED_STL = CSG.fromPolygons(polys);
+                        self.postMessage({ success: true, is_import: true });
+                    } catch(err) {
+                        self.postMessage({ success: false, is_import: true, err: err.message });
                     }
+                } 
+                else if (e.data.type === 'eval') {
+                    try {
+                        let fn = new Function("IMPORTED_STL", e.data.code + "\\nreturn main();");
+                        let csgResult = fn(IMPORTED_STL);
+                        if (!csgResult || typeof csgResult.toPolygons !== 'function') throw new Error("Objeto no válido o vacío");
+                        
+                        let polys = csgResult.toPolygons(); let numTriangles = 0;
+                        for(let i=0; i<polys.length; i++) numTriangles += (polys[i].vertices.length - 2);
+                        let v = new Float32Array(numTriangles * 9); let n = new Float32Array(numTriangles * 9); let idx = 0;
+                        
+                        for (let i = 0; i < polys.length; i++) {
+                            let poly = polys[i];
+                            let norm = poly.plane.normal; 
+                            for (let j = 2; j < poly.vertices.length; j++) {
+                                let v0 = poly.vertices[0], v1 = poly.vertices[j - 1], v2 = poly.vertices[j];
+                                v[idx]=v0.pos.x; v[idx+1]=v0.pos.y; v[idx+2]=v0.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                                v[idx]=v1.pos.x; v[idx+1]=v1.pos.y; v[idx+2]=v1.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                                v[idx]=v2.pos.x; v[idx+1]=v2.pos.y; v[idx+2]=v2.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                            }
+                        }
+                        self.postMessage({ success: true, v: v, n: n }, [v.buffer, n.buffer]);
+                    } catch(err) { self.postMessage({ success: false, err: err.message }); }
                 }
             };
         `;
+        const csgWorker = new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
+        let t0 = 0;
+        let isImportingSTL = false;
 
-        const blob = new Blob([workerCode], { type: 'application/javascript' });
-        const worker = new Worker(URL.createObjectURL(blob));
-
-        worker.onmessage = function(e) {
-            if (e.data.status === 'stl_loaded') {
-                log("<span class='log-success'>✓ STL transferido al Worker. Compilando híbrido...</span>");
+        csgWorker.onmessage = function(e) {
+            const data = e.data;
+            
+            if (data.is_import) {
                 isImportingSTL = false;
-                executeCSGCode(lastCode); 
+                if(data.success) {
+                    log("<span class='log-ok'>> Módulo Híbrido: STL importado, indexado y listo en memoria.</span>");
+                    if (lastCode !== "") executeCSGCode(lastCode); 
+                } else {
+                    log("<span class='log-err'>> WORKER ERROR (STL Import): " + data.err + "</span>"); document.getElementById('console').style.display = 'block';
+                    document.getElementById('loader').style.display = 'none';
+                }
+                return;
             }
-            else if (e.data.status === 'success') {
-                if (currentMesh) scene.remove(currentMesh);
 
-                const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute('position', new THREE.BufferAttribute(e.data.positions, 3));
-                if (e.data.normals.length > 0) geometry.setAttribute('normal', new THREE.BufferAttribute(e.data.normals, 3));
-                else geometry.computeVertexNormals();
-
-                const material = new THREE.MeshStandardMaterial({ 
-                    color: 0x00E5FF, roughness: 0.4, metalness: 0.1,
-                    side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1
-                });
-
-                currentMesh = new THREE.Mesh(geometry, material);
+            document.getElementById('loader').style.display = 'none';
+            if(data.success) {
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute('position', new THREE.BufferAttribute(data.v, 3)); 
+                geom.setAttribute('normal', new THREE.BufferAttribute(data.n, 3));
+                geom.computeBoundingBox();
                 
-                const edges = new THREE.EdgesGeometry(geometry);
-                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 }));
-                currentMesh.add(line);
-
+                if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
+                
+                currentMesh = new THREE.Mesh(geom, materials[matIndex]);
+                const center = new THREE.Vector3(); geom.boundingBox.getCenter(center);
+                currentMesh.position.sub(center); 
+                
+                const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
+                currentMesh.position.y += size.y / 2; 
                 scene.add(currentMesh);
-                log("<span class='log-success'>✓ Malla generada en " + e.data.time + "ms</span>");
-                document.getElementById('loader').style.display = 'none';
+                
+                document.getElementById('geo-x').innerText = size.x.toFixed(2) + " mm";
+                document.getElementById('geo-y').innerText = size.y.toFixed(2) + " mm";
+                document.getElementById('geo-z').innerText = size.z.toFixed(2) + " mm";
+                document.getElementById('geo-poly').innerText = (data.v.length / 3).toString();
+                document.getElementById('geo-time').innerText = Math.round(performance.now() - t0) + " ms";
 
-                // --- GANCHO AÑADIDO: EXPORTACIÓN HD ---
+                // --- GANCHO AÑADIDO: EXPORTACIÓN HD AUTOMÁTICA ---
                 if (window.IS_EXPORTING_HD) {
                     setTimeout(() => {
-                        exportSTL();
+                        exportFile('stl');
                         window.IS_EXPORTING_HD = false;
                         window.NEXUS_HD_EXPORT = false;
-                        log("<span class='log-success'>> Guardado HD Completado. Restaurando LOD...</span>");
+                        log("<span class='log-ok'>> Exportación HD procesada. Volviendo a LOD base...</span>");
                         executeCSGCode(lastCode); 
                     }, 500);
                 }
 
             } else {
-                log("<span class='log-error'>❌ ERROR: " + e.data.message + "</span>");
-                // Aseguramos que el loader se oculte si el código del usuario tiene un error
-                document.getElementById('loader').style.display = 'none';
+                log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
+                document.getElementById('console').style.display = 'block';
             }
         };
 
-        // --- SISTEMA ORIGINAL COMPLEMENTADO CON INYECCIÓN ---
+        // --- SISTEMA ORIGINAL COMPLEMENTADO CON LOD Y FILLET ---
         function executeCSGCode(rawCode) {
-            if (!rawCode) return;
-            document.getElementById('loader').style.display = 'block';
+            if (isImportingSTL) return; 
             
             let optimizedCode = rawCode;
             let currentSlices = window.NEXUS_HD_EXPORT ? 128 : 24;
 
             if (window.NEXUS_HD_EXPORT) {
                 optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 128');
-                log("<span class='log-warn'>> 💎 Renderizando HD (128 slices)...</span>");
+                document.getElementById('loader-txt').innerText = "RENDERIZANDO HD (128 SLICES)...";
+                log("<span class='log-warn'>> 💎 Forzando renderizado en Alta Resolución...</span>");
             } else {
                 optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 24');
+                document.getElementById('loader-txt').innerText = "WORKER PROCESANDO BOLEANAS...";
             }
 
-            // Inyección segura en texto plano para evitar que el Worker falle al parsear
+            // Inyectamos roundedBox antes del main
             let filletHelper = "\nfunction roundedBox(w, d, h, r) {\n" +
                 "var res = " + currentSlices + ";\n" +
                 "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
@@ -216,60 +295,66 @@
             
             optimizedCode = optimizedCode.replace("function main() {", "function main() {" + filletHelper);
 
-            worker.postMessage({ type: 'process_csg', code: optimizedCode });
-        }
-
-        // --- FUNCIÓN AÑADIDA PARA ACTIVAR HD ---
-        function triggerHDExport() {
-            if(!lastCode) { alert("No hay geometría para exportar."); return; }
-            window.IS_EXPORTING_HD = true;
-            window.NEXUS_HD_EXPORT = true;
-            executeCSGCode(lastCode); 
-        }
-
-        // --- FUNCIONES ORIGINALES INTACTAS ---
-        function exportSTL() {
-            if (!currentMesh) { alert("No hay malla para exportar"); return; }
-            const exporter = new THREE.STLExporter();
-            const stlString = exporter.parse(scene);
-            const blob = new Blob([stlString], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'nexus_part_' + Date.now() + '.stl';
-            link.click();
-            URL.revokeObjectURL(url);
+            document.getElementById('loader').style.display = 'flex';
+            t0 = performance.now(); 
+            csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
         }
 
         function loadAndSendSTL(url) {
             isImportingSTL = true;
-            document.getElementById('loader').style.display = 'block';
-            log(">> Descargando STL inyectado...");
+            document.getElementById('loader-txt').innerText = "DESCARGANDO STL LOCAL...";
+            document.getElementById('loader').style.display = 'flex';
             
             const loader = new THREE.STLLoader();
             loader.load(url, function (geometry) {
-                log(">> STL cargado. Convirtiendo a polígonos CSG...");
-                const pos = geometry.attributes.position.array;
-                const polygons = [];
-                
-                for(let i=0; i<pos.length; i+=9) {
-                    polygons.push({
-                        vertices: [
-                            {pos: {x: pos[i], y: pos[i+1], z: pos[i+2]}},
-                            {pos: {x: pos[i+3], y: pos[i+4], z: pos[i+5]}},
-                            {pos: {x: pos[i+6], y: pos[i+7], z: pos[i+8]}}
-                        ]
-                    });
-                }
-                
-                log(">> Enviando " + polygons.length + " polígonos al Worker...");
-                worker.postMessage({ type: 'load_stl', polygons: polygons });
-
+                document.getElementById('loader-txt').innerText = "TRIANGULIZANDO A NODO CSG...";
+                csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array });
             }, undefined, function (error) {
-                log("<span class='log-error'>❌ Error al cargar STL: " + error + "</span>");
-                isImportingSTL = false;
-                document.getElementById('loader').style.display = 'none';
+                log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>");
+                isImportingSTL = false; document.getElementById('loader').style.display = 'none';
             });
+        }
+
+        // --- EXPORT AND NATIVE SAVE ---
+        function exportFile(format) {
+            if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
+            document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + "...";
+            document.getElementById('loader').style.display = 'flex';
+            
+            setTimeout(() => {
+                let dataString = ""; let ext = "";
+                let pos = currentMesh.geometry.attributes.position.array;
+                let nor = currentMesh.geometry.attributes.normal.array;
+
+                if (format === 'stl') {
+                    ext = ".stl"; dataString = "solid nexus_export\n";
+                    for(let i=0; i<pos.length; i+=9) {
+                        dataString += "facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n  outer loop\n";
+                        dataString += "    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n  endloop\nendfacet\n";
+                    }
+                    dataString += "endsolid nexus_export\n";
+                } else if (format === 'obj') {
+                    ext = ".obj"; dataString = "# NEXUS CAD Export\n";
+                    for(let i=0; i<pos.length; i+=3) dataString += "v " + pos[i] + " " + pos[i+1] + " " + pos[i+2] + "\n";
+                    for(let i=0; i<nor.length; i+=3) dataString += "vn " + nor[i] + " " + nor[i+1] + " " + nor[i+2] + "\n";
+                    for(let i=1; i<=(pos.length/3); i+=3) dataString += "f " + i + "//" + i + " " + (i+1) + "//" + (i+1) + " " + (i+2) + "//" + (i+2) + "\n";
+                }
+
+                let filename = "nexus_model_" + Math.floor(Date.now()/1000) + ext;
+                
+                fetch(window.location.origin + '/api/save_export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename, data: dataString })
+                }).then(r => r.json()).then(res => {
+                    log("<span class='log-ok'>> ¡" + format.toUpperCase() + " GUARDADO EN LA PESTAÑA DB!</span>");
+                    document.getElementById('console').style.display = 'block';
+                    try {
+                        let blob = new Blob([dataString], {type: 'text/plain'});
+                        let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+                    } catch(e) {}
+                }).catch(err => log("<span class='log-err'>> Error exportación: " + err + "</span>")).finally(() => document.getElementById('loader').style.display = 'none');
+            }, 100);
         }
 
         // --- POLLING LOCALHOST ---

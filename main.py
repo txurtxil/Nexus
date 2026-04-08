@@ -34,7 +34,7 @@ def get_android_root():
 ANDROID_ROOT = get_android_root()
 
 # =========================================================
-# GLOBALES DE ESTADO (IA v21.1)
+# GLOBALES DE ESTADO (IA v21.2)
 # =========================================================
 LAN_IP = "127.0.0.1"
 INTERNAL_IP = "127.0.0.1" 
@@ -46,6 +46,7 @@ LATEST_NEEDS_STL = False
 INJECTED_CODE_IA = "" 
 VISION_B64 = ""
 LAST_ERROR_LOG = ""
+AGENTIC_PAYLOAD = None  # <-- NUEVO: Canal de comunicación para Agentic UI
 
 MAX_ASSEMBLY_PARTS = 10
 ASSEMBLY_PARTS_STATE = [{"active": False, "file": "", "mat": "pla", "x": 0, "y": 0, "z": 0} for _ in range(MAX_ASSEMBLY_PARTS)]
@@ -166,7 +167,7 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        global VISION_B64, INJECTED_CODE_IA, LAST_ERROR_LOG
+        global VISION_B64, INJECTED_CODE_IA, LAST_ERROR_LOG, AGENTIC_PAYLOAD
         
         if parsed.path == '/api/report_error':
             cl = int(self.headers.get('Content-Length', 0))
@@ -191,6 +192,20 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 data = json.loads(self.rfile.read(cl).decode('utf-8'))
                 INJECTED_CODE_IA = data.get('code', '')
                 self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok')
+            return
+
+        # --- AÑADIDO: Endpoint para AGENTIC UI ---
+        elif parsed.path == '/api/agentic_ui':
+            cl = int(self.headers.get('Content-Length', 0))
+            if cl > 0:
+                try:
+                    data = json.loads(self.rfile.read(cl).decode('utf-8'))
+                    AGENTIC_PAYLOAD = data # Se pasa al hilo de Flet
+                    self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'{"status":"ok"}')
+                    return
+                except Exception as e:
+                    print(f"Error parseando Agentic UI: {e}")
+            self.send_response(500); self._send_cors(); self.end_headers()
             return
 
         elif parsed.path == '/api/upload_raw':
@@ -353,12 +368,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v21.1 TITAN PRO"
+        page.title = "NEXUS CAD v21.2 TITAN PRO"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v21.1 TITAN | Motor IA Multi-Agente Activo", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v21.2 TITAN | Motor IA Multi-Agente Activo", color="#00E676", weight="bold")
 
         def custom_icon_btn(text, action, tooltip_txt): 
             return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
@@ -369,9 +384,11 @@ def main(page: ft.Page):
         ensamble_stack = []; herramienta_actual = "custom"; modo_ensamble = False
 
         def check_ia_injection():
-            global INJECTED_CODE_IA
+            global INJECTED_CODE_IA, AGENTIC_PAYLOAD
             while True:
                 time.sleep(1)
+                
+                # Revisa Inyección de Código (Modo Copiloto)
                 if INJECTED_CODE_IA:
                     txt_code.value = INJECTED_CODE_IA
                     INJECTED_CODE_IA = ""
@@ -379,6 +396,37 @@ def main(page: ft.Page):
                     status.value = "✓ Código de IA recibido e inyectado con éxito."
                     status.color = "#B388FF"
                     page.update()
+                
+                # --- AÑADIDO: Revisa Movimiento de Sliders (Modo Agentic) ---
+                if AGENTIC_PAYLOAD is not None:
+                    try:
+                        payload = AGENTIC_PAYLOAD
+                        AGENTIC_PAYLOAD = None # Limpiamos para no repetir
+                        
+                        tool_name = payload.get("tool", "gear")
+                        params = payload.get("params", {})
+                        
+                        # 1. Selecciona la herramienta visualmente
+                        select_tool(tool_name)
+                        
+                        # 2. Asigna valores a los sliders si existen
+                        for key, val in params.items():
+                            slider_name = f"sl_{key}"
+                            if hasattr(tools_lib, slider_name):
+                                slider_obj = getattr(tools_lib, slider_name)
+                                slider_obj.value = float(val)
+                        
+                        # 3. Forzar generador de código
+                        update_code_wrapper(None)
+                        
+                        # 4. Renderizar y mover usuario a la pestaña 3D
+                        run_render()
+                        
+                        status.value = "🎛️ AGENTIC UI: Interfaz ajustada automáticamente."
+                        status.color = "#00E676"
+                        page.update()
+                    except Exception as e:
+                        print(f"Error procesando el Agentic Payload: {e}")
                     
         threading.Thread(target=check_ia_injection, daemon=True).start()
 
@@ -500,7 +548,6 @@ def main(page: ft.Page):
         tools_lib = nexus_ui_tools.NexusTools(create_slider, update_code_wrapper, set_tab_wrapper, select_tool)
 
         def generate_param_code():
-            # <--- AÑADIDO: Recarga dinámica de módulos (Hot Reload)
             try:
                 importlib.reload(param_generators)
             except Exception as e:
@@ -737,7 +784,7 @@ def main(page: ft.Page):
         ], expand=True, scroll="auto")
 
         view_ia = ft.Column([
-            ft.Container(height=30), ft.Text("🤖 MOTOR IA VISUAL v21.1", size=24, color="#B388FF", weight="bold", text_align="center"), ft.Text("Ingeniería Paramétrica y Auto-Fix de Código.", color="#E6EDF3", text_align="center"), ft.Container(height=30), ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')), ft.Container(height=20), ft.Text("💡 El análisis 3D y los errores de código se envían aquí directamente.", color="#8B949E", size=12, text_align="center")
+            ft.Container(height=30), ft.Text("🤖 MOTOR IA MULTI-AGENTE v21.2", size=24, color="#B388FF", weight="bold", text_align="center"), ft.Text("Ingeniería Paramétrica y Control Total.", color="#E6EDF3", text_align="center"), ft.Container(height=30), ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')), ft.Container(height=20), ft.Text("💡 El análisis 3D y las inyecciones Agentic ocurren en segundo plano.", color="#8B949E", size=12, text_align="center")
         ], expand=True, horizontal_alignment="center")
 
         main_container = ft.Container(content=view_editor, expand=True)

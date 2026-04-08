@@ -157,3 +157,6 @@ git push origin main
 
 # para subir a github y compilar directamente:
  subir "Nexus version xxx..."
+
+# Cambio en README.md, para sincronizar:
+git pull

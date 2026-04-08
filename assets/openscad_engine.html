@@ -80,7 +80,6 @@
     <script type="module">
         import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/VRButton.js';
 
-        // VARIABLES DE SISTEMA HD EXPORT AÑADIDAS AL SCOPE DEL MODULO
         window.NEXUS_HD_EXPORT = false;
         window.IS_EXPORTING_HD = false;
 
@@ -90,7 +89,6 @@
         window.toggleConsole = () => { const c = document.getElementById('console'); c.style.display = c.style.display === 'none' || c.style.display === '' ? 'block' : 'none'; };
         window.exportFile = exportFile;
 
-        // NUEVA FUNCIÓN EXPUESTA AL WINDOW
         window.triggerHDExport = () => {
             if(!lastCode) { log("<span class='log-err'>No hay geometría para exportar.</span>"); document.getElementById('console').style.display = 'block'; return; }
             window.IS_EXPORTING_HD = true;
@@ -246,7 +244,6 @@
                 document.getElementById('geo-poly').innerText = (data.v.length / 3).toString();
                 document.getElementById('geo-time').innerText = Math.round(performance.now() - t0) + " ms";
 
-                // --- GANCHO AÑADIDO: EXPORTACIÓN HD AUTOMÁTICA ---
                 if (window.IS_EXPORTING_HD) {
                     setTimeout(() => {
                         exportFile('stl');
@@ -263,7 +260,6 @@
             }
         };
 
-        // --- SISTEMA ORIGINAL COMPLEMENTADO CON LOD Y FILLET ---
         function executeCSGCode(rawCode) {
             if (isImportingSTL) return; 
             
@@ -279,8 +275,8 @@
                 document.getElementById('loader-txt').innerText = "WORKER PROCESANDO BOLEANAS...";
             }
 
-            // Inyectamos roundedBox antes del main
-            let filletHelper = "\nfunction roundedBox(w, d, h, r) {\n" +
+            // CORRECCIÓN VITAL: Inyectar roundedBox al INICIO absoluto del script como función global
+            let filletHelper = "function roundedBox(w, d, h, r) {\n" +
                 "var res = " + currentSlices + ";\n" +
                 "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
                 "if(r<=0) return CSG.cube({radius:[w/2, d/2, h/2]});\n" +
@@ -291,9 +287,10 @@
                 "var c3 = CSG.cylinder({start:[w/2-r, -d/2+r, -h/2], end:[w/2-r, -d/2+r, h/2], radius:r, slices:res});\n" +
                 "var c4 = CSG.cylinder({start:[-w/2+r, -d/2+r, -h/2], end:[-w/2+r, -d/2+r, h/2], radius:r, slices:res});\n" +
                 "return b1.union([b2, c1, c2, c3, c4]);\n" +
-            "}\n";
+            "}\n\n";
             
-            optimizedCode = optimizedCode.replace("function main() {", "function main() {" + filletHelper);
+            // Simplemente concatenamos el helper arriba de tu código
+            optimizedCode = filletHelper + optimizedCode;
 
             document.getElementById('loader').style.display = 'flex';
             t0 = performance.now(); 
@@ -315,7 +312,6 @@
             });
         }
 
-        // --- EXPORT AND NATIVE SAVE ---
         function exportFile(format) {
             if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
             document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + "...";
@@ -357,7 +353,6 @@
             }, 100);
         }
 
-        // --- POLLING LOCALHOST ---
         let lastCode = "";
         let currentStlHash = "";
 

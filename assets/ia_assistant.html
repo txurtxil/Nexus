@@ -3,147 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v21.1 - TRIPLE POWER</title>
+    <title>NEXUS AI v21.2 - TITAN ENGINE</title>
     <style>
-        body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #00E5FF; }
-        .header h2 { margin: 0; color: #00E5FF; font-size: 18px; }
-        .content { padding: 15px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        label { font-size: 11px; color: #8B949E; font-weight: bold; }
-        input, select, textarea { width: 100%; padding: 10px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 5px; outline: none; font-size: 13px; }
-        textarea { height: 100px; font-family: monospace; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .btn { border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; color: white; font-size: 12px; }
-        .blue { background: #0277BD; } .purple { background: #8E24AA; } .green { background: #00E676; color: black; }
-        #visionContainer { display: none; background: #161B22; padding: 10px; border-radius: 8px; border: 1px dashed #00E5FF; text-align: center; position: relative; }
-        #visionPreview { max-width: 100%; max-height: 150px; border-radius: 5px; }
-        .loader { display: none; text-align: center; color: #00E5FF; font-size: 12px; margin: 10px 0; }
+        body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #B388FF; }
+        .header h2 { margin: 0; color: #B388FF; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+        .content { padding: 15px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        label { font-size: 11px; color: #8B949E; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+        input, select, textarea { width: 100%; padding: 12px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 6px; outline: none; font-size: 13px; box-sizing: border-box; transition: border-color 0.2s; }
+        input:focus, textarea:focus { border-color: #B388FF; }
+        textarea { height: 100px; font-family: monospace; resize: vertical; }
+        button { background-color: #B388FF; color: #0B0E14; border: none; padding: 14px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        button:hover { background-color: #9575CD; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); }
+        .btn-inject { background-color: #00E676; margin-top: 5px;}
+        .btn-inject:hover { background-color: #00C853; }
+        #loader { display: none; text-align: center; color: #B388FF; font-size: 12px; font-style: italic; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>👁️ NEXUS AI v21.1 (Gemini 3 Flash Core)</h2>
+    <h2>🤖 Nexus Titan AI</h2>
 </div>
 
 <div class="content">
-    <div id="visionContainer">
-        <label>📷 IMAGEN DETECTADA (Logo o Pieza)</label>
-        <img id="visionPreview" src="">
-        <button onclick="clearVision()" style="position:absolute; top:5px; right:5px; background:red; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer;">X</button>
+    <div>
+        <label>API Key (Google Gemini):</label>
+        <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
     </div>
+    
+    <div>
+        <label>Instrucción para la IA:</label>
+        <textarea id="promptInput" placeholder="Ej: Crea una caja hueca de 20x20x10 con paredes de 2mm de grosor..."></textarea>
+    </div>
+
+    <button onclick="generateCode()">⚡ Generar Código CSG</button>
+    <div id="loader">Ensamblando geometría neuronal... Por favor espera.</div>
 
     <div>
-        <label>🔑 API KEY GEMINI (v3 / v2.5)</label>
-        <input type="password" id="apiKey" placeholder="Pega tu clave AIzaSy... aquí">
+        <label>Código JS-CSG Generado (Editable):</label>
+        <textarea id="codeOutput" style="height: 180px; color: #00E676;"></textarea>
     </div>
 
-    <div>
-        <label>📝 PROMPT / LOGO / ERROR</label>
-        <textarea id="promptInput" placeholder="Describe una pieza, pide ensamblar objetos, o recibe auto-errores del visor aquí..."></textarea>
-    </div>
-
-    <div class="btn-group">
-        <button class="btn blue" onclick="process('code')">🛠️ GEN/FIX CÓDIGO</button>
-        <button class="btn purple" onclick="process('vision')">🔍 ANALIZAR VISIÓN</button>
-    </div>
-
-    <div class="loader" id="loader">Gemini 3 está pensando... ⏳</div>
-
-    <div>
-        <label>💻 RESULTADO DE LA IA</label>
-        <textarea id="codeOutput" style="height: 180px;"></textarea>
-    </div>
-
-    <button class="btn green" style="width:100%" onclick="inject()">🚀 INYECTAR A NEXUS</button>
+    <button class="btn-inject" id="btnInject" onclick="inject()">⚙️ Inyectar al Motor 3D</button>
 </div>
 
 <script>
-    document.getElementById('apiKey').value = localStorage.getItem('nexus_api_key') || '';
-    let currentVisionB64 = "";
+    // Recuperar API Key guardada automáticamente al iniciar
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedKey = localStorage.getItem('nexus_gemini_key');
+        if(savedKey) document.getElementById('apiKey').value = savedKey;
+    });
 
-    async function checkDataBridge() {
-        try {
-            const res = await fetch('/api/get_vision.json');
-            const data = await res.json();
-            
-            if (data.image_b64) {
-                currentVisionB64 = data.image_b64.split(',')[1];
-                document.getElementById('visionPreview').src = data.image_b64;
-                document.getElementById('visionContainer').style.display = 'block';
-            }
-            
-            if (data.last_error && data.last_error.trim() !== "") {
-                const promptBox = document.getElementById('promptInput');
-                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido que solucione esto.";
-            }
-        } catch(e) {}
-    }
-    
-    window.onload = checkDataBridge;
-    window.onfocus = checkDataBridge;
-
-    function clearVision() { currentVisionB64 = ""; document.getElementById('visionContainer').style.display = 'none'; }
-
-    async function process(mode) {
+    async function generateCode() {
         const key = document.getElementById('apiKey').value.trim();
         const prompt = document.getElementById('promptInput').value.trim();
-        if(!key) return alert("Falta API Key de Gemini");
-        localStorage.setItem('nexus_api_key', key);
-        document.getElementById('loader').style.display = 'block';
-        document.getElementById('codeOutput').value = '';
-
-        let sysPrompt = "Eres un ingeniero experto en diseño paramétrico 3D OpenJSCAD (JS-CSG).\n";
-        sysPrompt += "REGLAS:\n1. Usa primitivas: CSG.cube, CSG.cylinder, CSG.sphere, CSG.polygon.\n2. Operaciones: .union(), .subtract(), .intersect().\n3. Retorna 'return UTILS.mat(objeto);'.\n4. Solo código JS. Sin texto markdown.\n";
         
-        if(mode === 'code') {
-            sysPrompt += "Si el usuario te envía un error de consola, corrige su código subyacente. Si pide un ensamblaje, genera múltiples variables y únelas.";
-        } else {
-            sysPrompt += "Si el usuario adjunta un logo 2D: Devuelve código con un CSG.polygon() y extruyelo. Si es una pieza 3D: Realiza un informe de análisis de estrés mecánico.";
+        if(!key || !prompt) { 
+            alert("⚠️ Faltan datos: Asegúrate de ingresar tu API Key y una instrucción."); 
+            return; 
         }
+        
+        // Guardar la key en el dispositivo para futuras sesiones
+        localStorage.setItem('nexus_gemini_key', key);
+        
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('codeOutput').value = "";
+
+        // --- EL CEREBRO DE LA OPERACIÓN: SYSTEM PROMPT ---
+        const systemInstruction = `Eres NEXUS TITAN AI, un desarrollador experto en geometría paramétrica 3D usando la librería JavaScript CSG.js (Constructive Solid Geometry).
+Tu ÚNICO objetivo es devolver código JavaScript puro. NO uses bloques de markdown (\`\`\`javascript). NO des explicaciones.
+El código debe contener una única función global llamada 'main()' que retorne un objeto CSG válido.
+Las primitivas disponibles son:
+- CSG.cube({center: [x,y,z], radius: [x,y,z]}) o {radius: [x,y,z]} asumiendo centro en origen.
+- CSG.cylinder({start: [x,y,z], end: [x,y,z], radius: r})
+- CSG.sphere({center: [x,y,z], radius: r})
+Operaciones booleanas: .union(obj), .subtract(obj), .intersect(obj).
+Genera ahora el código exacto para cumplir esta petición: `;
 
         try {
-            const parts = [{ text: sysPrompt + "\n\nSolicitud del usuario: " + prompt }];
-            if(currentVisionB64) parts.push({ inlineData: { mimeType: "image/jpeg", data: currentVisionB64 } });
-
-            // NUEVO ENDPOINT ACTUALIZADO A 2026: gemini-3-flash-preview (o 2.5-flash)
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${key}`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ contents: [{ parts }] })
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: systemInstruction + "\\n\\n" + prompt }] }] 
+                })
             });
+            
             const data = await res.json();
             
-            if(data.error) {
-                // Si el modelo 3 falla por alguna razón de despliegue local, hacemos fallback al 2.5-flash
-                if(data.error.code === 404 || data.error.message.includes("not found")) {
-                    console.log("Fallback a gemini-2.5-flash");
-                    const resFb = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ contents: [{ parts }] })
-                    });
-                    const dataFb = await resFb.json();
-                    if(dataFb.error) throw new Error(dataFb.error.message);
-                    data.candidates = dataFb.candidates;
-                } else {
-                    throw new Error(data.error.message);
-                }
+            if(!res.ok) {
+                throw new Error(data.error?.message || "Error en la respuesta de Google.");
             }
             
             let text = data.candidates[0].content.parts[0].text;
-            if(text.includes("```")) text = text.split("```")[1].replace(/^javascript/i, "").replace(/^js/i, "").trim();
+            
+            // Limpieza robusta por si la IA devuelve Markdown
+            text = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
+            
             document.getElementById('codeOutput').value = text;
         } catch(e) { 
-            alert("Error de API: " + e.message); 
-            document.getElementById('codeOutput').value = "ERROR DETALLADO:\n" + e.message;
+            console.error(e);
+            alert("Error de Conexión o API: " + e.message); 
+            document.getElementById('codeOutput').value = "// ERROR DETALLADO:\\n// " + e.message;
+        } finally {
+            document.getElementById('loader').style.display = 'none';
         }
-        document.getElementById('loader').style.display = 'none';
     }
 
     async function inject() {
         const code = document.getElementById('codeOutput').value.trim();
-        if(!code) return;
-        await fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code }) });
-        alert("✓ Código Inyectado. Cierra y vuelve a la App.");
+        const btn = document.getElementById('btnInject');
+        
+        if(!code) { 
+            alert("No hay código generado para inyectar."); 
+            return; 
+        }
+        
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "⏳ Inyectando...";
+        
+        try {
+            const response = await fetch('/api/inject_code', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ code }) 
+            });
+            
+            if(response.ok) {
+                btn.innerHTML = "✅ INYECCIÓN EXITOSA";
+                btn.style.backgroundColor = "#2E7D32"; // Verde oscuro
+            } else {
+                throw new Error("El backend Python rechazó la conexión.");
+            }
+        } catch (error) {
+            alert("Error de red: " + error.message + "\\n¿Está corriendo Python (main.py)?");
+            btn.innerHTML = "❌ ERROR";
+            btn.style.backgroundColor = "#D50000";
+        } finally {
+            // Restaurar botón después de 2.5 segundos
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.backgroundColor = ""; // Vuelve a la clase CSS
+            }, 2500);
+        }
     }
 </script>
 </body>

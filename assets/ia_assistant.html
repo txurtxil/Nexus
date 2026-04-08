@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v21.2 - TITAN ENGINE</title>
+    <title>NEXUS AI v21.2 - GEMINI 3.1 ENGINE</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #B388FF; }
@@ -24,7 +24,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus Titan AI</h2>
+    <h2>🤖 Nexus Titan AI (Gemini 3.1)</h2>
 </div>
 
 <div class="content">
@@ -39,7 +39,7 @@
     </div>
 
     <button onclick="generateCode()">⚡ Generar Código CSG</button>
-    <div id="loader">Ensamblando geometría neuronal... Por favor espera.</div>
+    <div id="loader">Conectando con Gemini 3.1 Flash Lite... Por favor espera.</div>
 
     <div>
         <label>Código JS-CSG Generado (Editable):</label>
@@ -83,7 +83,8 @@ Operaciones booleanas: .union(obj), .subtract(obj), .intersect(obj).
 Genera ahora el código exacto para cumplir esta petición: `;
 
         try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+            // ACTUALIZADO AL MODELO MÁS RÁPIDO DE LA VERSIÓN 3.1
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`, {
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ 
@@ -133,7 +134,7 @@ Genera ahora el código exacto para cumplir esta petición: `;
             
             if(response.ok) {
                 btn.innerHTML = "✅ INYECCIÓN EXITOSA";
-                btn.style.backgroundColor = "#2E7D32"; // Verde oscuro
+                btn.style.backgroundColor = "#2E7D32";
             } else {
                 throw new Error("El backend Python rechazó la conexión.");
             }
@@ -142,10 +143,9 @@ Genera ahora el código exacto para cumplir esta petición: `;
             btn.innerHTML = "❌ ERROR";
             btn.style.backgroundColor = "#D50000";
         } finally {
-            // Restaurar botón después de 2.5 segundos
             setTimeout(() => {
                 btn.innerHTML = originalText;
-                btn.style.backgroundColor = ""; // Vuelve a la clase CSS
+                btn.style.backgroundColor = ""; 
             }, 2500);
         }
     }

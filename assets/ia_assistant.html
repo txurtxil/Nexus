@@ -2,153 +2,342 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v21.2 - GEMINI 3.1 ENGINE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEXUS CAD PRO - Motor Web Worker & Híbrido STL</title>
     <style>
-        body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #B388FF; }
-        .header h2 { margin: 0; color: #B388FF; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-        .content { padding: 15px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        label { font-size: 11px; color: #8B949E; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-        input, select, textarea { width: 100%; padding: 12px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 6px; outline: none; font-size: 13px; box-sizing: border-box; transition: border-color 0.2s; }
-        input:focus, textarea:focus { border-color: #B388FF; }
-        textarea { height: 100px; font-family: monospace; resize: vertical; }
-        button { background-color: #B388FF; color: #0B0E14; border: none; padding: 14px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-        button:hover { background-color: #9575CD; transform: translateY(-1px); }
-        button:active { transform: translateY(1px); }
-        .btn-inject { background-color: #00E676; margin-top: 5px;}
-        .btn-inject:hover { background-color: #00C853; }
-        #loader { display: none; text-align: center; color: #B388FF; font-size: 12px; font-style: italic; margin-top: 5px; }
+        :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
+        body { margin: 0; overflow: hidden; background-color: #0B0E14; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        
+        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; width: 140px; }
+        .btn { background: #21262D; border: 1px solid var(--nexus-border); color: #fff; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-transform: uppercase; text-align: left; display: flex; justify-content: space-between; transition: all 0.2s; }
+        .btn:hover { background: #30363D; }
+        .btn:active { transform: scale(0.95); }
+        
+        #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); }
+        .hud-section-title { color: var(--nexus-cyan); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--nexus-border); letter-spacing: 1px; }
+        .hud-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .hud-label { color: #8B949E; }
+        .hud-value { color: #fff; font-family: 'Courier New', monospace; text-align: right; }
+        .hud-value.highlight { color: var(--nexus-green); font-weight: bold; }
+        .hud-value.purple { color: var(--nexus-purple); font-weight: bold; }
+        
+        #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; }
+        .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
+        
+        #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
+        .spinner { border: 2px solid rgba(0, 229, 255, 0.2); border-top: 2px solid var(--nexus-cyan); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #VRButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; }
     </style>
+    <!-- Three.js y OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- STLLoader oficial para importaciones híbridas -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
 </head>
 <body>
 
-<div class="header">
-    <h2>🤖 Nexus Titan AI (Gemini 3.1)</h2>
-</div>
-
-<div class="content">
-    <div>
-        <label>API Key (Google Gemini):</label>
-        <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
-    </div>
+    <div id="canvas-container"></div>
     
-    <div>
-        <label>Instrucción para la IA:</label>
-        <textarea id="promptInput" placeholder="Ej: Crea una caja hueca de 20x20x10 con paredes de 2mm de grosor..."></textarea>
+    <div id="toolbar" class="nexus-panel">
+        <button class="btn" style="border-left: 3px solid #00E676;" onclick="toggleAutoRotate()">Rotar <span>🔄</span></button>
+        <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
+        <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura <span>🎨</span></button>
+        <button class="btn" style="border-left: 3px solid #D50000;" onclick="exportFile('stl')">Guardar STL <span>🧊</span></button>
+        <button class="btn" style="border-left: 3px solid #C51162;" onclick="exportFile('obj')">Guardar OBJ <span>📦</span></button>
+        <button class="btn" style="border-left: 3px solid #00B0FF;" onclick="toggleConsole()">Motor Logs <span>🖥️</span></button>
     </div>
 
-    <button onclick="generateCode()">⚡ Generar Código CSG</button>
-    <div id="loader">Conectando con Gemini 3.1 Flash Lite... Por favor espera.</div>
-
-    <div>
-        <label>Código JS-CSG Generado (Editable):</label>
-        <textarea id="codeOutput" style="height: 180px; color: #00E676;"></textarea>
+    <div id="hud-panel" class="nexus-panel">
+        <div class="hud-section-title">🔌 Telemetría Cliente</div>
+        <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
+        <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
+        <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
+        <div class="hud-row"><span class="hud-label">Batería:</span> <span class="hud-value" id="hw-bat">🔌 AC</span></div>
+        <div class="hud-row"><span class="hud-label">Red / Conexión:</span> <span class="hud-value" id="hw-net">Local</span></div>
+        <div style="height: 10px;"></div>
+        <div class="hud-section-title">📐 Análisis de Geometría</div>
+        <div class="hud-row"><span class="hud-label">Eje X (Ancho):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Eje Y (Largo):</span> <span class="hud-value" id="geo-y">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Eje Z (Alto):</span> <span class="hud-value" id="geo-z">0.00 mm</span></div>
+        <div class="hud-row"><span class="hud-label">Polígonos:</span> <span class="hud-value highlight" id="geo-poly">0</span></div>
+        <div class="hud-row"><span class="hud-label">Tiempo Render:</span> <span class="hud-value" id="geo-time">0 ms</span></div>
     </div>
 
-    <button class="btn-inject" id="btnInject" onclick="inject()">⚙️ Inyectar al Motor 3D</button>
-</div>
+    <div id="console" class="nexus-panel">
+        <div class="log-sys">> Inicializando Worker Multi-hilo...</div>
+        <div id="log-content"></div>
+    </div>
 
-<script>
-    // Recuperar API Key guardada automáticamente al iniciar
-    document.addEventListener('DOMContentLoaded', () => {
-        const savedKey = localStorage.getItem('nexus_gemini_key');
-        if(savedKey) document.getElementById('apiKey').value = savedKey;
-    });
+    <div id="loader" style="display:none;">
+        <div class="spinner"></div>
+        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold;">WORKER PROCESANDO...</div>
+    </div>
 
-    async function generateCode() {
-        const key = document.getElementById('apiKey').value.trim();
-        const prompt = document.getElementById('promptInput').value.trim();
+    <script type="module">
+        import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/VRButton.js';
+
+        window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
+        window.changeMaterial = () => { if(currentMesh) { matIndex = (matIndex + 1) % materials.length; currentMesh.material = materials[matIndex]; } };
+        window.toggleCamera = () => { camera.fov = camera.fov === 45 ? 10 : 45; camera.position.multiplyScalar(camera.fov === 10 ? 4 : 0.25); camera.updateProjectionMatrix(); };
+        window.toggleConsole = () => { const c = document.getElementById('console'); c.style.display = c.style.display === 'none' || c.style.display === '' ? 'block' : 'none'; };
+        window.exportFile = exportFile;
+
+        // HW DETECT
+        document.getElementById('hw-cpu').innerText = (navigator.hardwareConcurrency || '?') + ' Cores';
+        if (navigator.deviceMemory) document.getElementById('hw-ram').innerText = navigator.deviceMemory + ' GB+';
+        if (navigator.connection && navigator.connection.effectiveType) document.getElementById('hw-net').innerText = navigator.connection.effectiveType.toUpperCase();
         
-        if(!key || !prompt) { 
-            alert("⚠️ Faltan datos: Asegúrate de ingresar tu API Key y una instrucción."); 
-            return; 
+        if (navigator.getBattery) {
+            navigator.getBattery().then(bat => {
+                const updateBat = () => {
+                    let level = Math.round(bat.level * 100);
+                    let icon = bat.charging ? "⚡" : (level < 20 ? "🪫" : "🔋");
+                    document.getElementById('hw-bat').innerText = `${level}% ${icon}`;
+                };
+                updateBat(); bat.addEventListener('levelchange', updateBat); bat.addEventListener('chargingchange', updateBat);
+            });
         }
-        
-        // Guardar la key en el dispositivo para futuras sesiones
-        localStorage.setItem('nexus_gemini_key', key);
-        
-        document.getElementById('loader').style.display = 'block';
-        document.getElementById('codeOutput').value = "";
-
-        // --- EL CEREBRO DE LA OPERACIÓN: SYSTEM PROMPT ---
-        const systemInstruction = `Eres NEXUS TITAN AI, un desarrollador experto en geometría paramétrica 3D usando la librería JavaScript CSG.js (Constructive Solid Geometry).
-Tu ÚNICO objetivo es devolver código JavaScript puro. NO uses bloques de markdown (\`\`\`javascript). NO des explicaciones.
-El código debe contener una única función global llamada 'main()' que retorne un objeto CSG válido.
-Las primitivas disponibles son:
-- CSG.cube({center: [x,y,z], radius: [x,y,z]}) o {radius: [x,y,z]} asumiendo centro en origen.
-- CSG.cylinder({start: [x,y,z], end: [x,y,z], radius: r})
-- CSG.sphere({center: [x,y,z], radius: r})
-Operaciones booleanas: .union(obj), .subtract(obj), .intersect(obj).
-Genera ahora el código exacto para cumplir esta petición: `;
 
         try {
-            // ACTUALIZADO AL MODELO MÁS RÁPIDO DE LA VERSIÓN 3.1
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`, {
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    contents: [{ parts: [{ text: systemInstruction + "\\n\\n" + prompt }] }] 
-                })
-            });
+            const gl = document.createElement('canvas').getContext('webgl');
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            document.getElementById('hw-gpu').innerText = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).split(',')[0].replace('ANGLE (', '').substring(0, 18);
+        } catch (e) { document.getElementById('hw-gpu').innerText = "Bloqueado/Oculto"; }
+
+        function log(msg) {
+            const div = document.getElementById('log-content');
+            div.innerHTML += `<div>${msg}</div>`; div.parentElement.scrollTop = div.parentElement.scrollHeight;
+        }
+
+        // --- 3D SCENE & VR ---
+        let scene, camera, renderer, controls, currentMesh = null;
+        let matIndex = 0;
+        const materials = [
+            new THREE.MeshStandardMaterial({ color: 0xFFAB00, roughness: 0.3, metalness: 0.9 }), 
+            new THREE.MeshStandardMaterial({ color: 0x00E5FF, roughness: 0.2, metalness: 0.8 }), 
+            new THREE.MeshNormalMaterial(), 
+            new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }), 
+            new THREE.MeshStandardMaterial({ color: 0x1A1A1A, roughness: 0.8, metalness: 0.1 })  
+        ];
+
+        function initWebGL() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene(); 
+            const grid = new THREE.GridHelper(400, 80, 0x30363D, 0x161B22); grid.position.y = -0.5; scene.add(grid);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(50, 100, 50); scene.add(dl);
+            const bl = new THREE.DirectionalLight(0xB388FF, 0.5); bl.position.set(-50, 50, -50); scene.add(bl); 
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000); camera.position.set(80, 50, 80);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true; document.body.appendChild( VRButton.createButton( renderer ) );
+            container.appendChild(renderer.domElement);
+            controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+            renderer.setAnimationLoop( function () { controls.update(); renderer.render(scene, camera); });
+        }
+
+        // --- WORKER JS-CSG (AHORA SOPORTA IMPORTACIÓN) ---
+        const workerCode = `
+            importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
+            CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
+            CSG.prototype.scale = function(v) { if(typeof v === 'number') v = [v,v,v]; return this.transform(CSG.Matrix4x4.scaling(v)); };
+            CSG.prototype.rotateX = function(deg) { return this.transform(CSG.Matrix4x4.rotationX(deg)); };
+            CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
+            CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             
-            const data = await res.json();
+            // Variable Global inyectada en el worker
+            let IMPORTED_STL = CSG.cube({radius:[0.01, 0.01, 0.01]});
+
+            self.onmessage = function(e) {
+                if (e.data.type === 'set_import') {
+                    try {
+                        let pos = e.data.positions; let polys = [];
+                        // Convertir Float32Array de ThreeJS (triángulos crudos) a polígonos CSG
+                        for(let i=0; i<pos.length; i+=9) {
+                            let v1 = new CSG.Vertex(new CSG.Vector(pos[i], pos[i+1], pos[i+2]), new CSG.Vector(0,0,1));
+                            let v2 = new CSG.Vertex(new CSG.Vector(pos[i+3], pos[i+4], pos[i+5]), new CSG.Vector(0,0,1));
+                            let v3 = new CSG.Vertex(new CSG.Vector(pos[i+6], pos[i+7], pos[i+8]), new CSG.Vector(0,0,1));
+                            polys.push(new CSG.Polygon([v1, v2, v3])); // CSG.Polygon auto-calcula el plano y normal de cara
+                        }
+                        IMPORTED_STL = CSG.fromPolygons(polys);
+                        self.postMessage({ success: true, is_import: true });
+                    } catch(err) {
+                        self.postMessage({ success: false, is_import: true, err: err.message });
+                    }
+                } 
+                else if (e.data.type === 'eval') {
+                    try {
+                        let fn = new Function("IMPORTED_STL", e.data.code + "\\nreturn main();");
+                        let csgResult = fn(IMPORTED_STL);
+                        if (!csgResult || typeof csgResult.toPolygons !== 'function') throw new Error("Objeto no válido o vacío");
+                        
+                        let polys = csgResult.toPolygons(); let numTriangles = 0;
+                        for(let i=0; i<polys.length; i++) numTriangles += (polys[i].vertices.length - 2);
+                        let v = new Float32Array(numTriangles * 9); let n = new Float32Array(numTriangles * 9); let idx = 0;
+                        
+                        for (let i = 0; i < polys.length; i++) {
+                            let poly = polys[i];
+                            let norm = poly.plane.normal; // Usar la normal del plano para shading impecable
+                            for (let j = 2; j < poly.vertices.length; j++) {
+                                let v0 = poly.vertices[0], v1 = poly.vertices[j - 1], v2 = poly.vertices[j];
+                                v[idx]=v0.pos.x; v[idx+1]=v0.pos.y; v[idx+2]=v0.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                                v[idx]=v1.pos.x; v[idx+1]=v1.pos.y; v[idx+2]=v1.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                                v[idx]=v2.pos.x; v[idx+1]=v2.pos.y; v[idx+2]=v2.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                            }
+                        }
+                        self.postMessage({ success: true, v: v, n: n }, [v.buffer, n.buffer]);
+                    } catch(err) { self.postMessage({ success: false, err: err.message }); }
+                }
+            };
+        `;
+        const csgWorker = new Worker(URL.createObjectURL(new Blob([workerCode], {type: 'application/javascript'})));
+        let t0 = 0;
+        let isImportingSTL = false;
+
+        csgWorker.onmessage = function(e) {
+            const data = e.data;
             
-            if(!res.ok) {
-                throw new Error(data.error?.message || "Error en la respuesta de Google.");
+            // Interceptar respuesta de importación
+            if (data.is_import) {
+                isImportingSTL = false;
+                if(data.success) {
+                    log("<span class='log-ok'>> Módulo Híbrido: STL importado, indexado y listo en memoria.</span>");
+                    if (lastCode !== "") executeCSGCode(lastCode); // Re-evaluar con el nuevo STL
+                } else {
+                    log("<span class='log-err'>> WORKER ERROR (STL Import): " + data.err + "</span>"); document.getElementById('console').style.display = 'block';
+                    document.getElementById('loader').style.display = 'none';
+                }
+                return;
             }
-            
-            let text = data.candidates[0].content.parts[0].text;
-            
-            // Limpieza robusta por si la IA devuelve Markdown
-            text = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
-            
-            document.getElementById('codeOutput').value = text;
-        } catch(e) { 
-            console.error(e);
-            alert("Error de Conexión o API: " + e.message); 
-            document.getElementById('codeOutput').value = "// ERROR DETALLADO:\\n// " + e.message;
-        } finally {
+
+            // Normal Render Pipeline
             document.getElementById('loader').style.display = 'none';
-        }
-    }
-
-    async function inject() {
-        const code = document.getElementById('codeOutput').value.trim();
-        const btn = document.getElementById('btnInject');
-        
-        if(!code) { 
-            alert("No hay código generado para inyectar."); 
-            return; 
-        }
-        
-        const originalText = btn.innerHTML;
-        btn.innerHTML = "⏳ Inyectando...";
-        
-        try {
-            const response = await fetch('/api/inject_code', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ code }) 
-            });
-            
-            if(response.ok) {
-                btn.innerHTML = "✅ INYECCIÓN EXITOSA";
-                btn.style.backgroundColor = "#2E7D32";
+            if(data.success) {
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute('position', new THREE.BufferAttribute(data.v, 3)); 
+                geom.setAttribute('normal', new THREE.BufferAttribute(data.n, 3));
+                geom.computeBoundingBox();
+                
+                if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
+                
+                currentMesh = new THREE.Mesh(geom, materials[matIndex]);
+                const center = new THREE.Vector3(); geom.boundingBox.getCenter(center);
+                currentMesh.position.sub(center); 
+                
+                const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
+                currentMesh.position.y += size.y / 2; // Offset VR
+                scene.add(currentMesh);
+                
+                document.getElementById('geo-x').innerText = size.x.toFixed(2) + " mm";
+                document.getElementById('geo-y').innerText = size.y.toFixed(2) + " mm";
+                document.getElementById('geo-z').innerText = size.z.toFixed(2) + " mm";
+                document.getElementById('geo-poly').innerText = (data.v.length / 3).toString();
+                document.getElementById('geo-time').innerText = Math.round(performance.now() - t0) + " ms";
             } else {
-                throw new Error("El backend Python rechazó la conexión.");
+                log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
+                document.getElementById('console').style.display = 'block';
             }
-        } catch (error) {
-            alert("Error de red: " + error.message + "\\n¿Está corriendo Python (main.py)?");
-            btn.innerHTML = "❌ ERROR";
-            btn.style.backgroundColor = "#D50000";
-        } finally {
-            setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.style.backgroundColor = ""; 
-            }, 2500);
+        };
+
+        function executeCSGCode(rawCode) {
+            if (isImportingSTL) return; // Evitar conflictos de hilo
+            document.getElementById('loader-txt').innerText = "WORKER PROCESANDO BOLEANAS...";
+            document.getElementById('loader').style.display = 'flex';
+            t0 = performance.now(); 
+            csgWorker.postMessage({ type: 'eval', code: rawCode }); 
         }
-    }
-</script>
+
+        function loadAndSendSTL(url) {
+            isImportingSTL = true;
+            document.getElementById('loader-txt').innerText = "DESCARGANDO STL LOCAL...";
+            document.getElementById('loader').style.display = 'flex';
+            
+            const loader = new THREE.STLLoader();
+            loader.load(url, function (geometry) {
+                document.getElementById('loader-txt').innerText = "TRIANGULIZANDO A NODO CSG...";
+                // Extraer matriz de vértices en bruto y enviar al worker
+                csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array });
+            }, undefined, function (error) {
+                log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>");
+                isImportingSTL = false; document.getElementById('loader').style.display = 'none';
+            });
+        }
+
+        // --- EXPORT AND NATIVE SAVE ---
+        function exportFile(format) {
+            if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
+            document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + "...";
+            document.getElementById('loader').style.display = 'flex';
+            
+            setTimeout(() => {
+                let dataString = ""; let ext = "";
+                let pos = currentMesh.geometry.attributes.position.array;
+                let nor = currentMesh.geometry.attributes.normal.array;
+
+                if (format === 'stl') {
+                    ext = ".stl"; dataString = "solid nexus_export\n";
+                    for(let i=0; i<pos.length; i+=9) {
+                        dataString += "facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n  outer loop\n";
+                        dataString += "    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n  endloop\nendfacet\n";
+                    }
+                    dataString += "endsolid nexus_export\n";
+                } else if (format === 'obj') {
+                    ext = ".obj"; dataString = "# NEXUS CAD Export\n";
+                    for(let i=0; i<pos.length; i+=3) dataString += "v " + pos[i] + " " + pos[i+1] + " " + pos[i+2] + "\n";
+                    for(let i=0; i<nor.length; i+=3) dataString += "vn " + nor[i] + " " + nor[i+1] + " " + nor[i+2] + "\n";
+                    for(let i=1; i<=(pos.length/3); i+=3) dataString += "f " + i + "//" + i + " " + (i+1) + "//" + (i+1) + " " + (i+2) + "//" + (i+2) + "\n";
+                }
+
+                let filename = "nexus_model_" + Math.floor(Date.now()/1000) + ext;
+                
+                fetch(window.location.origin + '/api/save_export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename, data: dataString })
+                }).then(r => r.json()).then(res => {
+                    log("<span class='log-ok'>> ¡" + format.toUpperCase() + " GUARDADO EN LA PESTAÑA DB!</span>");
+                    document.getElementById('console').style.display = 'block';
+                    try {
+                        let blob = new Blob([dataString], {type: 'text/plain'});
+                        let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+                    } catch(e) {}
+                }).catch(err => log("<span class='log-err'>> Error exportación: " + err + "</span>")).finally(() => document.getElementById('loader').style.display = 'none');
+            }, 100);
+        }
+
+        // --- POLLING LOCALHOST ---
+        let lastCode = "";
+        let currentStlHash = "";
+
+        function checkServer() {
+            fetch(window.location.origin + '/api/get_code_b64.json')
+                .then(r => r.json())
+                .then(data => {
+                    // Detectar si el backend subió un nuevo STL
+                    if (data.stl_hash && data.stl_hash !== currentStlHash) {
+                        currentStlHash = data.stl_hash;
+                        log("<span class='log-warn'>> Nuevo STL detectado, iniciando flujo híbrido...</span>");
+                        document.getElementById('console').style.display = 'block';
+                        // Burlar caché añadiendo timestamp al final
+                        loadAndSendSTL(window.location.origin + '/exports/imported.stl?t=' + Date.now());
+                    }
+
+                    if (data && data.code_b64 && data.code_b64 !== "") {
+                        let decoded = atob(data.code_b64);
+                        if (decoded !== lastCode) { 
+                            lastCode = decoded; 
+                            if (!isImportingSTL) executeCSGCode(lastCode); 
+                        }
+                    }
+                }).catch(e => {});
+        }
+        
+        window.onload = () => { initWebGL(); setInterval(checkServer, 1000); };
+    </script>
 </body>
 </html>

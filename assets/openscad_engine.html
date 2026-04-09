@@ -84,7 +84,17 @@
         window.IS_EXPORTING_HD = false;
 
         window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
-        window.changeMaterial = () => { if(currentMesh) { matIndex = (matIndex + 1) % materials.length; currentMesh.material = materials[matIndex]; } };
+        
+        let dynamicMat = null; // Guardamos referencia al material dinámico
+
+        window.changeMaterial = () => { 
+            if(currentMesh) { 
+                matIndex = (matIndex + 1) % materials.length; 
+                // Al forzar el cambio de material, perdemos los vertexColors nativos
+                currentMesh.material = materials[matIndex]; 
+            } 
+        };
+        
         window.toggleCamera = () => { camera.fov = camera.fov === 45 ? 10 : 45; camera.position.multiplyScalar(camera.fov === 10 ? 4 : 0.25); camera.updateProjectionMatrix(); };
         window.toggleConsole = () => { const c = document.getElementById('console'); c.style.display = c.style.display === 'none' || c.style.display === '' ? 'block' : 'none'; };
         window.exportFile = exportFile;
@@ -127,8 +137,8 @@
         let scene, camera, renderer, controls, currentMesh = null;
         let matIndex = 0;
         const materials = [
-            new THREE.MeshStandardMaterial({ color: 0xFFAB00, roughness: 0.3, metalness: 0.9 }), 
             new THREE.MeshStandardMaterial({ color: 0x00E5FF, roughness: 0.2, metalness: 0.8 }), 
+            new THREE.MeshStandardMaterial({ color: 0xFFAB00, roughness: 0.3, metalness: 0.9 }), 
             new THREE.MeshNormalMaterial(), 
             new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }), 
             new THREE.MeshStandardMaterial({ color: 0x1A1A1A, roughness: 0.8, metalness: 0.1 })  
@@ -150,7 +160,7 @@
             renderer.setAnimationLoop( function () { controls.update(); renderer.render(scene, camera); });
         }
 
-        // --- WORKER JS-CSG ---
+        // --- WORKER JS-CSG CON COLOR ---
         const workerCode = `
             importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
             CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
@@ -159,7 +169,16 @@
             CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
             CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             
-            // --- PARCHE SENIOR: HACK PARA SOPORTAR ARRAYS EN CSG ---
+            // --- PARCHE DE COLOR SENIOR ---
+            CSG.prototype.setColor = function(c) {
+                this.toPolygons().forEach(function(p) {
+                    p.shared = p.shared || {};
+                    p.shared.color = c;
+                });
+                return this;
+            };
+            
+            // --- PARCHE PARA SOPORTAR ARRAYS EN BOOLEANAS ---
             const origUnion = CSG.prototype.union;
             const origSubtract = CSG.prototype.subtract;
             const origIntersect = CSG.prototype.intersect;
@@ -176,7 +195,6 @@
                 if(Array.isArray(obj)) { let r = this; for(let i=0; i<obj.length; i++) r = origIntersect.call(r, obj[i]); return r; }
                 return origIntersect.call(this, obj);
             };
-            // -------------------------------------------------------
 
             let IMPORTED_STL = CSG.cube({radius:[0.01, 0.01, 0.01]});
 
@@ -204,19 +222,38 @@
                         
                         let polys = csgResult.toPolygons(); let numTriangles = 0;
                         for(let i=0; i<polys.length; i++) numTriangles += (polys[i].vertices.length - 2);
-                        let v = new Float32Array(numTriangles * 9); let n = new Float32Array(numTriangles * 9); let idx = 0;
+                        
+                        let v = new Float32Array(numTriangles * 9); 
+                        let n = new Float32Array(numTriangles * 9); 
+                        let c = new Float32Array(numTriangles * 9); // Buffer de Color
+                        let idx = 0;
                         
                         for (let i = 0; i < polys.length; i++) {
                             let poly = polys[i];
                             let norm = poly.plane.normal; 
+                            // Asignar color azul claro por defecto si no tiene setColor
+                            let col = (poly.shared && poly.shared.color) ? poly.shared.color : [0.0, 0.89, 1.0];
+                            
                             for (let j = 2; j < poly.vertices.length; j++) {
                                 let v0 = poly.vertices[0], v1 = poly.vertices[j - 1], v2 = poly.vertices[j];
-                                v[idx]=v0.pos.x; v[idx+1]=v0.pos.y; v[idx+2]=v0.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
-                                v[idx]=v1.pos.x; v[idx+1]=v1.pos.y; v[idx+2]=v1.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
-                                v[idx]=v2.pos.x; v[idx+1]=v2.pos.y; v[idx+2]=v2.pos.z; n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; idx+=3;
+                                
+                                v[idx]=v0.pos.x; v[idx+1]=v0.pos.y; v[idx+2]=v0.pos.z; 
+                                n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; 
+                                c[idx]=col[0]; c[idx+1]=col[1]; c[idx+2]=col[2]; 
+                                idx+=3;
+                                
+                                v[idx]=v1.pos.x; v[idx+1]=v1.pos.y; v[idx+2]=v1.pos.z; 
+                                n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; 
+                                c[idx]=col[0]; c[idx+1]=col[1]; c[idx+2]=col[2]; 
+                                idx+=3;
+                                
+                                v[idx]=v2.pos.x; v[idx+1]=v2.pos.y; v[idx+2]=v2.pos.z; 
+                                n[idx]=norm.x; n[idx+1]=norm.y; n[idx+2]=norm.z; 
+                                c[idx]=col[0]; c[idx+1]=col[1]; c[idx+2]=col[2]; 
+                                idx+=3;
                             }
                         }
-                        self.postMessage({ success: true, v: v, n: n }, [v.buffer, n.buffer]);
+                        self.postMessage({ success: true, v: v, n: n, c: c }, [v.buffer, n.buffer, c.buffer]);
                     } catch(err) { self.postMessage({ success: false, err: err.message }); }
                 }
             };
@@ -231,10 +268,10 @@
             if (data.is_import) {
                 isImportingSTL = false;
                 if(data.success) {
-                    log("<span class='log-ok'>> Módulo Híbrido: STL importado, indexado y listo en memoria.</span>");
+                    log("<span class='log-ok'>> Módulo Híbrido: STL indexado listo.</span>");
                     if (lastCode !== "") executeCSGCode(lastCode); 
                 } else {
-                    log("<span class='log-err'>> WORKER ERROR (STL Import): " + data.err + "</span>"); document.getElementById('console').style.display = 'block';
+                    log("<span class='log-err'>> ERROR (STL Import): " + data.err + "</span>"); document.getElementById('console').style.display = 'block';
                     document.getElementById('loader').style.display = 'none';
                 }
                 return;
@@ -245,11 +282,28 @@
                 const geom = new THREE.BufferGeometry();
                 geom.setAttribute('position', new THREE.BufferAttribute(data.v, 3)); 
                 geom.setAttribute('normal', new THREE.BufferAttribute(data.n, 3));
+                
+                // Mapear los colores al buffer
+                if (data.c) {
+                    geom.setAttribute('color', new THREE.BufferAttribute(data.c, 3));
+                }
+                
                 geom.computeBoundingBox();
                 
                 if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
                 
-                currentMesh = new THREE.Mesh(geom, materials[matIndex]);
+                // Crear material inteligente que use los Vertex Colors
+                dynamicMat = new THREE.MeshStandardMaterial({ 
+                    vertexColors: !!data.c, 
+                    roughness: 0.4, 
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 1.0,
+                    side: THREE.DoubleSide
+                });
+                
+                currentMesh = new THREE.Mesh(geom, dynamicMat);
+                
                 const center = new THREE.Vector3(); geom.boundingBox.getCenter(center);
                 currentMesh.position.sub(center); 
                 
@@ -276,6 +330,13 @@
             } else {
                 log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
                 document.getElementById('console').style.display = 'block';
+                
+                // Reportar error al backend para que la IA lo vea
+                fetch('/api/report_error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({error: data.err})
+                }).catch(e => console.log(e));
             }
         };
 
@@ -290,8 +351,8 @@
                 document.getElementById('loader-txt').innerText = "RENDERIZANDO HD (128 SLICES)...";
                 log("<span class='log-warn'>> 💎 Forzando renderizado en Alta Resolución...</span>");
             } else {
-                optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 24');
-                document.getElementById('loader-txt').innerText = "WORKER PROCESANDO BOLEANAS...";
+                optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 32');
+                document.getElementById('loader-txt').innerText = "WORKER PROCESANDO...";
             }
 
             let filletHelper = "function roundedBox(w, d, h, r) {\n" +
@@ -370,6 +431,7 @@
             }, 100);
         }
 
+        // --- POLLING LOCALHOST ---
         let lastCode = "";
         let currentStlHash = "";
 

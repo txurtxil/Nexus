@@ -80,7 +80,6 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x1f2937); 
 
-            // ¡CORRECCIÓN! Límite de visión ampliado al máximo (100000) para objetos gigantes
             camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.01, 100000);
             camera.position.set(0, 0, 100);
 
@@ -171,7 +170,6 @@
                 function (geometry) {
                     if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); currentMesh.material.dispose(); }
 
-                    // Centrado inteligente y cálculo de tamaño
                     geometry.center();
                     geometry.computeBoundingSphere();
                     let radius = geometry.boundingSphere.radius;
@@ -181,7 +179,6 @@
                     currentMesh = new THREE.Mesh(geometry, material);
                     scene.add(currentMesh);
 
-                    // Auto-ajuste de cámara dinámico
                     camera.position.set(radius * 1.5, radius * 1.2, radius * 1.5);
                     camera.lookAt(0, 0, 0);
                     controls.target.set(0, 0, 0);
@@ -209,14 +206,21 @@
             injectBtn.disabled = true;
 
             try {
-                const arrayBuffer = await activeFile.arrayBuffer();
+                // CORRECCIÓN: Usamos activeFile (Blob) en lugar de pasarlo a ArrayBuffer. 
+                // Esto permite al navegador hacer streaming y evita que la RAM se sature.
                 const response = await fetch('/api/upload_raw', {
                     method: 'POST',
-                    headers: { 'File-Name': encodeURIComponent(activeFile.name), 'Content-Type': 'application/octet-stream' },
-                    body: arrayBuffer
+                    headers: { 
+                        'File-Name': encodeURIComponent(activeFile.name), 
+                        'Content-Type': 'application/octet-stream' 
+                    },
+                    body: activeFile 
                 });
 
-                if (!response.ok) throw new Error('Error en el servidor');
+                // Consumimos el texto de respuesta para liberar la conexión del socket limpiamente
+                const responseText = await response.text();
+
+                if (!response.ok) throw new Error(responseText || 'Error en el servidor');
 
                 injectBtn.classList.replace('bg-blue-600', 'bg-green-600');
                 injectBtn.classList.replace('hover:bg-blue-500', 'hover:bg-green-500');

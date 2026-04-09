@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v5 & Híbrido STL</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v6 (GPU OVERDRIVE)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -52,7 +52,7 @@
     </div>
 
     <div id="hud-panel" class="nexus-panel">
-        <div class="hud-section-title">🔌 Telemetría Cliente</div>
+        <div class="hud-section-title">🔌 Telemetría GPU (Overdrive)</div>
         <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
         <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
         <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
@@ -68,7 +68,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v5 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v6 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -154,9 +154,18 @@
             grid.position.y = -50; 
             scene.add(grid);
             
-            // SISTEMA DE ILUMINACIÓN TITAN HDR POTENCIADA
-            const sunLight = new THREE.PointLight(0xffffff, 4.5, 5000); 
+            // 🌟 SISTEMA DE ILUMINACIÓN TITAN HDR OVERDRIVE 🌟
+            const sunLight = new THREE.PointLight(0xffffff, 5.0, 8000); 
             sunLight.position.set(0, 0, 0);
+            
+            // Activar cálculos de sombras 4K en tiempo real
+            sunLight.castShadow = true; 
+            sunLight.shadow.mapSize.width = 4096; 
+            sunLight.shadow.mapSize.height = 4096;
+            sunLight.shadow.camera.near = 10;
+            sunLight.shadow.camera.far = 1000;
+            sunLight.shadow.bias = -0.0005; // Evita artifacts en geometrías complejas
+            
             scene.add(sunLight);
             
             const ambientLight = new THREE.AmbientLight(0x111122, 0.15); // Más oscuro para realismo
@@ -195,9 +204,15 @@
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 6000); 
             camera.position.set(220, 100, 220);
             
+            // 🌟 RENDERER DESBLOQUEADO PARA ADRENO GPU 🌟
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" }); 
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita a 2 para fluidez
+            // Limitador de píxeles eliminado: Ahora usa 100% de la resolución nativa de tu pantalla
+            renderer.setPixelRatio(window.devicePixelRatio); 
+            
+            // Activar renderizado de sombras suaves procesadas por la GPU
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             
             // Post-procesado cinematográfico de colores (HDR más brillante)
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -342,7 +357,7 @@
                 
                 if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
                 
-                // MATERIAL FÍSICO ULTRA REALISTA v5
+                // MATERIAL FÍSICO ULTRA REALISTA v6
                 dynamicMat = new THREE.MeshPhysicalMaterial({ 
                     vertexColors: !!data.c, 
                     roughness: 0.4, 
@@ -357,6 +372,11 @@
                 matIndex = 0; // Forzamos la vista buena al cargar
                 
                 currentMesh = new THREE.Mesh(geom, materialsArray[matIndex]);
+                
+                // 🌟 MODO OVERDRIVE: La malla proyecta y recibe sombras sobre sí misma
+                currentMesh.castShadow = true;
+                currentMesh.receiveShadow = true;
+                
                 scene.add(currentMesh);
                 
                 const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
@@ -386,7 +406,8 @@
             if (isImportingSTL) return; 
             
             let optimizedCode = rawCode;
-            let currentSlices = window.NEXUS_HD_EXPORT ? 512 : 256; // Calidad Aumentada sin límite
+            // 🌟 SIN LÍMITES: En normal 256, en HD 512
+            let currentSlices = window.NEXUS_HD_EXPORT ? 512 : 256; 
 
             if (window.NEXUS_HD_EXPORT) {
                 optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: 512');

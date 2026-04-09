@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - Motor Web Worker & Híbrido STL</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE & Híbrido STL</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
-        body { margin: 0; overflow: hidden; background-color: #0B0E14; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
+        body { margin: 0; overflow: hidden; background-color: #030408; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
         
         .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
@@ -68,7 +68,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> Inicializando Worker Multi-hilo...</div>
+        <div class="log-sys">> Inicializando Worker Multi-hilo HD...</div>
         <div id="log-content"></div>
     </div>
 
@@ -85,12 +85,11 @@
 
         window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
         
-        let dynamicMat = null; // Guardamos referencia al material dinámico
+        let dynamicMat = null; 
 
         window.changeMaterial = () => { 
             if(currentMesh) { 
                 matIndex = (matIndex + 1) % materials.length; 
-                // Al forzar el cambio de material, perdemos los vertexColors nativos
                 currentMesh.material = materials[matIndex]; 
             } 
         };
@@ -133,7 +132,7 @@
             div.innerHTML += `<div>${msg}</div>`; div.parentElement.scrollTop = div.parentElement.scrollHeight;
         }
 
-        // --- 3D SCENE & VR ---
+        // --- 3D SCENE & SPACE ENGINE VR ---
         let scene, camera, renderer, controls, currentMesh = null;
         let matIndex = 0;
         const materials = [
@@ -147,20 +146,48 @@
         function initWebGL() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene(); 
-            const grid = new THREE.GridHelper(400, 80, 0x30363D, 0x161B22); grid.position.y = -0.5; scene.add(grid);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-            const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(50, 100, 50); scene.add(dl);
-            const bl = new THREE.DirectionalLight(0xB388FF, 0.5); bl.position.set(-50, 50, -50); scene.add(bl); 
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000); camera.position.set(80, 50, 80);
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setSize(window.innerWidth, window.innerHeight);
+            scene.background = new THREE.Color(0x020205); // Fondo Espacio Profundo
+            
+            // Rejilla de referencia (Movida hacia abajo para no molestar órbitas)
+            const grid = new THREE.GridHelper(1000, 100, 0x161B22, 0x0B0E14); 
+            grid.position.y = -50; 
+            scene.add(grid);
+            
+            // SISTEMA DE ILUMINACIÓN TITAN
+            const sunLight = new THREE.PointLight(0xffffee, 1.8, 2000); // Emisión desde el centro (El Sol)
+            sunLight.position.set(0, 0, 0);
+            scene.add(sunLight);
+            
+            const ambientLight = new THREE.AmbientLight(0x111122, 0.4); // Luz base tenue
+            scene.add(ambientLight);
+
+            // GENERADOR DE ESTRELLAS PROCEDURALES
+            const starGeo = new THREE.BufferGeometry();
+            const starMat = new THREE.PointsMaterial({color: 0xffffff, size: 0.8, sizeAttenuation: true});
+            const starVerts = [];
+            for(let i=0; i<3000; i++) {
+                starVerts.push((Math.random()-0.5)*2000, (Math.random()-0.5)*2000, (Math.random()-0.5)*2000);
+            }
+            starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+            scene.add(new THREE.Points(starGeo, starMat));
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 5000); 
+            camera.position.set(200, 100, 200);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); 
+            renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.xr.enabled = true; document.body.appendChild( VRButton.createButton( renderer ) );
             container.appendChild(renderer.domElement);
-            controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+            
+            controls = new THREE.OrbitControls(camera, renderer.domElement); 
+            controls.enableDamping = true;
+            controls.target.set(0,0,0);
+            
             window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
             renderer.setAnimationLoop( function () { controls.update(); renderer.render(scene, camera); });
         }
 
-        // --- WORKER JS-CSG CON COLOR ---
+        // --- WORKER JS-CSG CON COLOR Y ARRAYS ---
         const workerCode = `
             importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
             CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
@@ -169,7 +196,7 @@
             CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
             CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             
-            // --- PARCHE DE COLOR SENIOR ---
+            // PARCHE DE COLOR SENIOR
             CSG.prototype.setColor = function(c) {
                 this.toPolygons().forEach(function(p) {
                     p.shared = p.shared || {};
@@ -178,7 +205,7 @@
                 return this;
             };
             
-            // --- PARCHE PARA SOPORTAR ARRAYS EN BOOLEANAS ---
+            // PARCHE PARA SOPORTAR ARRAYS EN BOOLEANAS
             const origUnion = CSG.prototype.union;
             const origSubtract = CSG.prototype.subtract;
             const origIntersect = CSG.prototype.intersect;
@@ -231,8 +258,7 @@
                         for (let i = 0; i < polys.length; i++) {
                             let poly = polys[i];
                             let norm = poly.plane.normal; 
-                            // Asignar color azul claro por defecto si no tiene setColor
-                            let col = (poly.shared && poly.shared.color) ? poly.shared.color : [0.0, 0.89, 1.0];
+                            let col = (poly.shared && poly.shared.color) ? poly.shared.color : [0.0, 0.89, 1.0]; // Cyan por defecto
                             
                             for (let j = 2; j < poly.vertices.length; j++) {
                                 let v0 = poly.vertices[0], v1 = poly.vertices[j - 1], v2 = poly.vertices[j];
@@ -283,19 +309,16 @@
                 geom.setAttribute('position', new THREE.BufferAttribute(data.v, 3)); 
                 geom.setAttribute('normal', new THREE.BufferAttribute(data.n, 3));
                 
-                // Mapear los colores al buffer
-                if (data.c) {
-                    geom.setAttribute('color', new THREE.BufferAttribute(data.c, 3));
-                }
+                if (data.c) geom.setAttribute('color', new THREE.BufferAttribute(data.c, 3));
                 
                 geom.computeBoundingBox();
                 
                 if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
                 
-                // Crear material inteligente que use los Vertex Colors
+                // MATERIAL TITAN MULTICOLOR
                 dynamicMat = new THREE.MeshStandardMaterial({ 
                     vertexColors: !!data.c, 
-                    roughness: 0.4, 
+                    roughness: 0.6, 
                     metalness: 0.1,
                     transparent: true,
                     opacity: 1.0,
@@ -304,13 +327,11 @@
                 
                 currentMesh = new THREE.Mesh(geom, dynamicMat);
                 
-                const center = new THREE.Vector3(); geom.boundingBox.getCenter(center);
-                currentMesh.position.sub(center); 
-                
-                const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
-                currentMesh.position.y += size.y / 2; 
+                // ATENCIÓN: Eliminado el autocentrado y offset Y. Las coordenadas son 100% absolutas.
+                // Esto permite que las piezas mantengan la posición exacta definida por el usuario.
                 scene.add(currentMesh);
                 
+                const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
                 document.getElementById('geo-x').innerText = size.x.toFixed(2) + " mm";
                 document.getElementById('geo-y').innerText = size.y.toFixed(2) + " mm";
                 document.getElementById('geo-z').innerText = size.z.toFixed(2) + " mm";
@@ -330,13 +351,6 @@
             } else {
                 log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
                 document.getElementById('console').style.display = 'block';
-                
-                // Reportar error al backend para que la IA lo vea
-                fetch('/api/report_error', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({error: data.err})
-                }).catch(e => console.log(e));
             }
         };
 

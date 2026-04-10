@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v22.0 - KINEMATIC ANIMATION & VISION</title>
+    <title>NEXUS AI v22.1 - GENERATIVE DESIGN & KINEMATICS</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #00E676; }
@@ -21,6 +21,11 @@
         .btn-inject:hover { background-color: #9575CD; }
         .btn-camera { background-color: #00B0FF; color: #000; margin-bottom: 5px;}
         
+        /* Nuevos botones de Macros */
+        .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-macro { background-color: #161B22; color: #FFAB00; border: 1px solid #FFAB00; padding: 10px; font-size: 11px; }
+        .btn-macro:hover { background-color: #FFAB00; color: #000; }
+
         #loader { display: none; text-align: center; color: #00E676; font-size: 12px; font-style: italic; margin-top: 5px; }
         
         .toggle-container { display: flex; align-items: center; gap: 10px; background: #161B22; padding: 10px; border-radius: 6px; border: 1px solid #30363D; }
@@ -35,7 +40,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus Kinematic AI (v22.0)</h2>
+    <h2>🤖 Nexus AI Core (v22.1 Generative)</h2>
 </div>
 
 <div class="content">
@@ -47,7 +52,7 @@
     <div class="toggle-container">
         <label style="color:#00E676;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
-            <option value="copilot">🛠️ Copiloto Libre (Generar JS-CSG Animado)</option>
+            <option value="copilot">🛠️ Copiloto Libre (Programar JS-CSG)</option>
             <option value="agentic">🎛️ Agentic UI (Mover Sliders App)</option>
         </select>
     </div>
@@ -55,6 +60,14 @@
     <div class="toggle-container" id="memoryContainer">
         <input type="checkbox" id="useMemory" checked>
         <label for="useMemory" class="toggle-label">🧠 <b>Modo Iterativo:</b> Leer y modificar la pieza actual.</label>
+    </div>
+
+    <div>
+        <label>Macros de Ingeniería (Fase 7):</label>
+        <div class="macro-grid">
+            <button class="btn-macro" onclick="applyGenerativeMacro('lattice')">🧬 Generative Lattice (Ahorro Peso)</button>
+            <button class="btn-macro" onclick="applyGenerativeMacro('shell')">🔲 Shell / Vaciado Interno</button>
+        </div>
     </div>
 
     <div>
@@ -70,11 +83,11 @@
 
     <div>
         <label>Instrucción / Animación / Errores:</label>
-        <textarea id="promptInput" placeholder="Ej: Haz un engranaje y anímalo girando a 60rpm usando KINE_T...&#10;Ej: Haz que el pistón actual suba y baje usando un seno matemático."></textarea>
+        <textarea id="promptInput" placeholder="Ej: Haz un engranaje y anímalo girando a 60rpm usando KINE_T..."></textarea>
     </div>
 
     <button onclick="generateCode()">⚡ Generar / Ejecutar</button>
-    <div id="loader">Analizando cinemática y conectando con Gemini 3.1...</div>
+    <div id="loader">Calculando matrices booleanas...</div>
 
     <div>
         <label>Respuesta / Código JS (Editable):</label>
@@ -155,6 +168,19 @@
         return "";
     }
 
+    function applyGenerativeMacro(type) {
+        document.getElementById('aiMode').value = 'copilot';
+        document.getElementById('useMemory').checked = true;
+        
+        const promptBox = document.getElementById('promptInput');
+        if (type === 'lattice') {
+            promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza. Crea una red de vaciados (Lattice/Honeycomb) usando bucles matemáticos (for) y CSG.subtract(). El objetivo es comerse el interior de la pieza para ahorrar un 30-40% de material, dejando las paredes exteriores y estructurales intactas.";
+        } else if (type === 'shell') {
+            promptBox.value = "Aplica un vaciado (Shell) a esta pieza. Réstale una versión de sí misma ligeramente más pequeña para que quede hueca por dentro, pero con un grosor de pared de unos 2mm. Esto ahorrará material y tiempo de impresión.";
+        }
+        generateCode();
+    }
+
     async function generateCode() {
         const key = document.getElementById('apiKey').value.trim();
         const prompt = document.getElementById('promptInput').value.trim();
@@ -185,27 +211,23 @@ Ejemplo si piden "engranaje de 45 dientes con hueco de 5": {"tool": "gear", "par
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            // 🌟 INYECCIÓN DE LÓGICA DE ANIMACIÓN (KINE_T) Y PROGRAMACIÓN DEFENSIVA 🌟
-            systemInstruction = `Eres NEXUS TITAN AI, un experto en geometría 3D y cinemática matemática.
+            systemInstruction = `Eres NEXUS TITAN AI, un experto en geometría 3D, optimización topológica y cinemática matemática.
 Tu ÚNICO objetivo es devolver código JavaScript puro usando CSG.js, sin markdown y sin explicaciones.
 El código DEBE contener una función global 'main(params)' que retorne un objeto CSG válido.
 
+REGLAS DE OPTIMIZACIÓN Y BOOLEANAS:
+Si el usuario pide aligerar, optimización topológica o "lattice", usa bucles for() para crear un array de CSG.cylinder() o CSG.sphere() y aplícale .subtract() a la pieza principal para generar celosías paramétricas.
+
 REGLA ESTRICTA DE ANIMACIÓN (KINE_T):
-El motor inyectará un parámetro temporal continuo para animar. Debes usar programación defensiva SIEMPRE al inicio de main():
+El motor inyectará un parámetro continuo. Usa programación defensiva SIEMPRE:
   params = params || {};
   var KINE_T = params.KINE_T || 0;
-
-Si el usuario pide animación (rotar, subir/bajar, girar), usa KINE_T. 
-Ejemplo rotación: .rotateZ(KINE_T)
-Ejemplo traslación cíclica (subir/bajar): .translate([0, 0, Math.sin(KINE_T * Math.PI/180) * 20])
-
-Primitivas permitidas: CSG.cube(), CSG.cylinder(), CSG.sphere(). Función inyectada disponible: roundedBox(width, depth, height, radius).
-Si el usuario adjunta un plano/imagen, extrae medidas exactas.`;
+Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T) o traslaciones trigonométricas.`;
 
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura de la pieza actual. Añade o modifica según pida el usuario, los errores reportados, o lo que muestre el plano.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual. Añade el mecanizado, lattice o vaciado usando operaciones booleanas.`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }
@@ -240,7 +262,7 @@ Si el usuario adjunta un plano/imagen, extrae medidas exactas.`;
             document.getElementById('codeOutput').value = "// ERROR:\n" + e.message;
         } finally {
             document.getElementById('loader').style.display = 'none';
-            document.getElementById('loader').innerText = "Analizando cinemática y conectando con Gemini 3.1...";
+            document.getElementById('loader').innerText = "Calculando matrices booleanas...";
         }
     }
 

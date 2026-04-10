@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v8.7 (FEA STRESS SIMULATION)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v8.7 (FEA SIMULATION)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -94,6 +94,7 @@
         window.NEXUS_HD_EXPORT = false;
         window.IS_EXPORTING_HD = false;
         
+        // ⏱️ RELOJ GLOBAL DE ANIMACIÓN
         window.KINE_T_VALUE = 0;
         window.isWorkerBusy = false; 
 
@@ -113,7 +114,7 @@
 
         window.changeMaterial = () => { 
             if(currentMesh) { 
-                isStressMode = false; // Si pintamos normal, desactivamos el modo estrés
+                isStressMode = false; // Desactiva modo FEA si cambiamos pintura
                 matIndex = (matIndex + 1) % materialsArray.length; 
                 currentMesh.material = materialsArray[matIndex]; 
             } 
@@ -188,8 +189,12 @@
             sunLight.shadow.bias = -0.0001; 
             
             scene.add(sunLight);
-            scene.add(new THREE.AmbientLight(0x0a0a1a, 0.3));
-            scene.add(new THREE.HemisphereLight(0x00E5FF, 0x6200EA, 0.6)); 
+            
+            const ambientLight = new THREE.AmbientLight(0x0a0a1a, 0.3); 
+            scene.add(ambientLight);
+
+            const hemiLight = new THREE.HemisphereLight(0x00E5FF, 0x6200EA, 0.6); 
+            scene.add(hemiLight);
 
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 6000); 
             camera.position.set(220, 100, 220);
@@ -197,6 +202,7 @@
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" }); 
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio); 
+            
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -243,7 +249,7 @@
         const workerCode = `
             importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
             
-            // 🔥 NÚCLEO MATEMÁTICO PURO 🔥
+            // 🔥 NÚCLEO MATEMÁTICO PURO (SIN DEPENDER DE CSG.Matrix4x4 QUE NO EXISTE) 🔥
             CSG.prototype.translate = function(v) {
                 var dx = v[0], dy = v[1], dz = v[2];
                 return CSG.fromPolygons(this.toPolygons().map(function(p) {
@@ -395,6 +401,8 @@
                 if (currentMesh) { 
                     currentMesh.geometry.dispose();
                     currentMesh.geometry = geom;
+                    // Asegurar que conserva el shader correcto tras actualizar la geometría en animaciones
+                    currentMesh.material = isStressMode ? stressMaterial : materialsArray[matIndex];
                 } else {
                     dynamicMat = new THREE.MeshPhysicalMaterial({ 
                         vertexColors: !!data.c, roughness: 0.35, metalness: 0.15,
@@ -498,7 +506,7 @@
                 csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array });
             }, undefined, function (error) {
                 log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>");
-                isImportingSTL = false document.getElementById('loader').style.display = 'none';
+                isImportingSTL = false; document.getElementById('loader').style.display = 'none'; // ¡ERROR CORREGIDO AQUÍ!
             });
         }
 
@@ -588,7 +596,7 @@
                         let decoded = atob(data.code_b64);
                         if (decoded !== lastCode) { 
                             lastCode = decoded; 
-                            window.isWorkerBusy = false; 
+                            window.isWorkerBusy = false; // Liberamos para la primera carga
                             if (!isImportingSTL && !lastCode.includes("KINE_T")) executeCSGCode(lastCode); 
                         }
                     }

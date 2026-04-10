@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v22.1 - GENERATIVE DESIGN & KINEMATICS</title>
+    <title>NEXUS AI v23.0 - REVERSE ENGINEERING CORE</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #00E676; }
@@ -21,10 +21,13 @@
         .btn-inject:hover { background-color: #9575CD; }
         .btn-camera { background-color: #00B0FF; color: #000; margin-bottom: 5px;}
         
-        /* Nuevos botones de Macros */
         .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .btn-macro { background-color: #161B22; color: #FFAB00; border: 1px solid #FFAB00; padding: 10px; font-size: 11px; }
         .btn-macro:hover { background-color: #FFAB00; color: #000; }
+        
+        /* 🔥 FASE 12: Estilo específico para Ingeniería Inversa */
+        .btn-reverse { background-color: #D50000; color: #FFF; border: 1px solid #FF5252; grid-column: span 2; }
+        .btn-reverse:hover { background-color: #FF5252; color: #000; }
 
         #loader { display: none; text-align: center; color: #00E676; font-size: 12px; font-style: italic; margin-top: 5px; }
         
@@ -40,12 +43,12 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v22.1 Generative)</h2>
+    <h2>🤖 Nexus AI Core (v23.0 REVERSE ENGIN.)</h2>
 </div>
 
 <div class="content">
     <div>
-        <label>API Key (Google Gemini):</label>
+        <label>API Key (Google Gemini 3.1 Pro):</label>
         <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
     </div>
     
@@ -63,10 +66,11 @@
     </div>
 
     <div>
-        <label>Macros de Ingeniería (Fase 7):</label>
+        <label>Nexus Copilot Macros (Fase 12):</label>
         <div class="macro-grid">
-            <button class="btn-macro" onclick="applyGenerativeMacro('lattice')">🧬 Generative Lattice (Ahorro Peso)</button>
-            <button class="btn-macro" onclick="applyGenerativeMacro('shell')">🔲 Shell / Vaciado Interno</button>
+            <button class="btn-macro" onclick="applyGenerativeMacro('lattice')">🧬 Generative Lattice</button>
+            <button class="btn-macro" onclick="applyGenerativeMacro('shell')">🔲 Shell / Vaciado</button>
+            <button class="btn-macro btn-reverse" onclick="applyGenerativeMacro('reverse')">🔄 Invertir STL a Código (Bounding Box)</button>
         </div>
     </div>
 
@@ -83,7 +87,7 @@
 
     <div>
         <label>Instrucción / Animación / Errores:</label>
-        <textarea id="promptInput" placeholder="Ej: Haz un engranaje y anímalo girando a 60rpm usando KINE_T..."></textarea>
+        <textarea id="promptInput" placeholder="Ej: Haz un soporte en U para un rodamiento de 8mm..."></textarea>
     </div>
 
     <button onclick="generateCode()">⚡ Generar / Ejecutar</button>
@@ -168,17 +172,30 @@
         return "";
     }
 
+    // 🔥 FASE 12: Lógica de Interceptación del LocalStorage
     function applyGenerativeMacro(type) {
         document.getElementById('aiMode').value = 'copilot';
-        document.getElementById('useMemory').checked = true;
         
         const promptBox = document.getElementById('promptInput');
-        if (type === 'lattice') {
+        
+        if (type === 'reverse') {
+            document.getElementById('useMemory').checked = false; // Queremos código nuevo, no modificar el existente
+            const copilotData = JSON.parse(localStorage.getItem('nexus_copilot_data') || "null");
+            
+            if(copilotData) {
+                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nHe importado una malla STL estática ("puré de polígonos") de ${copilotData.polys} triángulos.\n\nHe calculado su Bounding Box exacta:\n- Ancho (X): ${copilotData.x} mm\n- Largo (Y): ${copilotData.y} mm\n- Alto (Z): ${copilotData.z} mm\n\nTu tarea: Genera desde cero un código paramétrico CSG limpio (retornando la función main) que englobe exactamente este volumen. Asume que es una carcasa mecánica o soporte. No uses la variable IMPORTED_STL, usa prismas o cilindros generados matemáticamente.`;
+            } else {
+                alert("⚠️ Primero tienes que ir a la pestaña del VISOR 3D y pulsar el botón 'Copiloto IA' para que yo pueda escanear la pieza.");
+            }
+        } else if (type === 'lattice') {
+            document.getElementById('useMemory').checked = true;
             promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza. Crea una red de vaciados (Lattice/Honeycomb) usando bucles matemáticos (for) y CSG.subtract(). El objetivo es comerse el interior de la pieza para ahorrar un 30-40% de material, dejando las paredes exteriores y estructurales intactas.";
         } else if (type === 'shell') {
+            document.getElementById('useMemory').checked = true;
             promptBox.value = "Aplica un vaciado (Shell) a esta pieza. Réstale una versión de sí misma ligeramente más pequeña para que quede hueca por dentro, pero con un grosor de pared de unos 2mm. Esto ahorrará material y tiempo de impresión.";
         }
-        generateCode();
+        
+        if (type !== 'reverse') generateCode();
     }
 
     async function generateCode() {
@@ -211,23 +228,29 @@ Ejemplo si piden "engranaje de 45 dientes con hueco de 5": {"tool": "gear", "par
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            systemInstruction = `Eres NEXUS TITAN AI, un experto en geometría 3D, optimización topológica y cinemática matemática.
-Tu ÚNICO objetivo es devolver código JavaScript puro usando CSG.js, sin markdown y sin explicaciones.
-El código DEBE contener una función global 'main(params)' que retorne un objeto CSG válido.
+            // 🔥 FASE 12: System Prompt afinado para Gemini 3.1 Pro
+            systemInstruction = `Eres NEXUS TITAN AI, impulsado por Gemini 3.1 Pro. Eres un arquitecto experto en geometría 3D, ingeniería inversa paramétrica y cinemática matemática.
+Tu ÚNICO objetivo es devolver código JavaScript puro usando la librería CSG.js.
+NO uses bloques de markdown (no pongas \`\`\`javascript).
+NO des explicaciones ni saludos.
+El código DEBE contener una función global 'main(params)' que retorne un objeto CSG válido y bien formado.
 
 REGLAS DE OPTIMIZACIÓN Y BOOLEANAS:
-Si el usuario pide aligerar, optimización topológica o "lattice", usa bucles for() para crear un array de CSG.cylinder() o CSG.sphere() y aplícale .subtract() a la pieza principal para generar celosías paramétricas.
+Si el usuario pide aligerar, optimización topológica o "lattice", usa bucles for() para crear un array de primitivas y aplícale .subtract() a la pieza principal para generar celosías paramétricas estables.
+
+REGLAS DE INGENIERÍA INVERSA:
+Si el usuario te da un Bounding Box (X, Y, Z), tu código CSG debe generar una forma base cuyo volumen respete EXTREMADAMENTE esas medidas.
 
 REGLA ESTRICTA DE ANIMACIÓN (KINE_T):
 El motor inyectará un parámetro continuo. Usa programación defensiva SIEMPRE:
   params = params || {};
   var KINE_T = params.KINE_T || 0;
-Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T) o traslaciones trigonométricas.`;
+Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
 
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual. Añade el mecanizado, lattice o vaciado usando operaciones booleanas.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Añade el mecanizado, lattice o vaciado usando operaciones booleanas.`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }
@@ -237,7 +260,8 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T) o traslaciones trigonométri
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`, {
+            // Llamamos a Gemini 3.1 Pro (Heavy Lifting Logic)
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })
             });

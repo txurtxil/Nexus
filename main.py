@@ -194,13 +194,12 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'ok')
             return
 
-        # --- AÑADIDO: Endpoint para AGENTIC UI ---
         elif parsed.path == '/api/agentic_ui':
             cl = int(self.headers.get('Content-Length', 0))
             if cl > 0:
                 try:
                     data = json.loads(self.rfile.read(cl).decode('utf-8'))
-                    AGENTIC_PAYLOAD = data # Se pasa al hilo de Flet
+                    AGENTIC_PAYLOAD = data 
                     self.send_response(200); self._send_cors(); self.end_headers(); self.wfile.write(b'{"status":"ok"}')
                     return
                 except Exception as e:
@@ -336,6 +335,18 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_response(500); self._send_cors(); self.end_headers(); self.wfile.write(str(e).encode())
 
+        # --- AÑADIDO: Intercepción limpia para el Cloud Studio del PC ---
+        elif parsed.path == '/nexus_pc.html':
+            filepath = os.path.join(ASSETS_DIR, "nexus_pc.html")
+            if not os.path.exists(filepath): 
+                filepath = os.path.join(BASE_DIR, "nexus_pc.html")
+            if os.path.exists(filepath):
+                with open(filepath, "r", encoding="utf-8") as f: content = f.read().encode('utf-8')
+                self.send_response(200); self.send_header("Content-type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(content))); self._send_cors(); self.end_headers(); self.wfile.write(content)
+            else: 
+                self.send_response(404); self._send_cors(); self.end_headers()
+            return
+
         else:
             try:
                 fn = parsed.path.strip("/")
@@ -388,38 +399,33 @@ def main(page: ft.Page):
             while True:
                 time.sleep(1)
                 
-                # Revisa Inyección de Código (Modo Copiloto)
+                # Revisa Inyección de Código (Modo Copiloto / o desde el PC)
                 if INJECTED_CODE_IA:
                     txt_code.value = INJECTED_CODE_IA
                     INJECTED_CODE_IA = ""
                     txt_code.update()
-                    status.value = "✓ Código de IA recibido e inyectado con éxito."
-                    status.color = "#B388FF"
+                    status.value = "✓ Código inyectado y compilado."
+                    status.color = "#00E5FF"
                     page.update()
                 
-                # --- AÑADIDO: Revisa Movimiento de Sliders (Modo Agentic) ---
+                # Revisa Movimiento de Sliders (Modo Agentic)
                 if AGENTIC_PAYLOAD is not None:
                     try:
                         payload = AGENTIC_PAYLOAD
-                        AGENTIC_PAYLOAD = None # Limpiamos para no repetir
+                        AGENTIC_PAYLOAD = None 
                         
                         tool_name = payload.get("tool", "gear")
                         params = payload.get("params", {})
                         
-                        # 1. Selecciona la herramienta visualmente
                         select_tool(tool_name)
                         
-                        # 2. Asigna valores a los sliders si existen
                         for key, val in params.items():
                             slider_name = f"sl_{key}"
                             if hasattr(tools_lib, slider_name):
                                 slider_obj = getattr(tools_lib, slider_name)
                                 slider_obj.value = float(val)
                         
-                        # 3. Forzar generador de código
                         update_code_wrapper(None)
-                        
-                        # 4. Renderizar y mover usuario a la pestaña 3D
                         run_render()
                         
                         status.value = "🎛️ AGENTIC UI: Interfaz ajustada automáticamente."
@@ -601,9 +607,15 @@ def main(page: ft.Page):
                 except: pass
         threading.Thread(target=hw_monitor_loop, daemon=True).start()
 
+        # --- AÑADIDO: Interfaz actualizada para mostrar URL de Nexus PC ---
         view_visor = ft.Column([
             ft.Container(height=5), hw_panel, ft.Container(height=5),
-            ft.Container(content=ft.Column([ft.Text("🥽 MODO GAFAS VR O PC EXTERNO", color="#B388FF", weight="bold", size=11), ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=16, text_align="center", bgcolor="#161B22", color="#00E676")]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#B388FF")),
+            ft.Container(content=ft.Column([
+                ft.Text("🥽 VISOR 3D EXTERNO (VR / SMART TV)", color="#B388FF", weight="bold", size=11),
+                ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=13, text_align="center", bgcolor="#161B22", color="#00E676"),
+                ft.Text("☁️ NEXUS CLOUD STUDIO (PC MAC / WINDOWS)", color="#00E5FF", weight="bold", size=11),
+                ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/nexus_pc.html", read_only=True, text_size=13, text_align="center", bgcolor="#161B22", color="#00E5FF")
+            ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#00E5FF")),
             ft.Container(height=5),
             ft.Text("Motor Web Worker (Exportación 100% Nativa TITAN)", text_align="center", color="#00E5FF", weight="bold"),
             ft.ElevatedButton("🔄 ABRIR VISOR 3D (ESTÁNDAR)", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", color="black", height=60, width=float('inf')),
@@ -811,4 +823,3 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     if "TERMUX_VERSION" in os.environ: ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
     else: ft.app(target=main)
-    

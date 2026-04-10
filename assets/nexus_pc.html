@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS CAD - CLOUD STUDIO (PC SYNC)</title>
+    <style>
+        :root { --bg: #0B0E14; --panel: #161B22; --border: #30363D; --cyan: #00E5FF; --green: #00E676; --purple: #B388FF; --text: #E6EDF3; }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        
+        /* Panel Izquierdo: Editor de Código */
+        #editor-panel { width: 40%; display: flex; flex-direction: column; border-right: 2px solid var(--border); background: var(--panel); box-shadow: 5px 0 15px rgba(0,0,0,0.5); z-index: 10; }
+        .header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #000; }
+        .header h2 { margin: 0; font-size: 16px; color: var(--cyan); letter-spacing: 1.5px; }
+        .header .status { font-size: 12px; color: var(--green); font-family: monospace; display: flex; align-items: center; gap: 5px; }
+        .status-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        .toolbar { padding: 10px; display: flex; gap: 10px; background: var(--panel); border-bottom: 1px solid var(--border); }
+        button { flex: 1; padding: 12px; background: #21262D; border: 1px solid var(--border); color: #fff; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 12px; transition: 0.2s; letter-spacing: 1px; }
+        button:hover { background: #30363D; }
+        button:active { transform: translateY(2px); }
+        .btn-pull { border-bottom: 3px solid var(--cyan); }
+        .btn-push { background: var(--green); color: #000; border: none; border-bottom: 3px solid #00B248; }
+        .btn-push:hover { background: #00C853; }
+
+        #code-editor { flex-grow: 1; width: 100%; box-sizing: border-box; background: var(--bg); color: #00E676; font-family: 'Courier New', Courier, monospace; font-size: 15px; padding: 15px; border: none; resize: none; outline: none; line-height: 1.4; }
+        
+        /* Panel Derecho: Visor 3D Híbrido */
+        #viewer-panel { width: 60%; position: relative; background: #000; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .overlay-tag { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); border: 1px solid var(--purple); color: var(--purple); padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: bold; letter-spacing: 1px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="editor-panel">
+        <div class="header">
+            <h2>☁️ NEXUS CLOUD STUDIO</h2>
+            <div class="status"><div class="status-dot"></div> SYNC LOCAL</div>
+        </div>
+        <div class="toolbar">
+            <button class="btn-pull" onclick="pullCode()">📥 Extraer del Móvil</button>
+            <button class="btn-push" id="btn-push" onclick="pushCode()">🚀 Compilar e Inyectar</button>
+        </div>
+        <textarea id="code-editor" spellcheck="false" placeholder="// Escribe aquí tu código JS-CSG o extráelo del móvil usando el botón superior..."></textarea>
+    </div>
+
+    <div id="viewer-panel">
+        <div class="overlay-tag">STREAMING DIRECTO DEL VISOR</div>
+        <iframe src="/" id="visor-frame"></iframe>
+    </div>
+
+    <script>
+        // Extraer el código actual que tiene el servidor/móvil
+        async function pullCode() {
+            try {
+                const btn = document.querySelector('.btn-pull');
+                btn.innerText = "⏳ Extrayendo...";
+                
+                const res = await fetch('/api/get_code_b64.json');
+                const data = await res.json();
+                
+                if (data && data.code_b64) {
+                    document.getElementById('code-editor').value = atob(data.code_b64);
+                } else {
+                    alert("No hay código en el servidor actualmente.");
+                }
+            } catch (error) {
+                alert("Error de conexión con el móvil: " + error.message);
+            } finally {
+                document.querySelector('.btn-pull').innerText = "📥 Extraer del Móvil";
+            }
+        }
+
+        // Inyectar el código modificado en el PC de vuelta al servidor/móvil
+        async function pushCode() {
+            const code = document.getElementById('code-editor').value.trim();
+            if (!code) {
+                alert("El editor está vacío.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-push');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ INYECTANDO...";
+            btn.style.background = "#FFAB00"; // Naranja indicando proceso
+
+            try {
+                const response = await fetch('/api/inject_code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+
+                if (response.ok) {
+                    btn.innerText = "✅ INYECTADO";
+                    btn.style.background = "#00E676"; // Verde éxito
+                    
+                    // Pequeño truco: Recargar el iframe para asegurar que el visor pille el cambio al instante
+                    setTimeout(() => {
+                        const iframe = document.getElementById('visor-frame');
+                        iframe.src = iframe.src; 
+                    }, 500);
+
+                } else {
+                    throw new Error("Rechazado por el móvil.");
+                }
+            } catch (error) {
+                alert("Error de inyección: " + error.message);
+                btn.innerText = "❌ ERROR";
+                btn.style.background = "#D50000"; // Rojo error
+            } finally {
+                setTimeout(() => {
+                    btn.innerText = "🚀 Compilar e Inyectar";
+                    btn.style.background = ""; // Restaurar CSS original
+                }, 2000);
+            }
+        }
+
+        // Cargar el código automáticamente al abrir la página en el PC
+        window.onload = pullCode;
+    </script>
+</body>
+</html>

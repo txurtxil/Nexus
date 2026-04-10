@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v10.0 (PBR + STUDIO RENDER)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v11.0 (MULTIPLAYER NEXUS)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -110,12 +110,13 @@
     </div>
 
     <div id="hud-panel" class="nexus-panel">
-        <div class="hud-section-title">🔌 Telemetría GPU (Overdrive)</div>
+        <div class="hud-section-title">🔌 Telemetría GPU & Red</div>
         <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
         <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
         <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
         <div class="hud-row"><span class="hud-label">Reloj (KINE_T):</span> <span class="hud-value" style="color: #00E676;" id="hw-kinet">0</span></div>
-        <div class="hud-row"><span class="hud-label">Red / Conexión:</span> <span class="hud-value" id="hw-net">Local</span></div>
+        <div class="hud-row"><span class="hud-label">Sincronización:</span> <span class="hud-value" id="hw-net">LOCAL</span></div>
+        <div class="hud-row"><span class="hud-label">Usuarios Sala:</span> <span class="hud-value highlight" id="hud-users">1</span></div>
         <div style="height: 10px;"></div>
         <div class="hud-section-title">📐 Análisis Sólido</div>
         <div class="hud-row"><span class="hud-label">Eje X (Ancho):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
@@ -126,7 +127,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v10.0 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v11.0 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -143,6 +144,11 @@
         window.isWorkerBusy = false; 
         window.isKineActive = true; 
 
+        // 🔥 FASE 11: VARIABLES MULTIJUGADOR (NEXUS SYNC)
+        let ws = null;
+        let myClientId = Math.random().toString(36).substr(2, 9); // ID único para esta pestaña
+        let multiplayerAvatars = {}; // Guarda los hologramas de otros usuarios
+        
         let world, physicsBody, floorBody;
         window.isPhysicsActive = false;
 
@@ -168,18 +174,13 @@
         
         let matIndex = 0;
         
-        // 🔥 FASE 10: MATERIALES PBR FOTORREALISTAS
         const materialsArray = [
-            null, // 0: Dinámico
-            new THREE.MeshNormalMaterial(), // 1: Diagnóstico de normales
-            new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }), // 2: Alambre / Malla estructural
-            // 3: Aluminio Cepillado PBR
+            null, 
+            new THREE.MeshNormalMaterial(), 
+            new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }), 
             new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 1.0, roughness: 0.35, envMapIntensity: 1.2 }), 
-            // 4: Plástico Automotriz Rojo PBR
             new THREE.MeshPhysicalMaterial({ color: 0xcc0000, metalness: 0.1, roughness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.05, envMapIntensity: 1.0 }),
-            // 5: Cristal de Laboratorio PBR
             new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.0, roughness: 0.0, transmission: 1.0, ior: 1.5, transparent: true, opacity: 1, envMapIntensity: 1.5, side: THREE.DoubleSide }),
-            // 6: Goma Mate Oscura PBR
             new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.0, roughness: 0.85, envMapIntensity: 0.5 })
         ];
 
@@ -526,8 +527,6 @@
         };
 
         document.getElementById('hw-cpu').innerText = (navigator.hardwareConcurrency || '?') + ' Cores';
-        if (navigator.deviceMemory) document.getElementById('hw-ram').innerText = navigator.deviceMemory + ' GB+';
-        if (navigator.connection && navigator.connection.effectiveType) document.getElementById('hw-net').innerText = navigator.connection.effectiveType.toUpperCase();
         
         try {
             const gl = document.createElement('canvas').getContext('webgl');
@@ -541,6 +540,70 @@
         }
 
         let scene, camera, renderer, controls, currentMesh = null;
+
+        // 🔥 INICIALIZAR MULTIJUGADOR (WebSockets)
+        function initMultiplayer() {
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(protocol + '//' + window.location.host + '/ws');
+
+                ws.onopen = () => {
+                    log("<span class='log-ok'>> 🌐 SYNC: Conectado a Sala de Diseño.</span>");
+                    document.getElementById('console').style.display = 'block';
+                    document.getElementById('hw-net').innerText = "WSS ONLINE";
+                    document.getElementById('hw-net').style.color = "#00E676";
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        // Recibir movimientos de cámara de otros usuarios
+                        if (data.type === 'cam' && data.id !== myClientId) {
+                            updateMultiplayerAvatar(data);
+                        }
+                        
+                        // Recibir código directamente por WS (si tu backend lo soporta)
+                        if (data.type === 'code' && data.code !== lastCode) {
+                            lastCode = data.code;
+                            window.isWorkerBusy = false;
+                            executeCSGCode(lastCode, true);
+                        }
+
+                        // Actualizar contador
+                        if (data.type === 'users') {
+                            document.getElementById('hud-users').innerText = data.count;
+                        }
+
+                    } catch(e) {}
+                };
+
+                ws.onerror = () => {
+                    document.getElementById('hw-net').innerText = "LOCAL (Fallback)";
+                    document.getElementById('hw-net').style.color = "#8B949E";
+                };
+            } catch(e) {
+                console.warn("NEXUS MULTIPLAYER: Fallo al inicializar WebSocket. Usando modo Local.");
+            }
+        }
+
+        // Dibuja la cámara holográfica de tu compañero
+        function updateMultiplayerAvatar(data) {
+            if (!scene) return;
+            if (!multiplayerAvatars[data.id]) {
+                // Crear un holograma (Pirámide)
+                const geo = new THREE.CylinderGeometry(0, 3, 10, 4);
+                geo.rotateX(Math.PI / 2); // Apuntar hacia adelante
+                const mat = new THREE.MeshBasicMaterial({ color: 0x00E5FF, wireframe: true });
+                const mesh = new THREE.Mesh(geo, mat);
+                scene.add(mesh);
+                multiplayerAvatars[data.id] = mesh;
+            }
+            
+            const avatar = multiplayerAvatars[data.id];
+            avatar.position.set(data.pos.x, data.pos.y, data.pos.z);
+            avatar.lookAt(data.target.x, data.target.y, data.target.z);
+        }
 
         function initWebGL() {
             const container = document.getElementById('canvas-container');
@@ -569,7 +632,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio); 
             
-            // 🔥 FASE 10: CONFIGURACIÓN PBR ESTABLE
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -577,16 +639,13 @@
             renderer.outputEncoding = THREE.sRGBEncoding; 
             renderer.physicallyCorrectLights = true;
 
-            // 🔥 FIX: Entorno de Estudio Procedural (Evita el uso de modulos externos)
             const studioEnv = new THREE.Scene();
             const boxMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const boxMatCyan = new THREE.MeshBasicMaterial({ color: 0x00E5FF });
             const boxMatPurple = new THREE.MeshBasicMaterial({ color: 0x6200EA });
             
-            // Techo de luz
             const ceil = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), boxMatWhite);
             ceil.position.set(0, 50, 0); ceil.rotation.x = Math.PI / 2; studioEnv.add(ceil);
-            // Paredes luminosas para dar reflejos metalizados
             const side1 = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), boxMatWhite);
             side1.position.set(50, 0, 0); side1.rotation.y = -Math.PI / 2; studioEnv.add(side1);
             const side2 = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), boxMatCyan);
@@ -594,7 +653,6 @@
             const side3 = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), boxMatPurple);
             side3.position.set(0, 0, -50); studioEnv.add(side3);
 
-            // Inyectamos nuestro estudio virtual al renderizador
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             pmremGenerator.compileEquirectangularShader();
             scene.environment = pmremGenerator.fromScene(studioEnv).texture;
@@ -662,6 +720,18 @@
             controls.enableDamping = true;
             controls.target.set(30, 50, 0); 
             
+            // 🔥 FASE 11: Emitir nuestra posición de cámara al movernos
+            controls.addEventListener('change', () => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'cam',
+                        id: myClientId,
+                        pos: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+                        target: { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+                    }));
+                }
+            });
+
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
             window.addEventListener('pointerdown', (e) => {
@@ -961,14 +1031,30 @@
         }
 
         let lastCode = ""; let currentStlHash = "";
+        
+        // El polling clásico sigue aquí como Fallback seguro
         function checkServer() {
+            // Si el WS está dictando el código, no hacemos polling del código para evitar doble render
             fetch(window.location.origin + '/api/get_code_b64.json').then(r => r.json()).then(data => {
                 if (data.stl_hash && data.stl_hash !== currentStlHash) { currentStlHash = data.stl_hash; log("<span class='log-warn'>> Nuevo STL detectado, iniciando flujo híbrido...</span>"); document.getElementById('console').style.display = 'block'; loadAndSendSTL(window.location.origin + '/exports/imported.stl?t=' + Date.now()); }
-                if (data && data.code_b64 && data.code_b64 !== "") { let decoded = atob(data.code_b64); if (decoded !== lastCode) { lastCode = decoded; window.isWorkerBusy = false; if (!isImportingSTL && !lastCode.includes("KINE_T")) executeCSGCode(lastCode, true); } }
+                
+                // Solo leemos de la API REST si el WebSocket no está controlando esto
+                if ((!ws || ws.readyState !== WebSocket.OPEN) && data && data.code_b64 && data.code_b64 !== "") { 
+                    let decoded = atob(data.code_b64); 
+                    if (decoded !== lastCode) { 
+                        lastCode = decoded; 
+                        window.isWorkerBusy = false; 
+                        if (!isImportingSTL && !lastCode.includes("KINE_T")) executeCSGCode(lastCode, true); 
+                    } 
+                }
             }).catch(e => {});
         }
         
-        window.onload = () => { initWebGL(); setInterval(checkServer, 1000); };
+        window.onload = () => { 
+            initWebGL(); 
+            initMultiplayer(); // Arrancamos motor de red
+            setInterval(checkServer, 1000); 
+        };
     </script>
 </body>
 </html>

@@ -47,6 +47,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/ARButton.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 </head>
 <body>
@@ -134,11 +135,7 @@
         <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
     </div>
 
-    <script type="module">
-        import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
-        // 🔥 Importamos entorno de estudio pregenerado para IBL (Reflejos realistas sin necesidad de descargar texturas pesadas)
-        import { RoomEnvironment } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/environments/RoomEnvironment.js';
-
+    <script>
         window.NEXUS_HD_EXPORT = false;
         window.IS_EXPORTING_HD = false;
         
@@ -171,18 +168,18 @@
         
         let matIndex = 0;
         
-        // 🔥 FASE 10: MATERIALES PBR FOTORREALISTAS (Physically Based Rendering)
+        // 🔥 FASE 10: MATERIALES PBR FOTORREALISTAS
         const materialsArray = [
-            null, // 0: Dinámico (Lo crea el worker)
+            null, // 0: Dinámico
             new THREE.MeshNormalMaterial(), // 1: Diagnóstico de normales
             new THREE.MeshBasicMaterial({ color: 0x00E676, wireframe: true }), // 2: Alambre / Malla estructural
-            // 3: Aluminio Cepillado (Metal puro, algo rugoso)
+            // 3: Aluminio Cepillado PBR
             new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 1.0, roughness: 0.35, envMapIntensity: 1.2 }), 
-            // 4: Plástico Automotriz Rojo (Dieléctrico, pulido, con capa de barniz)
+            // 4: Plástico Automotriz Rojo PBR
             new THREE.MeshPhysicalMaterial({ color: 0xcc0000, metalness: 0.1, roughness: 0.1, clearcoat: 1.0, clearcoatRoughness: 0.05, envMapIntensity: 1.0 }),
-            // 5: Cristal de Laboratorio / Óptica (Transmisión de luz real, índice de refracción)
+            // 5: Cristal de Laboratorio PBR
             new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.0, roughness: 0.0, transmission: 1.0, ior: 1.5, transparent: true, opacity: 1, envMapIntensity: 1.5, side: THREE.DoubleSide }),
-            // 6: Goma Mate Oscura / Polímero Industrial
+            // 6: Goma Mate Oscura PBR
             new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.0, roughness: 0.85, envMapIntensity: 0.5 })
         ];
 
@@ -254,7 +251,7 @@
             window.isMechanismActive = !window.isMechanismActive;
 
             if(window.isMechanismActive) {
-                log("<span class='log-ok'>> 🔗 Ensamblaje Físico Iniciado: Sistema Biela-Manivela-Pistón.</span>");
+                log("<span class='log-ok'>> 🔗 Ensamblaje Físico Iniciado.</span>");
                 document.getElementById('console').style.display = 'block';
                 window.isKineActive = false;
                 
@@ -328,8 +325,8 @@
                 mechanismBodies = [crankBody, rodBody, pistonBody, railTop, railBottom, railFront, railBack];
                 
                 mechanismBodies.forEach(b => {
-                    let meshMat = b.mass === 0 ? new THREE.MeshStandardMaterial({color: 0x30363D, transparent:true, opacity:0.3}) : materialsArray[3]; // Usar Aluminio Cepillado PBR
-                    if(b === pistonBody) meshMat = materialsArray[4]; // Usar Plástico Rojo PBR para el pistón
+                    let meshMat = b.mass === 0 ? new THREE.MeshStandardMaterial({color: 0x30363D, transparent:true, opacity:0.3}) : materialsArray[3];
+                    if(b === pistonBody) meshMat = materialsArray[4]; 
 
                     let shape = b.shapes[0];
                     let geo = new THREE.BoxGeometry(shape.halfExtents.x*2, shape.halfExtents.y*2, shape.halfExtents.z*2);
@@ -572,19 +569,35 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio); 
             
-            // 🔥 FASE 10: CONFIGURACIÓN PBR (Physically Based Rendering)
+            // 🔥 FASE 10: CONFIGURACIÓN PBR ESTABLE
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.2;
-            renderer.outputEncoding = THREE.sRGBEncoding; // Codificación de color real para PBR
+            renderer.outputEncoding = THREE.sRGBEncoding; 
             renderer.physicallyCorrectLights = true;
 
-            // Generador PMREM para calcular reflejos fotorrealistas instantáneos
+            // 🔥 FIX: Entorno de Estudio Procedural (Evita el uso de modulos externos)
+            const studioEnv = new THREE.Scene();
+            const boxMatWhite = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const boxMatCyan = new THREE.MeshBasicMaterial({ color: 0x00E5FF });
+            const boxMatPurple = new THREE.MeshBasicMaterial({ color: 0x6200EA });
+            
+            // Techo de luz
+            const ceil = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), boxMatWhite);
+            ceil.position.set(0, 50, 0); ceil.rotation.x = Math.PI / 2; studioEnv.add(ceil);
+            // Paredes luminosas para dar reflejos metalizados
+            const side1 = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), boxMatWhite);
+            side1.position.set(50, 0, 0); side1.rotation.y = -Math.PI / 2; studioEnv.add(side1);
+            const side2 = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), boxMatCyan);
+            side2.position.set(-50, 0, 0); side2.rotation.y = Math.PI / 2; studioEnv.add(side2);
+            const side3 = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), boxMatPurple);
+            side3.position.set(0, 0, -50); studioEnv.add(side3);
+
+            // Inyectamos nuestro estudio virtual al renderizador
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             pmremGenerator.compileEquirectangularShader();
-            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-            // No cambiamos el fondo (sigue negro), pero la pieza reflejará un estudio fotográfico invisible.
+            scene.environment = pmremGenerator.fromScene(studioEnv).texture;
 
             stressMaterial = new THREE.ShaderMaterial({
                 vertexShader: `
@@ -622,7 +635,9 @@
             world.addBody(floorBody);
 
             renderer.xr.enabled = true; 
-            document.body.appendChild( ARButton.createButton( renderer ) );
+            if(typeof ARButton !== 'undefined') {
+                document.body.appendChild( ARButton.createButton( renderer ) );
+            }
 
             renderer.xr.addEventListener('sessionstart', () => {
                 scene.background = null; 

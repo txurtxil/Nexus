@@ -1,0 +1,191 @@
+ 
+
+
+
+ROADMAP: NEXUS TITAN AI- FASE 5 (EL
+"MOTOR FÍSICO")
+Esta fase transformará tus modelos estáticos en
+máquinas que "viven".
+1. Cinemática Inversa y Animación de
+Parámetros (IA-Anim)
+• Concepto: Permitir que la IA no solo cree la
+pieza, sino que defina cómo se mueve.
+Acción: Añadir un nodo KINE_T
+(Tiempo/Grados) que el visor 3D incremente
+automáticamente. Podrás pedirle a la IA:
+"Haz que este engranaje gire a 60rpm y que
+el pistón suba y baje" y Nexus generará la
+animación matemática en bucle.
+• Impacto: Verás tus diseños funcionando en
+tiempo real antes de imprimirlos.
+
+2. Análisis de Esfuerzos Térmico/ Mecánicc
+(Simulación Visual)
+Concepto: Usar Shaders para colorear la
+pieza según su debilidad estructural.
+Acción: Implementar un algoritmo en JS que
+analice el grosor de las paredes (thickness
+analysis ). Las zonas demasiado finas se
+pintarán de rojo en el visor.
+• Impacto: Evitarás fallos de impresión y
+roturas en piezas mecánicas.
+FASE 6 (INDUSTRIALIZACIÓNY 
+PRODUCTIVIDAD)
+3. Generador de Planos Técnicos Automático
+(Auto-Drafting)
+• Concepto: Convertir el 3D en un plano 2D
+para fabricación manual o láser.
+◦ Acción: Un botón que "aplane" la vista
+actual y genere un archivo SVG/DXF o una
+imagen con las cotas principales anotadas
+por la IA.
+Impacto: Nexus se convierte en una
+herramienta profesional de taller.
+4. "Nexus Cloud Sync" (Local-First)
+• Concepto: Poder ver tus piezas en el PC de
+casa sin cables.
+• Accion: Refinar el servidor Python para que
+el código QR que ya tenemos permita no
+solo ver, sino editar desde cualquier
+dispositivo en la misma red WiFi.
+
+◦ Impacto: Usas la potencia del móvil para
+procesar, pero la comodidad de una pantalla
+grande para diseñar.
+
+
+
+
+
+FASE 2: IA Paramétrica (El "Copiloto" Inteligente)
+​El problema de la IA actual es que genera todo el código JS desde cero en cada petición, lo que da pie a errores de sintaxis (alucinaciones).
+​De Código a JSON (Agentic UI): Le enseñaremos a Gemini todos tus parámetros de nexus_ui_tools.py (los sliders de drones, engranajes, cajas). Si el usuario pide "Haz un engranaje planetario de 45 dientes", la IA no programa JS; devuelve un JSON estructurado que mueve los sliders de tu interfaz automáticamente. Usamos la matemática perfecta que tú ya programaste, la IA solo la orquesta.
+​Memoria de Sesión (Iteración Continua): La IA debe saber qué hay en la pantalla. Si primero le pides un cubo, en el siguiente prompt le dices "Hazle un agujero de 5mm en el centro". Modificaremos el flujo para enviarle el código actual en cada petición para que aplique operaciones booleanas (.subtract()) sobre lo ya existente.
+​👁️ FASE 3: Sketch-to-3D (Visión Artificial)
+​Dado que usas Gemini 2.5 Flash, tenemos capacidades multimodales a nuestra disposición.
+​Análisis de Planos y Bocetos: Añadir un botón en la interfaz de la IA para subir una foto de un plano a mano alzada o una servilleta. La IA analiza las cotas de la imagen y genera el script CSG correspondiente para levantar la pieza en 3D.
+​🧩 FASE 4: Ensamblaje Asistido (AI Auto-Mate)
+​En la pestaña de PBR Studio (Ensamblajes), tienes colisiones por Bounding Box.
+​Snapping Semántico: Que la IA analice los archivos STL cargados (buscando cilindros/agujeros) y sugiera automáticamente dónde encaja una pieza con otra (ej. "Detectado tornillo M4, ajustando al orificio de la tapa").
+​¿Por dónde te gustaría que ataquemos primero: implementamos el LOD Dinámico / Mejoras de Redondeo para que las piezas impresas queden perfectas, o reescribimos el motor de la IA para que trabaje modificando parámetros de forma iterativa y con memoria?
+
+
+código prueba render:
+
+function main(params) {
+    var t = (typeof KINE_T !== 'undefined') ? KINE_T : 0;
+    var s = 3.5; 
+    
+    // --- HACK ANTI-LIMITADOR ---
+    // Usamos variables para que el motor no sobreescriba nuestra resolución.
+    var U_HD = 512; // Ultra HD (Sol y Anillos)
+    var HD = 256;   // HD (Planetas Principales)
+    var MD = 128;   // Medio (Lunas)
+    var SD = 64;    // Estándar (Asteroides)
+
+    // Función Bypass de Alta Velocidad
+    function fastCombine(arr) {
+        var polys = [];
+        for(var i=0; i<arr.length; i++) polys = polys.concat(arr[i].toPolygons());
+        return CSG.fromPolygons(polys);
+    }
+
+    var sol = CSG.sphere({center: [0,0,0], radius: 25, slices: U_HD}).setColor([1.0, 0.95, 0.8]);
+    var elementosSistema = [sol];
+
+    function crearOrbita(dist) {
+        return CSG.cylinder({start: [0,0,-0.1], end: [0,0,0.1], radius: dist + 0.15, slices: HD})
+            .subtract(CSG.cylinder({start: [0,0,-0.2], end: [0,0,0.2], radius: dist - 0.15, slices: HD}))
+            .setColor([0.2, 0.2, 0.25]); // Órbitas oscuras para no opacar el HDR
+    }
+
+    function crearPlaneta(dist, radio, vel, color, numLunas, lunasSize) {
+        var angulo = (t * vel) * (Math.PI / 180);
+        var px = Math.cos(angulo) * dist;
+        var py = Math.sin(angulo) * dist;
+        
+        var planeta = CSG.sphere({center: [px, py, 0], radius: radio * s, slices: HD}).setColor(color);
+        
+        elementosSistema.push(crearOrbita(dist));
+        elementosSistema.push(planeta);
+        
+        if (numLunas > 0) {
+            for(var i=1; i<=numLunas; i++) {
+                var angLuna = (t * vel * (5 + i*3)) * (Math.PI / 180);
+                var distLuna = (radio * s) + (i * 4) + 1;
+                var lx = px + Math.cos(angLuna) * distLuna;
+                var ly = py + Math.sin(angLuna) * distLuna;
+                var luna = CSG.sphere({center: [lx, ly, 0], radius: (lunasSize || 0.7) * s, slices: MD}).setColor([0.7, 0.7, 0.75]);
+                elementosSistema.push(luna);
+            }
+        }
+    }
+
+    // Planetas Interiores
+    crearPlaneta(45, 1.2, 4.1, [0.6, 0.5, 0.5], 0); // Mercurio
+    crearPlaneta(65, 2.8, 1.6, [0.9, 0.7, 0.3], 0); // Venus
+    crearPlaneta(95, 3.2, 1.0, [0.1, 0.6, 1.0], 1); // Tierra
+    crearPlaneta(130, 1.7, 0.5, [0.9, 0.3, 0.1], 2); // Marte
+
+    // ☄️ CINTURÓN DE ASTEROIDES EXTREMO (1.500 Rocas)
+    // Generación determinista pseudo-aleatoria (sin Math.random) para estabilizar la animación
+    for(var a=1; a<=1500; a++) {
+        var rand1 = (a * 13.54) % (Math.PI * 2);
+        var rand2 = (a * 7.21) % 25;
+        var rand3 = ((a * 3.14) % 8) - 4;
+
+        var rDist = 155 + rand2;
+        var ax = Math.cos(rand1) * rDist;
+        var ay = Math.sin(rand1) * rDist;
+        var az = rand3;
+
+        var asteroide = CSG.sphere({center: [ax, ay, az], radius: (0.2 + (a%3)*0.1) * s, slices: SD}).setColor([0.4, 0.4, 0.45]);
+        elementosSistema.push(asteroide);
+    }
+
+    // Gigantes Gaseosos y Exteriores
+    crearPlaneta(220, 8.5, 0.2, [0.8, 0.6, 0.4], 8, 0.5); // Júpiter + 8 Lunas
+
+    // SATURNO (Con anillos dobles para proyectar sombras complejas)
+    var angSat = (t * 0.1) * (Math.PI / 180);
+    var satX = Math.cos(angSat) * 310;
+    var satY = Math.sin(angSat) * 310;
+    
+    elementosSistema.push(CSG.sphere({center: [satX, satY, 0], radius: 7.0 * s, slices: HD}).setColor([0.9, 0.8, 0.5]));
+    
+    var tilt = 25 * (Math.PI / 180);
+    var hExt = 0.1; var dzExt = hExt * Math.cos(tilt); var dyExt = hExt * Math.sin(tilt);
+    var hInt = 0.3; var dzInt = hInt * Math.cos(tilt); var dyInt = hInt * Math.sin(tilt);
+
+    // Anillo Exterior (Anillo A)
+    var anilloA = CSG.cylinder({start: [satX, satY + dyExt, -dzExt], end: [satX, satY - dyExt, dzExt], radius: 16 * s, slices: U_HD})
+                    .subtract(CSG.cylinder({start: [satX, satY + dyInt, -dzInt], end: [satX, satY - dyInt, dzInt], radius: 13.5 * s, slices: U_HD}))
+                    .setColor([0.85, 0.75, 0.65]);
+                    
+    // Anillo Interior (Anillo B - Deja un hueco físico para la División de Cassini)
+    var anilloB = CSG.cylinder({start: [satX, satY + dyExt, -dzExt], end: [satX, satY - dyExt, dzExt], radius: 13 * s, slices: U_HD})
+                    .subtract(CSG.cylinder({start: [satX, satY + dyInt, -dzInt], end: [satX, satY - dyInt, dzInt], radius: 9 * s, slices: U_HD}))
+                    .setColor([0.7, 0.6, 0.5]);
+                    
+    elementosSistema.push(anilloA);
+    elementosSistema.push(anilloB);
+    elementosSistema.push(crearOrbita(310));
+
+    crearPlaneta(400, 4.0, 0.05, [0.4, 0.8, 0.9], 5, 0.4); // Urano
+    crearPlaneta(480, 3.8, 0.03, [0.1, 0.3, 0.8], 3, 0.5); // Neptuno
+
+    // ¡FUSIÓN MÁXIMA!
+    return fastCombine(elementosSistema);
+}
+
+
+
+Opción A: FASE 3 - Sketch-to-3D (Visión Artificial)
+​Dado que Gemini 3.1 es multimodal, podemos añadir un botón en la pestaña de IA para subir una foto. Podrías dibujar un plano simple en un papel (ej. un rectángulo con dos agujeros y unas cotas escritas a mano), hacerle una foto con el móvil, y que la IA analice la imagen para generar directamente el código JS-CSG.
+(Esto requiere tocar el HTML de la IA para enviar imágenes en Base64 a la API).
+​🎛️ Opción B: FASE 2a - Agentic UI (Control de la Interfaz)
+​Hacer que la IA tome el control de tu app. En lugar de escribir código libre, le enseñamos a la IA los "deslizadores" (sliders) que ya tienes programados en nexus_ui_tools.py (Engranajes, Cajas, Drones). Si le pides "Haz un engranaje de 45 dientes", la IA devuelve un JSON y Flet mueve los controles de tu interfaz mágicamente.
+(Esto requiere tocar el main.py y el prompt del backend).
+​🧩 Opción C: FASE 4 - Ensamblaje Asistido en PBR Studio
+​Dejar la IA aparcada un momento y volver al motor 3D. Mejorar pbr_studio.html para que, cuando acerques un tornillo a un agujero, las piezas hagan "Snap" magnético exacto alineando sus ejes, en lugar de solo chocar por cajas (Bounding Boxes).
+​¿Qué reto te motiva más para el próximo commit?

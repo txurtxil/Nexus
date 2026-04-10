@@ -28,7 +28,9 @@
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
         #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
-        .spinner { border: 2px solid rgba(0, 229, 255, 0.2); border-top: 2px solid var(--nexus-cyan); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
+        
+        /* 🔥 NUEVO ENGRANAJE DE CARGA AL ESTILO OPENSCAD */
+        .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Estilos Realidad Mixta (AR) */
@@ -126,7 +128,7 @@
     </div>
 
     <div id="loader" style="display:none;">
-        <div class="spinner"></div>
+        <div class="gear-spinner">⚙️</div>
         <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold;">WORKER PROCESANDO...</div>
     </div>
 

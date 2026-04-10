@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.0 - REVERSE ENGINEERING CORE</title>
+    <title>NEXUS AI v23.1 - REVERSE ENGINEERING CORE</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #00E676; }
@@ -43,12 +43,12 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.0 REVERSE ENGIN.)</h2>
+    <h2>🤖 Nexus AI Core (v23.1 REVERSE ENGIN.)</h2>
 </div>
 
 <div class="content">
     <div>
-        <label>API Key (Google Gemini 3.1 Pro):</label>
+        <label>API Key (Google Gemini):</label>
         <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
     </div>
     
@@ -179,13 +179,13 @@
         const promptBox = document.getElementById('promptInput');
         
         if (type === 'reverse') {
-            document.getElementById('useMemory').checked = false; // Queremos código nuevo, no modificar el existente
+            document.getElementById('useMemory').checked = false; 
             const copilotData = JSON.parse(localStorage.getItem('nexus_copilot_data') || "null");
             
             if(copilotData) {
                 promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nHe importado una malla STL estática ("puré de polígonos") de ${copilotData.polys} triángulos.\n\nHe calculado su Bounding Box exacta:\n- Ancho (X): ${copilotData.x} mm\n- Largo (Y): ${copilotData.y} mm\n- Alto (Z): ${copilotData.z} mm\n\nTu tarea: Genera desde cero un código paramétrico CSG limpio (retornando la función main) que englobe exactamente este volumen. Asume que es una carcasa mecánica o soporte. No uses la variable IMPORTED_STL, usa prismas o cilindros generados matemáticamente.`;
             } else {
-                alert("⚠️ Primero tienes que ir a la pestaña del VISOR 3D y pulsar el botón 'Copiloto IA' para que yo pueda escanear la pieza.");
+                alert("⚠️ Primero tienes que ir a la pestaña del VISOR 3D (o PBR Studio) y pulsar el botón 'Copiloto IA' para que yo pueda escanear la pieza.");
             }
         } else if (type === 'lattice') {
             document.getElementById('useMemory').checked = true;
@@ -228,9 +228,8 @@ Ejemplo si piden "engranaje de 45 dientes con hueco de 5": {"tool": "gear", "par
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            // 🔥 FASE 12: System Prompt afinado para Gemini 3.1 Pro
-            systemInstruction = `Eres NEXUS TITAN AI, impulsado por Gemini 3.1 Pro. Eres un arquitecto experto en geometría 3D, ingeniería inversa paramétrica y cinemática matemática.
-Tu ÚNICO objetivo es devolver código JavaScript puro usando la librería CSG.js.
+            systemInstruction = `Eres NEXUS TITAN AI, un experto en geometría 3D, optimización topológica y cinemática matemática.
+Tu ÚNICO objetivo es devolver código JavaScript puro usando CSG.js.
 NO uses bloques de markdown (no pongas \`\`\`javascript).
 NO des explicaciones ni saludos.
 El código DEBE contener una función global 'main(params)' que retorne un objeto CSG válido y bien formado.
@@ -260,8 +259,8 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            // Llamamos a Gemini 3.1 Pro (Heavy Lifting Logic)
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent?key=${key}`, {
+            // 🔥 CORRECCIÓN: Restaurado al endpoint funcional
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })
             });

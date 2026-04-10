@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v8.5 (KINETIC ANIMATION)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v8.6 (PURE KINEMATICS)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -78,7 +78,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v8.5 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v8.6 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -95,7 +95,7 @@
         
         // ⏱️ RELOJ GLOBAL DE ANIMACIÓN
         window.KINE_T_VALUE = 0;
-        window.isWorkerBusy = false; // Flag para no saturar al Worker si tarda en calcular
+        window.isWorkerBusy = false; 
 
         window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
         
@@ -164,7 +164,6 @@
             
             const sunLight = new THREE.PointLight(0xffffff, 5.5, 8000); 
             sunLight.position.set(0, 0, 0);
-            
             sunLight.castShadow = true; 
             sunLight.shadow.mapSize.width = 4096; 
             sunLight.shadow.mapSize.height = 4096;
@@ -189,7 +188,6 @@
             
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.6;
 
@@ -206,11 +204,63 @@
 
         const workerCode = `
             importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
-            CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
-            CSG.prototype.scale = function(v) { if(typeof v === 'number') v = [v,v,v]; return this.transform(CSG.Matrix4x4.scaling(v)); };
-            CSG.prototype.rotateX = function(deg) { return this.transform(CSG.Matrix4x4.rotationX(deg)); };
-            CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
-            CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
+            
+            // 🔥 NÚCLEO MATEMÁTICO PURO (SIN DEPENDER DE CSG.Matrix4x4 QUE NO EXISTE) 🔥
+            CSG.prototype.translate = function(v) {
+                var dx = v[0], dy = v[1], dz = v[2];
+                return CSG.fromPolygons(this.toPolygons().map(function(p) {
+                    return new CSG.Polygon(p.vertices.map(function(vert) {
+                        return new CSG.Vertex(new CSG.Vector(vert.pos.x + dx, vert.pos.y + dy, vert.pos.z + dz), vert.normal);
+                    }), p.shared);
+                }));
+            };
+            
+            CSG.prototype.scale = function(v) {
+                var sx = Array.isArray(v) ? v[0] : v;
+                var sy = Array.isArray(v) ? v[1] : v;
+                var sz = Array.isArray(v) ? v[2] : v;
+                return CSG.fromPolygons(this.toPolygons().map(function(p) {
+                    return new CSG.Polygon(p.vertices.map(function(vert) {
+                        return new CSG.Vertex(new CSG.Vector(vert.pos.x * sx, vert.pos.y * sy, vert.pos.z * sz), vert.normal);
+                    }), p.shared);
+                }));
+            };
+            
+            CSG.prototype.rotateX = function(deg) {
+                var rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+                return CSG.fromPolygons(this.toPolygons().map(function(p) {
+                    return new CSG.Polygon(p.vertices.map(function(v) {
+                        return new CSG.Vertex(
+                            new CSG.Vector(v.pos.x, v.pos.y * cos - v.pos.z * sin, v.pos.y * sin + v.pos.z * cos), 
+                            new CSG.Vector(v.normal.x, v.normal.y * cos - v.normal.z * sin, v.normal.y * sin + v.normal.z * cos)
+                        );
+                    }), p.shared);
+                }));
+            };
+            
+            CSG.prototype.rotateY = function(deg) {
+                var rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+                return CSG.fromPolygons(this.toPolygons().map(function(p) {
+                    return new CSG.Polygon(p.vertices.map(function(v) {
+                        return new CSG.Vertex(
+                            new CSG.Vector(v.pos.x * cos + v.pos.z * sin, v.pos.y, -v.pos.x * sin + v.pos.z * cos), 
+                            new CSG.Vector(v.normal.x * cos + v.normal.z * sin, v.normal.y, -v.normal.x * sin + v.normal.z * cos)
+                        );
+                    }), p.shared);
+                }));
+            };
+            
+            CSG.prototype.rotateZ = function(deg) {
+                var rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+                return CSG.fromPolygons(this.toPolygons().map(function(p) {
+                    return new CSG.Polygon(p.vertices.map(function(v) {
+                        return new CSG.Vertex(
+                            new CSG.Vector(v.pos.x * cos - v.pos.y * sin, v.pos.x * sin + v.pos.y * cos, v.pos.z), 
+                            new CSG.Vector(v.normal.x * cos - v.normal.y * sin, v.normal.x * sin + v.normal.y * cos, v.normal.z)
+                        );
+                    }), p.shared);
+                }));
+            };
             
             CSG.prototype.setColor = function(c) {
                 this.toPolygons().forEach(function(p) { p.shared = p.shared || {}; p.shared.color = c; }); return this;
@@ -244,7 +294,6 @@
                 } 
                 else if (e.data.type === 'eval') {
                     try {
-                        // ⏱️ Permite inyectar variables simulando el entorno main()
                         let fn = new Function("IMPORTED_STL", e.data.code);
                         let csgResult = fn(IMPORTED_STL);
                         
@@ -280,7 +329,7 @@
         let isImportingSTL = false;
 
         csgWorker.onmessage = function(e) {
-            window.isWorkerBusy = false; // Liberar el Worker para el siguiente frame de animación
+            window.isWorkerBusy = false; 
             const data = e.data;
             
             if (data.is_import) {
@@ -305,7 +354,6 @@
                 
                 geom.computeBoundingBox();
                 
-                // Actualización ultrarrápida sin parpadeos para animaciones
                 if (currentMesh) { 
                     currentMesh.geometry.dispose();
                     currentMesh.geometry = geom;
@@ -341,7 +389,6 @@
             } else {
                 log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
                 document.getElementById('console').style.display = 'block';
-                // Si hay error matemático, detenemos la animación para evitar spam de consola
                 window.isWorkerBusy = true; 
             }
         };
@@ -358,7 +405,6 @@
             if (window.NEXUS_HD_EXPORT) {
                 document.getElementById('loader-txt').innerText = "RENDERIZANDO HD (512 SLICES)...";
             } else {
-                // Ocultar texto durante animaciones fluidas
                 document.getElementById('loader-txt').innerText = "";
             }
 
@@ -378,10 +424,8 @@
                 "return b1.union([b2, c1, c2, c3, c4]);\n" +
             "}\n\n";
             
-            // ⏱️ INYECCIÓN KINE_T: Sustituimos el clásico 'return main();' por la ejecución parametrizada
             let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
             
-            // Eliminamos llamadas antiguas si las hubiera para evitar conflictos
             optimizedCode = optimizedCode.replace(/return main\(\);/g, "");
             optimizedCode = optimizedCode.replace(/return main\(\{.*\}\);/g, "");
 
@@ -393,15 +437,12 @@
             csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
         }
 
-        // ⏱️ BUCLE DE ANIMACIÓN
-        // Cada 100ms intentamos avanzar el reloj si el código usa la variable KINE_T
         setInterval(() => {
             if (lastCode !== "" && lastCode.includes("KINE_T")) {
-                window.KINE_T_VALUE += 5; // Aumentamos 5 grados el tiempo
-                if (window.KINE_T_VALUE > 36000) window.KINE_T_VALUE = 0; // Evitar desbordamiento
+                window.KINE_T_VALUE += 5; 
+                if (window.KINE_T_VALUE > 36000) window.KINE_T_VALUE = 0; 
                 document.getElementById('hw-kinet').innerText = window.KINE_T_VALUE;
                 
-                // Si el Worker ha terminado el cálculo anterior, pedimos el siguiente frame
                 if (!window.isWorkerBusy) {
                     executeCSGCode(lastCode);
                 }
@@ -509,7 +550,7 @@
                         let decoded = atob(data.code_b64);
                         if (decoded !== lastCode) { 
                             lastCode = decoded; 
-                            // Solo ejecutamos si no hay animación en curso (el bucle se encarga del resto)
+                            window.isWorkerBusy = false; // Liberamos para la primera carga
                             if (!isImportingSTL && !lastCode.includes("KINE_T")) executeCSGCode(lastCode); 
                         }
                     }

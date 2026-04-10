@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS PBR STUDIO v21.2 - AI AUTO-MATE</title>
+    <title>NEXUS PBR STUDIO v22.0 - MULTIPLAYER & AI BRIDGE</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
@@ -16,12 +16,14 @@
         .panel.collapsed { transform: translateY(-150%); opacity: 0; pointer-events: none; }
         .fab { position: absolute; bottom: 20px; right: 20px; background: #00E5FF; color: black; width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 1000; font-size: 24px; border: none; outline: none; }
         
-        /* Banner de Error IA */
         #errorBanner { display:none; position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#B71C1C; color:white; padding:15px 25px; border-radius:30px; font-weight:bold; z-index:10000; border:2px solid #FF5252; box-shadow:0 0 20px rgba(255,0,0,0.5); cursor:pointer; }
 
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00E5FF; cursor: pointer; margin-top: -6px; }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #30363D; border-radius: 2px; }
+        
+        .btn-ai { background:#D50000; color:#fff; padding:10px; border:none; border-radius:5px; cursor:pointer; font-weight:bold; margin-top:15px; width:100%; text-transform:uppercase; border: 1px solid #FF5252;}
+        .btn-ai:hover { background:#FF5252; color:#000; }
     </style>
 </head>
 <body>
@@ -29,7 +31,9 @@
 
     <button class="fab" onclick="togglePanel()" id="fabBtn">⚙️</button>
     <div class="panel" id="uiPanel">
-        <h3 style="margin:0 0 10px 0;color:#00E5FF;font-size:16px;">🎨 PBR STUDIO v21.2</h3>
+        <h3 style="margin:0 0 5px 0;color:#00E5FF;font-size:16px;">🎨 PBR STUDIO</h3>
+        <div id="wsStatus" style="color:#FFAB00; font-size:10px; font-weight:bold; margin-bottom:10px;">🔴 SYNC OFFLINE</div>
+        
         <div id="singleMatContainer">
             <select id="matSelect" style="width:100%;background:#0B0E14;color:#00E5FF;padding:8px;border:1px solid #30363D;border-radius:5px;outline:none;font-weight:bold;margin-bottom:10px;">
                 <option value="carbon">Fibra de Carbono</option>
@@ -48,13 +52,15 @@
         </div>
         
         <button onclick="takeScreenshot()" style="width:100%;background:#0D47A1;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">📸 TOMAR FOTO (PNG)</button>
-        <button onclick="analyzeWithIA(event)" style="width:100%;background:#8E24AA;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">🤖 ANALIZAR CON IA</button>
+        <button onclick="analyzeWithIA(event)" style="width:100%;background:#8E24AA;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;font-weight:bold;margin-top:5px;">👁️ VISIÓN IA</button>
+        
+        <button onclick="sendToCopilot()" class="btn-ai">🤖 Copiloto IA (Invertir)</button>
 
-        <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Render guardado!</div>
+        <div id="toast" style="display:none; margin-top:10px; color:#00E676; font-size:12px; font-weight:bold; text-align:center;">¡Acción completada!</div>
         <p id="modeText" style="color:#FFAB00;font-size:10px;margin:10px 0 0 0;text-align:center;"></p>
 
         <div id="transformControls" style="margin-top:15px; border-top:1px solid #30363D; padding-top:15px;">
-            <label style="color:#00E5FF;font-size:11px;font-weight:bold;">🔍 Escala: <span id="scaleVal">1.0</span>x</label>
+            <label style="color:#00E5FF;font-size:11px;font-weight:bold;">🔍 Escala Global: <span id="scaleVal">1.0</span>x</label>
             <input type="range" id="scaleSlider" min="0.01" max="10" step="0.05" value="1" style="margin-bottom:10px;">
             <label style="color:#00E5FF;font-size:11px;font-weight:bold;">↕️ Altura Z (Suelo): <span id="posYVal">0</span> mm</label>
             <input type="range" id="posYSlider" min="-500" max="500" step="1" value="0" style="margin-bottom:10px;">
@@ -64,7 +70,51 @@
     </div>
     
     <script>
-        // --- AUTO FIX IA v21.1 ---
+        // --- MULTIPLAYER SYNC (FASE 11) ---
+        let ws = null;
+        let myClientId = Math.random().toString(36).substr(2, 9);
+        let multiplayerAvatars = {};
+
+        function initMultiplayer() {
+            try {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                ws = new WebSocket(protocol + '//' + window.location.host + '/ws');
+
+                ws.onopen = () => {
+                    const status = document.getElementById('wsStatus');
+                    status.innerText = "🟢 SYNC MULTI-USER ONLINE";
+                    status.style.color = "#00E676";
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'cam' && data.id !== myClientId) {
+                            updateMultiplayerAvatar(data);
+                        }
+                    } catch(e) {}
+                };
+
+                ws.onerror = () => {
+                    document.getElementById('wsStatus').innerText = "🔴 LOCAL FALLBACK";
+                };
+            } catch(e) { console.warn("PBR MULTIPLAYER: Fallback Local."); }
+        }
+
+        function updateMultiplayerAvatar(data) {
+            if (!scene) return;
+            if (!multiplayerAvatars[data.id]) {
+                const geo = new THREE.SphereGeometry(3, 16, 16);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xFFAB00, wireframe: true, transparent: true, opacity: 0.5 });
+                const mesh = new THREE.Mesh(geo, mat);
+                scene.add(mesh);
+                multiplayerAvatars[data.id] = mesh;
+            }
+            const avatar = multiplayerAvatars[data.id];
+            avatar.position.set(data.pos.x, data.pos.y, data.pos.z);
+        }
+
+        // --- AUTO FIX IA ---
         let lastErrorMsg = "";
         window.onerror = function(msg, url, line, col, error) {
             lastErrorMsg = `Mensaje: ${msg} en línea ${line}:${col}`;
@@ -99,6 +149,17 @@
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement); 
         controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 + 0.1; 
+        
+        // Emitir movimiento de cámara
+        controls.addEventListener('change', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'cam', id: myClientId,
+                    pos: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+                    target: { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+                }));
+            }
+        });
 
         const pmremGenerator = new THREE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
@@ -136,7 +197,7 @@
         function takeScreenshot() {
             renderer.render(scene, camera); const dataURL = renderer.domElement.toDataURL("image/png");
             fetch('/api/save_image', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({filename: 'render_' + Date.now() + '.png', image_data: dataURL}) }).then(r => {
-                const t = document.getElementById('toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+                const t = document.getElementById('toast'); t.innerText = "¡Render guardado!"; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
             });
         }
 
@@ -147,6 +208,39 @@
             .then(() => { btn.innerText = "✅ ENVIADO"; btn.style.background = "#00E676"; btn.style.color = "#000"; setTimeout(() => { btn.innerText = originalText; btn.style.background = "#8E24AA"; btn.style.color = "#fff"; }, 3000); })
             .catch(() => { btn.innerText = "❌ ERROR"; setTimeout(() => { btn.innerText = originalText; }, 3000); });
         }
+
+        // --- EXTRACCIÓN DE BOUNDING BOX GLOBAL (FASE 12) ---
+        window.sendToCopilot = () => {
+            if(!currentGroup || currentGroup.children.length === 0) {
+                alert("⚠️ No hay piezas cargadas en el estudio.");
+                return;
+            }
+            
+            // Calculamos la caja que envuelve TODO el ensamblaje actual
+            const box = new THREE.Box3().setFromObject(currentGroup);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            
+            let totalPolys = 0;
+            currentGroup.traverse((child) => {
+                if (child.isMesh && child.geometry && child.geometry.attributes.position) {
+                    totalPolys += Math.round(child.geometry.attributes.position.count / 3);
+                }
+            });
+
+            const metadata = {
+                x: size.x.toFixed(2),
+                y: size.y.toFixed(2),
+                z: size.z.toFixed(2),
+                polys: totalPolys
+            };
+            
+            localStorage.setItem('nexus_copilot_data', JSON.stringify(metadata));
+            const t = document.getElementById('toast'); 
+            t.innerText = "🧠 Datos transferidos. Ve a IA Asistente."; 
+            t.style.display = 'block'; 
+            setTimeout(() => t.style.display = 'none', 4000);
+        };
 
         function createTex(type) {
             const c = document.createElement('canvas'); c.width=512; c.height=512; const ctx = c.getContext('2d');
@@ -226,9 +320,7 @@
                 dragControls.addEventListener('hoveroff', (e) => { e.object.material.emissive.setHex(0x000000); });
                 dragControls.addEventListener('dragstart', () => { controls.enabled = false; });
                 
-                // --- CONEXIÓN AL NUEVO MOTOR AUTO-MATE ---
                 dragControls.addEventListener('drag', (e) => { snapToClosest(e.object); });
-                
                 dragControls.addEventListener('dragend', () => { controls.enabled = true; });
             }
             if(centerCam) { 
@@ -237,17 +329,14 @@
             }
         }
 
-        // --- CEREBRO AUTO-MATE (SNAPPING SEMÁNTICO MAGNÉTICO) ---
         function snapToClosest(movingMesh) {
             movingMesh.updateMatrixWorld();
-
-            // 1. Calcular el Bounding Box global y el Centro de la pieza que movemos
             const mBox = new THREE.Box3().setFromObject(movingMesh);
             const mCenter = new THREE.Vector3();
             mBox.getCenter(mCenter);
 
-            const snapDistXZ = 8.0; // Distancia magnética para alinear centros (agujeros/ejes)
-            const snapDistY = 3.0;  // Distancia magnética para apilar caras (planos)
+            const snapDistXZ = 8.0; 
+            const snapDistY = 3.0;  
 
             for(let other of interactableMeshes) {
                 if(other === movingMesh) continue;
@@ -257,41 +346,40 @@
                 const oCenter = new THREE.Vector3();
                 oBox.getCenter(oCenter);
 
-                // 2. Verificar proximidad en el plano XZ (Alineación de ejes/cilindros)
                 const distXZ = Math.hypot(mCenter.x - oCenter.x, mCenter.z - oCenter.z);
 
                 if(distXZ < snapDistXZ) {
-                    // SNAP DE EJES (Magnético XZ)
                     movingMesh.position.x -= (mCenter.x - oCenter.x);
                     movingMesh.position.z -= (mCenter.z - oCenter.z);
 
-                    // Recalcular caja tras mover XZ
                     movingMesh.updateMatrixWorld();
                     mBox.setFromObject(movingMesh);
 
-                    // 3. SNAP DE CARAS (Apilamiento en Y)
                     if (Math.abs(mBox.min.y - oBox.max.y) < snapDistY) {
-                        // Lo apilamos encima
                         movingMesh.position.y += (oBox.max.y - mBox.min.y);
                     } else if (Math.abs(mBox.max.y - oBox.max.y) < snapDistY) {
-                        // Lo metemos a ras (superficies alineadas por arriba)
                         movingMesh.position.y += (oBox.max.y - mBox.max.y);
                     }
 
-                    // Efecto visual de "Enganche"
                     const origEmissive = other.material.emissive ? other.material.emissive.getHex() : 0x000000;
-                    other.material.emissive.setHex(0x005533); // Destello verde oscuro de confirmación
+                    other.material.emissive.setHex(0x005533); 
                     setTimeout(() => { 
                         if(other.material) other.material.emissive.setHex(origEmissive); 
                     }, 200);
                     
-                    break; // Solo encajamos con una pieza a la vez
+                    break; 
                 }
             }
         }
 
         document.getElementById('matSelect').addEventListener('change', () => { stateHash = ""; checkState(); });
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } 
+        
+        window.onload = () => {
+            initMultiplayer();
+            animate();
+        };
+
         window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>

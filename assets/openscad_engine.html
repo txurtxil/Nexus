@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v8.10 (AR + CAM + DRAFTING)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v8.11 (PHYSICS + CAM)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -11,7 +11,7 @@
         
         .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; width: 150px; }
+        #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; gap: 8px; width: 150px; max-height: 90vh; overflow-y: auto; }
         .btn { background: #21262D; border: 1px solid var(--nexus-border); color: #fff; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-transform: uppercase; text-align: left; display: flex; justify-content: space-between; transition: all 0.2s; }
         .btn:hover { background: #30363D; }
         .btn:active { transform: scale(0.95); }
@@ -29,14 +29,12 @@
         
         #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
         
-        /* 🔥 NUEVO ENGRANAJE DE CARGA AL ESTILO OPENSCAD */
-        .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; }
+        /* 🔥 ENGRANAJE DE CARGA AL ESTILO OPENSCAD */
+        .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Estilos Realidad Mixta (AR) */
         #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
 
-        /* Estilos del Slicer Modal (Fase 5) */
         #slicer-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #161B22; border: 2px solid #00E676; border-radius: 8px; padding: 20px; z-index: 100; box-shadow: 0 10px 30px rgba(0,230,118,0.2); }
         .slicer-title { color: #00E676; font-weight: bold; font-size: 14px; text-transform: uppercase; margin-bottom: 15px; text-align: center; letter-spacing: 1px; }
         .slicer-input-group { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
@@ -50,6 +48,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 </head>
 <body>
 
@@ -68,6 +67,9 @@
 
         <button class="btn" style="border-left: 3px solid #00E5FF;" onclick="toggleLights()">Luces <span>💡</span></button>
         <button class="btn" style="border-left: 3px solid #B388FF;" onclick="toggleKine()">Animación <span>🎬</span></button>
+        
+        <button class="btn" style="border-left: 3px solid #FF5252; background: #2A0A0A;" onclick="togglePhysics()">Gravedad <span>🍎</span></button>
+        
         <button class="btn" style="border-left: 3px solid #00E676;" onclick="toggleAutoRotate()">Rotar <span>🔄</span></button>
         <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
         <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura <span>🎨</span></button>
@@ -123,17 +125,16 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v8.10 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v8.11 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
-    <div id="loader" style="display:none;">
+    <div id="loader">
         <div class="gear-spinner">⚙️</div>
-        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold;">WORKER PROCESANDO...</div>
+        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
     </div>
 
     <script type="module">
-        // Importamos ARButton para habilitar la Realidad Mixta Passthrough
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
         window.NEXUS_HD_EXPORT = false;
@@ -141,11 +142,16 @@
         
         window.KINE_T_VALUE = 0;
         window.isWorkerBusy = false; 
-        window.isKineActive = true; // Control de cinemática
+        window.isKineActive = true; 
+
+        // VARIABLES FASE 8 (CANNON.JS)
+        let world, physicsBody, floorBody;
+        window.isPhysicsActive = false;
 
         window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
         
         window.toggleKine = () => {
+            if(window.isPhysicsActive) { log("<span class='log-err'>> Desactiva la gravedad primero.</span>"); document.getElementById('console').style.display = 'block'; return; }
             window.isKineActive = !window.isKineActive;
             log(`<span class='log-warn'>> 🎬 Cinemática ${window.isKineActive ? 'Activada' : 'Pausada'}</span>`);
             document.getElementById('console').style.display = 'block';
@@ -192,7 +198,40 @@
             }
         };
 
-        // LÓGICA DE DRAFTING 2D (FASE 3)
+        // 🔥 FASE 8: LÓGICA DE FÍSICAS (CANNON.JS)
+        window.togglePhysics = () => {
+            if(!currentMesh) return;
+            window.isPhysicsActive = !window.isPhysicsActive;
+            
+            if (window.isPhysicsActive) {
+                log("<span class='log-warn'>> 🍎 Motor Físico Activado. ¡Haz clic en la pieza para empujarla!</span>");
+                document.getElementById('console').style.display = 'block';
+                window.isKineActive = false; // Pausar cinemática matemática
+                
+                // Calcular caja envolvente para colisión
+                currentMesh.geometry.computeBoundingBox();
+                const size = new THREE.Vector3();
+                currentMesh.geometry.boundingBox.getSize(size);
+                
+                // Crear RigidBody
+                const shape = new CANNON.Box(new CANNON.Vec3(size.x/2, size.y/2, size.z/2));
+                if(physicsBody) world.remove(physicsBody);
+                
+                physicsBody = new CANNON.Body({
+                    mass: 5, // 5 kg
+                    position: new CANNON.Vec3(currentMesh.position.x, currentMesh.position.y + 10, currentMesh.position.z),
+                    material: new CANNON.Material({ friction: 0.1, restitution: 0.7 })
+                });
+                physicsBody.addShape(shape);
+                world.addBody(physicsBody);
+            } else {
+                log("<span class='log-ok'>> 🛑 Gravedad Desactivada. Control CSG restaurado.</span>");
+                if(physicsBody) world.remove(physicsBody);
+                currentMesh.position.set(0,0,0);
+                currentMesh.quaternion.set(0,0,0,1);
+            }
+        };
+
         window.exportBlueprint = () => {
             if(!currentMesh) { log("<span class='log-err'>No hay pieza generada.</span>"); document.getElementById('console').style.display = 'block'; return; }
             log("<span class='log-warn'>> 📐 Generando Plano Técnico Blueprint...</span>");
@@ -275,7 +314,6 @@
             log("<span class='log-ok'>> ¡Plano descargado!</span>");
         };
 
-        // LÓGICA NEXUS CAM SLICER (FASE 5)
         window.openSlicer = () => {
             if(!currentMesh) { log("<span class='log-err'>No hay pieza para laminar.</span>"); document.getElementById('console').style.display = 'block'; return; }
             document.getElementById('slicer-modal').style.display = 'block';
@@ -362,10 +400,7 @@
 
         window.changeLOD = () => {
             if (lastCode !== "") {
-                let val = document.getElementById('lod-selector').value;
-                log("<span class='log-warn'>> Recalculando malla a " + val + " polígonos/curva...</span>");
-                document.getElementById('console').style.display = 'block';
-                executeCSGCode(lastCode);
+                executeCSGCode(lastCode, true); // Forzamos mostrar el loader al cambiar la calidad
             }
         };
 
@@ -373,7 +408,7 @@
             if(!lastCode) { log("<span class='log-err'>No hay geometría para exportar.</span>"); document.getElementById('console').style.display = 'block'; return; }
             window.IS_EXPORTING_HD = true;
             window.NEXUS_HD_EXPORT = true;
-            executeCSGCode(lastCode); 
+            executeCSGCode(lastCode, true); 
         };
 
         document.getElementById('hw-cpu').innerText = (navigator.hardwareConcurrency || '?') + ' Cores';
@@ -384,7 +419,7 @@
             const gl = document.createElement('canvas').getContext('webgl');
             const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
             document.getElementById('hw-gpu').innerText = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).split(',')[0].replace('ANGLE (', '').substring(0, 18);
-        } catch (e) { document.getElementById('hw-gpu').innerText = "Bloqueado/Oculto"; }
+        } catch (e) { document.getElementById('hw-gpu').innerText = "Bloqueado"; }
 
         function log(msg) {
             const div = document.getElementById('log-content');
@@ -402,12 +437,11 @@
             grid.position.y = -50; 
             scene.add(grid);
             
-            // 🔥 CORRECCIÓN DE ILUMINACIÓN
             lightGroup = new THREE.Group();
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Luz base fuerte
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); // Sombra y reflejo
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); 
             dirLight.position.set(100, 200, 100);
-            const hemiLight = new THREE.HemisphereLight(0x00E5FF, 0x6200EA, 0.5); // Tono Cyberpunk
+            const hemiLight = new THREE.HemisphereLight(0x00E5FF, 0x6200EA, 0.5); 
             
             lightGroup.add(ambientLight);
             lightGroup.add(dirLight);
@@ -420,7 +454,6 @@
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer: true }); 
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio); 
-            
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -441,53 +474,87 @@
                         vec3 coolColor = vec3(0.0, 0.3, 0.8);
                         vec3 midColor = vec3(1.0, 0.8, 0.0);
                         vec3 hotColor = vec3(1.0, 0.0, 0.0);
-                        
                         vec3 finalColor = mix(coolColor, midColor, smoothstep(0.0, 0.5, vIntensity));
                         finalColor = mix(finalColor, hotColor, smoothstep(0.5, 1.0, vIntensity));
-                        
                         gl_FragColor = vec4(finalColor, 1.0);
                     }
                 `,
                 side: THREE.DoubleSide
             });
 
-            // 🔥 FASE 6: REALIDAD MIXTA (AR PASSTHROUGH)
+            // 🔥 INICIALIZACIÓN MUNDO FÍSICO CANNON.JS
+            world = new CANNON.World();
+            world.gravity.set(0, -98.2, 0); // Gravedad realista
+            world.broadphase = new CANNON.NaiveBroadphase();
+            world.solver.iterations = 10;
+
+            // Suelo Físico (Plano invisible colisionador)
+            const floorShape = new CANNON.Plane();
+            floorBody = new CANNON.Body({ mass: 0 }); // Masa 0 = Estático
+            floorBody.addShape(floorShape);
+            floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+            floorBody.position.y = -50; // Alinear con el Grid Helper visual
+            world.addBody(floorBody);
+
             renderer.xr.enabled = true; 
             document.body.appendChild( ARButton.createButton( renderer ) );
 
-            // Algoritmo de Escala 1:1 para el mundo real
             renderer.xr.addEventListener('sessionstart', () => {
-                scene.background = null; // Vuelve el fondo transparente para la cámara
+                scene.background = null; 
                 if(grid) grid.visible = false;
-                
                 if (currentMesh) {
-                    // Escala crítica: CSG usa mm, WebXR usa Metros. Escala x0.001
                     currentMesh.scale.set(0.001, 0.001, 0.001);
-                    // Coloca la pieza a 50cm delante del teléfono y 20cm más abajo
                     currentMesh.position.set(0, -0.2, -0.5); 
                 }
-                log("<span class='log-ok'>> 🕶️ AR Activo: Escala 1:1 ajustada a Metros.</span>");
             });
 
             renderer.xr.addEventListener('sessionend', () => {
                 scene.background = new THREE.Color(0x000000);
                 if(grid) grid.visible = true;
-                
                 if (currentMesh) {
                     currentMesh.scale.set(1, 1, 1);
-                    currentMesh.position.set(0, 0, 0); // Vuelve al centro del visor
+                    currentMesh.position.set(0, 0, 0); 
                 }
-                log("<span class='log-warn'>> AR Finalizado.</span>");
             });
 
             container.appendChild(renderer.domElement);
-            
             controls = new THREE.OrbitControls(camera, renderer.domElement); 
             controls.enableDamping = true;
             controls.target.set(0,0,0);
             
+            // Interactividad: Raycaster para Empujar piezas físicamente
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            window.addEventListener('pointerdown', (e) => {
+                if(!window.isPhysicsActive || !physicsBody || !currentMesh) return;
+                // No interactuar si tocamos un botón de la UI
+                if(e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+                
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                
+                let intersects = raycaster.intersectObject(currentMesh);
+                if(intersects.length > 0) {
+                    // Aplicar un empujón fuerte y giro hacia arriba
+                    physicsBody.velocity.set((Math.random()-0.5)*100, 150, (Math.random()-0.5)*100);
+                    physicsBody.angularVelocity.set((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10);
+                }
+            });
+
             window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
-            renderer.setAnimationLoop( function () { controls.update(); renderer.render(scene, camera); });
+            
+            // LOOP PRINCIPAL (RENDER + FÍSICAS)
+            renderer.setAnimationLoop( function () { 
+                controls.update(); 
+                if (window.isPhysicsActive && physicsBody && currentMesh) {
+                    world.step(1 / 60); // Paso de simulación de Cannon.js
+                    // Vincular la pieza visual al cuerpo físico
+                    currentMesh.position.copy(physicsBody.position);
+                    currentMesh.quaternion.copy(physicsBody.quaternion);
+                }
+                renderer.render(scene, camera); 
+            });
         }
 
         const workerCode = `
@@ -623,15 +690,18 @@
                 isImportingSTL = false;
                 if(data.success) {
                     log("<span class='log-ok'>> Módulo Híbrido: STL indexado listo.</span>");
-                    if (lastCode !== "") executeCSGCode(lastCode); 
+                    if (lastCode !== "") executeCSGCode(lastCode, true); 
                 } else {
-                    log("<span class='log-err'>> ERROR (STL Import): " + data.err + "</span>"); document.getElementById('console').style.display = 'block';
+                    log("<span class='log-err'>> ERROR (STL Import): " + data.err + "</span>"); 
+                    document.getElementById('console').style.display = 'block';
                     document.getElementById('loader').style.display = 'none';
                 }
                 return;
             }
 
+            // Ocultamos SIEMPRE el loader al terminar cualquier cálculo
             document.getElementById('loader').style.display = 'none';
+            
             if(data.success) {
                 const geom = new THREE.BufferGeometry();
                 geom.setAttribute('position', new THREE.BufferAttribute(data.v, 3)); 
@@ -670,8 +740,15 @@
                         window.IS_EXPORTING_HD = false;
                         window.NEXUS_HD_EXPORT = false;
                         log("<span class='log-ok'>> Exportación HD procesada. Volviendo a LOD base...</span>");
-                        executeCSGCode(lastCode); 
+                        executeCSGCode(lastCode, true); 
                     }, 500);
+                }
+
+                // Sincronizar Físicas si están activas y la forma cambia
+                if (window.isPhysicsActive && physicsBody) {
+                    const shape = new CANNON.Box(new CANNON.Vec3(size.x/2, size.y/2, size.z/2));
+                    physicsBody.shapes = []; 
+                    physicsBody.addShape(shape);
                 }
 
             } else {
@@ -681,22 +758,20 @@
             }
         };
 
-        function executeCSGCode(rawCode) {
+        // Lógica de carga modificada para manejar la visualización del engranaje
+        function executeCSGCode(rawCode, forceLoader = false) {
             if (isImportingSTL || window.isWorkerBusy) return; 
             window.isWorkerBusy = true;
             
-            let optimizedCode = rawCode;
-            
+            if (forceLoader || window.NEXUS_HD_EXPORT) {
+                document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "RENDERIZANDO HD (512 SLICES)..." : "CALCULANDO SÓLIDO...";
+                document.getElementById('loader').style.display = 'flex';
+            }
+
             let comboValue = parseInt(document.getElementById('lod-selector').value);
             let currentSlices = window.NEXUS_HD_EXPORT ? 512 : comboValue; 
 
-            if (window.NEXUS_HD_EXPORT) {
-                document.getElementById('loader-txt').innerText = "RENDERIZANDO HD (512 SLICES)...";
-            } else {
-                document.getElementById('loader-txt').innerText = "";
-            }
-
-            optimizedCode = optimizedCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
+            let optimizedCode = rawCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
             optimizedCode = optimizedCode.replace(/resolution\s*:\s*\d+/g, 'resolution: ' + currentSlices);
 
             let filletHelper = "function roundedBox(w, d, h, r) {\n" +
@@ -718,22 +793,20 @@
             optimizedCode = optimizedCode.replace(/return main\(\{.*\}\);/g, "");
 
             optimizedCode = filletHelper + optimizedCode + executionCall;
-
-            if (window.NEXUS_HD_EXPORT) document.getElementById('loader').style.display = 'flex';
             
             t0 = performance.now(); 
             csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
         }
 
-        // 🔥 CONTROL DE CINEMÁTICA CON BOTÓN
+        // Bucle de cinemática que NO muestra el loader
         setInterval(() => {
-            if (window.isKineActive && lastCode !== "" && lastCode.includes("KINE_T")) {
+            if (window.isKineActive && lastCode !== "" && lastCode.includes("KINE_T") && !window.isPhysicsActive) {
                 window.KINE_T_VALUE += 5; 
                 if (window.KINE_T_VALUE > 36000) window.KINE_T_VALUE = 0; 
                 document.getElementById('hw-kinet').innerText = window.KINE_T_VALUE;
                 
                 if (!window.isWorkerBusy) {
-                    executeCSGCode(lastCode);
+                    executeCSGCode(lastCode, false);
                 }
             }
         }, 50);
@@ -840,7 +913,8 @@
                         if (decoded !== lastCode) { 
                             lastCode = decoded; 
                             window.isWorkerBusy = false; 
-                            if (!isImportingSTL && !lastCode.includes("KINE_T")) executeCSGCode(lastCode); 
+                            // Si es un código nuevo y no de importación, forzamos mostrar el loader
+                            if (!isImportingSTL) executeCSGCode(lastCode, true); 
                         }
                     }
                 }).catch(e => {});

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.1 (AR, AI & GIT TIMELINE)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.2 (AR FIX & GIT TIMELINE)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -32,8 +32,8 @@
         .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Ocultamos el botón original de Three.js para usar el nuestro en el toolbar */
-        #ARButton { display: none !important; }
+        /* 🔥 FASE 13.2: Restaurado el botón original flotante para cumplir con políticas de seguridad WebXR */
+        #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
 
         #slicer-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #161B22; border: 2px solid #00E676; border-radius: 8px; padding: 20px; z-index: 100; box-shadow: 0 10px 30px rgba(0,230,118,0.2); }
         .slicer-title { color: #00E676; font-weight: bold; font-size: 14px; text-transform: uppercase; margin-bottom: 15px; text-align: center; letter-spacing: 1px; }
@@ -45,7 +45,6 @@
         .btn-close { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #8B949E; cursor: pointer; font-weight: bold; }
         .btn-close:hover { color: #FFF; }
 
-        /* 🔥 FASE 13: ESTILOS DEL TIMELINE GIT */
         #timeline-panel { top: 15px; left: 180px; width: 280px; max-height: 80vh; overflow-y: auto; display: none; border-top: 3px solid #FFF; }
         .commit-card { background: #161B22; border: 1px solid #30363D; border-radius: 6px; padding: 10px; margin-bottom: 8px; position: relative; }
         .commit-card::before { content: ''; position: absolute; left: -13px; top: 15px; width: 12px; height: 2px; background: #30363D; }
@@ -91,9 +90,6 @@
         <button class="btn" style="border-left: 3px solid #00E676;" onclick="toggleAutoRotate()">Rotar <span>🔄</span></button>
         <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
         <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura PBR <span>🎨</span></button>
-        
-        <button class="btn" style="border-left: 3px solid #00E5FF; background: #002233;" onclick="startAR()">Real. Aumentada <span>📱</span></button>
-
         <button class="btn" style="border-left: 3px solid #FF3D00;" onclick="toggleStressAnalysis()">Simulación FEA <span>🔥</span></button>
         
         <button class="btn" style="border-left: 3px solid #00B0FF;" onclick="exportBlueprint()">Plano 2D <span>📐</span></button>
@@ -156,7 +152,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v13.1 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v13.2 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -173,7 +169,6 @@
         window.isWorkerBusy = false; 
         window.isKineActive = true; 
 
-        // 🔥 FASE 13: VARIABLES DE MÁQUINA DEL TIEMPO
         let codeHistory = [];
         let isCompareMode = false;
         let ghostMesh = null;
@@ -200,7 +195,6 @@
             document.getElementById('console').style.display = 'block';
         };
 
-        // 🔥 FASE 13: Lógica UI Timeline
         window.toggleTimeline = () => {
             const p = document.getElementById('timeline-panel');
             p.style.display = (p.style.display === 'none' || p.style.display === '') ? 'block' : 'none';
@@ -358,18 +352,6 @@
             localStorage.setItem('nexus_copilot_data', JSON.stringify(metadata));
             log("<span class='log-ok'>> 🧠 Datos transferidos al AI Copilot. Ve a la pestaña de IA.</span>");
             document.getElementById('console').style.display = 'block';
-        };
-
-        window.startAR = () => {
-            const nativeBtn = document.getElementById('ARButton');
-            if(nativeBtn) {
-                log("<span class='log-warn'>> 📱 Iniciando Realidad Aumentada...</span>");
-                document.getElementById('console').style.display = 'block';
-                nativeBtn.click();
-            } else {
-                log("<span class='log-err'>> Tu navegador no soporta WebXR AR.</span>");
-                document.getElementById('console').style.display = 'block';
-            }
         };
 
         window.togglePhysics = () => {
@@ -836,7 +818,6 @@
 
             renderer.xr.enabled = true; 
             if(typeof ARButton !== 'undefined') {
-                // Se inyecta en el DOM de forma invisible
                 document.body.appendChild( ARButton.createButton( renderer ) );
             }
 
@@ -844,8 +825,8 @@
                 scene.background = null; 
                 if(grid) grid.visible = false;
                 if (currentMesh) {
-                    currentMesh.scale.set(0.001, 0.001, 0.001); // Pasamos la escala a metros para AR real
-                    currentMesh.position.set(0, -0.2, -0.5); // A medio metro frente a la cámara
+                    currentMesh.scale.set(0.001, 0.001, 0.001); 
+                    currentMesh.position.set(0, -0.2, -0.5); 
                 }
             });
 
@@ -1091,13 +1072,12 @@
                 document.getElementById('geo-poly').innerText = (data.v.length / 3).toString();
                 document.getElementById('geo-time').innerText = timeMs + " ms";
 
-                // 🔥 FASE 13: GUARDAR EN LA MÁQUINA DEL TIEMPO
                 if (!window.isKineActive && !window.NEXUS_HD_EXPORT && !isImportingSTL) {
                     if (codeHistory.length === 0 || codeHistory[codeHistory.length - 1].code !== lastCode) {
                         codeHistory.push({
                             time: new Date().toLocaleTimeString(),
                             code: lastCode,
-                            v: new Float32Array(data.v), // Clonar buffer para que no se sobreescriba
+                            v: new Float32Array(data.v), 
                             n: new Float32Array(data.n),
                             c: data.c ? new Float32Array(data.c) : null,
                             ms: timeMs

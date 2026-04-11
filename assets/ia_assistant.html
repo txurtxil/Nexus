@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.14 - SLICER AGENTIC CORE</title>
+    <title>NEXUS AI v23.15 - DOUBLE AGENT CORE</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -34,7 +34,6 @@
         .toggle-container input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #FFAB00; }
         .toggle-label { font-size: 12px; color: #E6EDF3; cursor: pointer; }
 
-        /* 🔥 FASE 15: Panel Slicer UI */
         .slicer-panel { background: #161B22; padding: 12px; border: 1px solid #00E5FF; border-radius: 6px; }
         .slicer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;}
         .slicer-grid input { padding: 8px; font-weight: bold; color: #FFF;}
@@ -47,7 +46,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.14 - SLICER AGENTIC)</h2>
+    <h2>🤖 Nexus AI Core (v23.15 - DOUBLE AGENT)</h2>
 </div>
 
 <div class="content">
@@ -69,7 +68,8 @@
     <div class="toggle-container">
         <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
-            <option value="copilot">🛠️ Copiloto Libre (Programar JS-CSG)</option>
+            <option value="architect">🧠 Doble Agente (Texto Natural -> 3D)</option>
+            <option value="copilot">🛠️ Copiloto Libre (Programar / Editar)</option>
             <option value="agentic">🎛️ Agentic UI (Mover Slicer App)</option>
         </select>
     </div>
@@ -84,7 +84,7 @@
         </div>
     </div>
     
-    <div class="toggle-container" id="memoryContainer">
+    <div class="toggle-container" id="memoryContainer" style="display:none;">
         <input type="checkbox" id="useMemory" checked>
         <label for="useMemory" class="toggle-label">🧠 <b>Modo Iterativo:</b> Leer y modificar la pieza actual.</label>
     </div>
@@ -111,7 +111,7 @@
 
     <div>
         <label>Instrucción / Animación / Errores:</label>
-        <textarea id="promptInput" placeholder="Ej: Clona esta pieza... O en Modo Agentic: Configura para imprimir TPU."></textarea>
+        <textarea id="promptInput" placeholder="Ej: Hazme una base para mi smartphone para ver vídeos en horizontal..."></textarea>
     </div>
 
     <button onclick="generateCode()" id="btnGenerate">⚡ Analizar / Ejecutar</button>
@@ -164,7 +164,8 @@
         if(savedKey) document.getElementById('apiKey').value = savedKey;
         
         document.getElementById('aiMode').addEventListener('change', (e) => {
-            document.getElementById('memoryContainer').style.display = e.target.value === 'agentic' ? 'none' : 'flex';
+            const val = e.target.value;
+            document.getElementById('memoryContainer').style.display = val === 'copilot' ? 'flex' : 'none';
         });
 
         checkDataBridge();
@@ -201,6 +202,7 @@
 
     function applyGenerativeMacro(type) {
         document.getElementById('aiMode').value = 'copilot';
+        document.getElementById('memoryContainer').style.display = 'flex';
         const promptBox = document.getElementById('promptInput');
         
         if (type === 'reverse') {
@@ -228,7 +230,6 @@
         if (type !== 'reverse') generateCode();
     }
 
-    // 🔥 ANIMACIÓN VISUAL PARA EL MODO AGENTIC
     function highlightSlider(elementId) {
         const el = document.getElementById(elementId);
         if(el) {
@@ -240,6 +241,20 @@
                 el.style.color = "#FFF";
             }, 800);
         }
+    }
+
+    // Función auxiliar para llamar a la API de Gemini
+    async function fetchGemini(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
+        let payloadParts = [{ text: systemInstruction + "\n\n" + promptText }];
+        if (imageB64) payloadParts.push({ inlineData: { mimeType: mimeType, data: imageB64 } });
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ contents: [{ parts: payloadParts }] })
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error?.message);
+        return data.candidates[0].content.parts[0].text.trim();
     }
 
     async function generateCode() {
@@ -254,64 +269,56 @@
         
         localStorage.setItem('nexus_gemini_key', key);
         document.getElementById('loader').style.display = 'block';
-        document.getElementById('loader').innerText = `Procesando con ${selectedModel}...`;
         document.getElementById('codeOutput').value = "";
 
-        let systemInstruction = "";
-        let finalPrompt = prompt;
-
-        if (aiMode === "agentic") {
-            // 🔥 FASE 15: CEREBRO AGENTIC PARA EL LAMINADOR
-            systemInstruction = `Eres el Agente CAM de NEXUS. Tu objetivo es configurar automáticamente los parámetros de laminado (Slicer) para la impresora Bambu Lab A1 Mini basándote en la intención del usuario.
-Devuelve ÚNICAMENTE un JSON válido. Cero explicaciones. Cero Markdown.
-
-Estructura obligatoria:
-{"tool": "slicer", "params": {"nozzle_temp": valor_numerico, "bed_temp": valor_numerico, "speed": valor_numerico, "infill": valor_numerico}}
-
-Guía de perfiles térmicos y mecánicos:
-- PLA (Prototipos rápidos, piezas estéticas): Fusor 220, Cama 60, Vel 150-200, Relleno 10-15%.
-- PETG (Mecánico, exterior, coche, calor moderado): Fusor 240-250, Cama 70-80, Vel 40-60, Relleno 30-50%.
-- TPU / Flexible (Fundas, amortiguadores): Fusor 230, Cama 40, Vel 20-30, Relleno 15-40% (determina la rigidez).
-- ABS / ASA (Alta temperatura): Fusor 260, Cama 90, Vel 50, Relleno 40%.
-- Pieza ultra resistente/sólida: Sube el infill a 80-100%.`;
-            finalPrompt = `Instrucción del usuario: "${prompt}"`;
-        } 
-        else {
-            systemInstruction = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando la librería 'csg.js' nativa de JavaScript.
-Tu ÚNICO objetivo es devolver código JavaScript puro. NUNCA uses markdown ni \`\`\`javascript.
-El código DEBE contener una función global 'main(params)' que retorne un ÚNICO objeto CSG final.
-
-⛔ REGLAS VITALES MATEMÁTICAS (ANTI-FLIP BSP ERROR):
-1. NO PASES ARRAYS a booleanas. NUNCA HAGAS a.subtract([b,c]). DEBES encadenar: a.subtract(b).subtract(c).
-2. CARAS COPLANARES: Cualquier objeto de resta (subtract) debe ser EXAGERADAMENTE MÁS LARGO que la pieza a cortar.
-
-⛔ REGLA FÍSICA ESTRICTA (BAMBU LAB A1 MINI):
-Si generas una pieza que supere los 170mm en cualquier eje, DEBES aplicar un escalado usando .scale() al objeto final justo antes de retornarlo para que encaje perfectamente.`;
-
-            if (useMemory) {
-                let currentCode = await getCurrentCode();
-                if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta.`;
-                    finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
-                }
-            }
-        }
-
-        let payloadParts = [{ text: systemInstruction + "\n\n" + finalPrompt }];
-        if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
-
         try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ contents: [{ parts: payloadParts }] })
-            });
-            const data = await res.json();
-            if(!res.ok) throw new Error(data.error?.message);
-            
-            let text = data.candidates[0].content.parts[0].text.trim();
-            
-            if (aiMode === "agentic") {
-                // 🔥 FASE 15: INTERCEPCIÓN Y ANIMACIÓN DEL SLICER
+            let finalCodeText = "";
+
+            // 🔥 FASE 16: DOBLE AGENTE (Traductor Natural -> Ingeniero 3D)
+            if (aiMode === "architect") {
+                document.getElementById('loader').innerText = "🧠 Arquitecto: Traduciendo a especificaciones mecánicas...";
+                
+                const archSystem = `Eres el Arquitecto Mecánico Jefe. El usuario te pedirá objetos cotidianos en lenguaje natural. 
+Tu tarea: Traducir su deseo a un pliego técnico estricto de diseño 3D.
+Debes detallar: 
+1. Primitivas base a usar (cubos, cilindros).
+2. Medidas lógicas en milímetros (dedúcelas: ej. un vaso mide 80x80x100mm, un móvil 75x150x10mm).
+3. Operaciones booleanas requeridas (cortes, uniones).
+Devuelve SOLO la especificación técnica en 3-4 viñetas. Nada más.`;
+                
+                let techPlan = await fetchGemini("gemini-3-flash-preview", key, archSystem, `Deseo del usuario: "${prompt}"`, currentB64, currentMimeType);
+                
+                document.getElementById('loader').innerText = `⚙️ Programador: Escribiendo código CSG con ${selectedModel}...`;
+                
+                const coderSystem = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando 'csg.js'.
+Tu objetivo es devolver código JavaScript puro basado EXACTAMENTE en la especificación técnica dada.
+NUNCA uses markdown ni \`\`\`javascript.
+El código DEBE contener una función global 'main(params)'.
+
+⛔ REGLAS VITALES:
+1. NO PASES ARRAYS a booleanas (usa a.subtract(b).subtract(c)).
+2. CARAS COPLANARES: Objetos de resta deben ser MUCHO MÁS LARGOS que la pieza a cortar.
+3. LÍMITE FÍSICO 180mm: Si excede 170mm, usa .scale() antes de retornar.`;
+
+                let rawCode = await fetchGemini(selectedModel, key, coderSystem, `Escribe el código para este plan técnico:\n\n${techPlan}`);
+                
+                rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
+                
+                // Formateamos la salida para que el usuario vea la magia del Doble Agente
+                finalCodeText = `/* ========================================\n   🧠 PLAN TÉCNICO DEL ARQUITECTO:\n----------------------------------------\n${techPlan}\n======================================== */\n\n${rawCode}`;
+                document.getElementById('codeOutput').value = finalCodeText;
+            } 
+            else if (aiMode === "agentic") {
+                document.getElementById('loader').innerText = `🎛️ Agente Slicer analizando perfil de material...`;
+                const slicerSystem = `Eres el Agente CAM de NEXUS. Configura los parámetros de laminado (Slicer) para la Bambu Lab A1 Mini. Devuelve ÚNICAMENTE un JSON válido.
+Estructura: {"tool": "slicer", "params": {"nozzle_temp": num, "bed_temp": num, "speed": num, "infill": num}}
+Perfiles:
+- PLA: Fusor 220, Cama 60, Vel 150-200, Relleno 10-15%.
+- PETG: Fusor 240, Cama 70, Vel 60, Relleno 30-50%.
+- TPU: Fusor 230, Cama 40, Vel 30, Relleno 20%.
+- ABS: Fusor 260, Cama 90, Vel 50, Relleno 40%.`;
+                
+                let text = await fetchGemini("gemini-3-flash-preview", key, slicerSystem, prompt);
                 text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
                 let jsonPayload = JSON.parse(text);
                 document.getElementById('codeOutput').value = "JSON INTERCEPTADO (Slicer Actualizado):\n" + JSON.stringify(jsonPayload, null, 2);
@@ -322,11 +329,20 @@ Si generas una pieza que supere los 170mm en cualquier eje, DEBES aplicar un esc
                     if(jsonPayload.params.speed) { document.getElementById('speed').value = jsonPayload.params.speed; highlightSlider('speed'); }
                     if(jsonPayload.params.infill) { document.getElementById('infill').value = jsonPayload.params.infill; highlightSlider('infill'); }
                 }
-
-                // Enviar también al backend si el motor principal lo requiere
                 await fetch('/api/agentic_ui', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: text });
-
-            } else {
+            } 
+            else {
+                document.getElementById('loader').innerText = `🛠️ Copiloto procesando código...`;
+                let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro, NUNCA markdown. Retorna main(params). Reglas Anti-Flip: Cero Arrays, restas exageradamente largas. Límite: 180mm.`;
+                let finalPrompt = prompt;
+                if (useMemory) {
+                    let currentCode = await getCurrentCode();
+                    if (currentCode && currentCode.trim() !== "") {
+                        sys += `\nMantén la estructura actual.`;
+                        finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\nINSTRUCCIÓN: ${prompt}`;
+                    }
+                }
+                let text = await fetchGemini(selectedModel, key, sys, finalPrompt, currentB64, currentMimeType);
                 text = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 document.getElementById('codeOutput').value = text;
             }
@@ -339,7 +355,7 @@ Si generas una pieza que supere los 170mm en cualquier eje, DEBES aplicar un esc
 
     async function inject() {
         if(document.getElementById('aiMode').value === "agentic") {
-            alert("⚠️ En Modo Agentic UI la IA configura el Slicer. Para inyectar piezas 3D, cambia a 'Copiloto Libre'."); return;
+            alert("⚠️ En Modo Agentic UI la IA configura el Slicer. No hay modelo 3D que inyectar."); return;
         }
         const code = document.getElementById('codeOutput').value.trim();
         if(!code) return;

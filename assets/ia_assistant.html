@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.5 - VISION TO PRINT CORE (GEMINI 3.1 PRO)</title>
+    <title>NEXUS AI v23.7 - VISION TO PRINT CORE (MULTI-MODEL)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
         .header h2 { margin: 0; color: #FFAB00; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
         .content { padding: 15px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        label { font-size: 11px; color: #8B949E; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+        label { font-size: 11px; color: #8B949E; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; display: block; }
         input, select, textarea { width: 100%; padding: 12px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 6px; outline: none; font-size: 13px; box-sizing: border-box; transition: border-color 0.2s; }
-        input:focus, textarea:focus { border-color: #FFAB00; }
+        input:focus, textarea:focus, select:focus { border-color: #FFAB00; }
         textarea { height: 90px; font-family: monospace; resize: vertical; }
         button { background-color: #FFAB00; color: #0B0E14; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
         button:hover { background-color: #FFC400; transform: translateY(-1px); }
@@ -43,7 +43,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.5 GEMINI 3.1 PRO)</h2>
+    <h2>🤖 Nexus AI Core (v23.7 MULTI-MODEL)</h2>
 </div>
 
 <div class="content">
@@ -51,9 +51,17 @@
         <label>API Key (Google Gemini):</label>
         <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
     </div>
+
+    <div>
+        <label>Motor IA (Selecciona en caso de error de tokens):</label>
+        <select id="modelSelector">
+            <option value="gemini-2.5-pro" selected>🧠 Gemini 2.5 Pro (Máximo Razonamiento - Recomendado)</option>
+            <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash Preview (Alta Velocidad - Backup)</option>
+        </select>
+    </div>
     
     <div class="toggle-container">
-        <label style="color:#FFAB00;">⚡ MODO:</label>
+        <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
             <option value="copilot">🛠️ Copiloto Libre (Programar JS-CSG)</option>
             <option value="agentic">🎛️ Agentic UI (Mover Sliders App)</option>
@@ -91,7 +99,7 @@
     </div>
 
     <button onclick="generateCode()">⚡ Analizar / Programar Pieza</button>
-    <div id="loader">Analizando geometría visual y calculando booleanas (Gemini 3.1 Pro)...</div>
+    <div id="loader">Analizando geometría visual y calculando booleanas...</div>
 
     <div>
         <label>Respuesta / Código JS (Editable):</label>
@@ -207,11 +215,13 @@
         const prompt = document.getElementById('promptInput').value.trim();
         const aiMode = document.getElementById('aiMode').value;
         const useMemory = document.getElementById('useMemory').checked;
+        const selectedModel = document.getElementById('modelSelector').value; // 🔥 Obtenemos el modelo seleccionado
         
         if(!key || (!prompt && !currentB64)) { alert("⚠️ Faltan datos."); return; }
         
         localStorage.setItem('nexus_gemini_key', key);
         document.getElementById('loader').style.display = 'block';
+        document.getElementById('loader').innerText = `Procesando con ${selectedModel}...`; // Feedback visual del modelo
         document.getElementById('codeOutput').value = "";
 
         let systemInstruction = "";
@@ -263,8 +273,8 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            // 🔥 CORRECCIÓN: Actualizado a Gemini 3.1 Pro Preview para máxima capacidad deductiva y visión 3D.
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${key}`, {
+            // 🔥 Fetch dinámico usando la variable selectedModel
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })
             });
@@ -289,7 +299,6 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
             document.getElementById('codeOutput').value = "// ERROR:\n" + e.message;
         } finally {
             document.getElementById('loader').style.display = 'none';
-            document.getElementById('loader').innerText = "Calculando matrices booleanas...";
         }
     }
 

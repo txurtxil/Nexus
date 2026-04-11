@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.4 - VISION TO PRINT CORE (GEMINI 2.5 PRO)</title>
+    <title>NEXUS AI v23.5 - VISION TO PRINT CORE (GEMINI 3.1 PRO)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -43,7 +43,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.4 GEMINI 2.5 PRO)</h2>
+    <h2>🤖 Nexus AI Core (v23.5 GEMINI 3.1 PRO)</h2>
 </div>
 
 <div class="content">
@@ -91,7 +91,7 @@
     </div>
 
     <button onclick="generateCode()">⚡ Analizar / Programar Pieza</button>
-    <div id="loader">Analizando geometría visual y calculando booleanas (Gemini 2.5 Pro)...</div>
+    <div id="loader">Analizando geometría visual y calculando booleanas (Gemini 3.1 Pro)...</div>
 
     <div>
         <label>Respuesta / Código JS (Editable):</label>
@@ -263,8 +263,8 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            // 🔥 CORRECCIÓN: Actualizado a Gemini 2.5 Pro para maximizar el razonamiento espacial y deducción de imágenes.
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${key}`, {
+            // 🔥 CORRECCIÓN: Actualizado a Gemini 3.1 Pro Preview para máxima capacidad deductiva y visión 3D.
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })
             });

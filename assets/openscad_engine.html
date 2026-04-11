@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.2 (AR FIX & GIT TIMELINE)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.3 (AR FIX FINAL)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -32,8 +32,32 @@
         .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* 🔥 FASE 13.2: Restaurado el botón original flotante para cumplir con políticas de seguridad WebXR */
-        #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
+        /* 🔥 FASE 13.3: BOTÓN AR NATIVO ESTILIZADO, FLOTANTE, CENTRADO Y 100% VISIBLE */
+        #ARButton {
+            display: block !important;
+            position: absolute !important;
+            bottom: 30px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            background: var(--nexus-cyan) !important;
+            color: #000 !important;
+            border: 2px solid #FFF !important;
+            border-radius: 8px !important;
+            padding: 12px 24px !important;
+            font-weight: 900 !important;
+            font-family: 'Segoe UI', sans-serif !important;
+            letter-spacing: 1px !important;
+            font-size: 14px !important;
+            text-transform: uppercase !important;
+            z-index: 99999 !important;
+            box-shadow: 0 0 15px var(--nexus-cyan) !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            text-align: center;
+        }
+        #ARButton:active {
+            transform: translateX(-50%) scale(0.95) !important;
+        }
 
         #slicer-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #161B22; border: 2px solid #00E676; border-radius: 8px; padding: 20px; z-index: 100; box-shadow: 0 10px 30px rgba(0,230,118,0.2); }
         .slicer-title { color: #00E676; font-weight: bold; font-size: 14px; text-transform: uppercase; margin-bottom: 15px; text-align: center; letter-spacing: 1px; }
@@ -152,7 +176,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v13.2 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v13.3 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -817,8 +841,12 @@
             world.addBody(floorBody);
 
             renderer.xr.enabled = true; 
+            
+            // 🔥 FASE 13.3: Inyección garantizada con ID para cazar siempre nuestro CSS
             if(typeof ARButton !== 'undefined') {
-                document.body.appendChild( ARButton.createButton( renderer ) );
+                const arBtn = ARButton.createButton( renderer );
+                arBtn.id = "ARButton"; 
+                document.body.appendChild( arBtn );
             }
 
             renderer.xr.addEventListener('sessionstart', () => {
@@ -828,6 +856,8 @@
                     currentMesh.scale.set(0.001, 0.001, 0.001); 
                     currentMesh.position.set(0, -0.2, -0.5); 
                 }
+                log("<span class='log-warn'>> 📱 Sesión AR Iniciada.</span>");
+                document.getElementById('console').style.display = 'block';
             });
 
             renderer.xr.addEventListener('sessionend', () => {
@@ -837,6 +867,7 @@
                     currentMesh.scale.set(1, 1, 1);
                     currentMesh.position.set(0, 0, 0); 
                 }
+                log("<span class='log-ok'>> 📱 Sesión AR Finalizada. Restaurando entorno.</span>");
             });
 
             container.appendChild(renderer.domElement);

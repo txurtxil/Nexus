@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v12.1 (AR & AI REVERSE ENGINEERING)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.1 (AR, AI & GIT TIMELINE)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -44,6 +44,20 @@
         .btn-generate:hover { background: #00C853; }
         .btn-close { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #8B949E; cursor: pointer; font-weight: bold; }
         .btn-close:hover { color: #FFF; }
+
+        /* 🔥 FASE 13: ESTILOS DEL TIMELINE GIT */
+        #timeline-panel { top: 15px; left: 180px; width: 280px; max-height: 80vh; overflow-y: auto; display: none; border-top: 3px solid #FFF; }
+        .commit-card { background: #161B22; border: 1px solid #30363D; border-radius: 6px; padding: 10px; margin-bottom: 8px; position: relative; }
+        .commit-card::before { content: ''; position: absolute; left: -13px; top: 15px; width: 12px; height: 2px; background: #30363D; }
+        .commit-time { color: #00E5FF; font-size: 10px; font-family: monospace; margin-bottom: 5px; font-weight: bold; }
+        .commit-info { color: #8B949E; font-size: 10px; margin-bottom: 8px; }
+        .commit-actions { display: flex; gap: 5px; }
+        .btn-sm { flex: 1; padding: 6px; font-size: 9px; cursor: pointer; border: none; border-radius: 3px; font-weight: bold; text-transform: uppercase; }
+        .btn-restore { background: #238636; color: white; }
+        .btn-restore:hover { background: #2EA043; }
+        .btn-compare { background: #B388FF; color: black; }
+        .btn-compare:hover { background: #D1B2FF; }
+        .btn-compare.active { background: #FF5252; color: white; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -66,6 +80,8 @@
             </select>
         </div>
 
+        <button class="btn" style="border-left: 3px solid #FFF; background: #21262D;" onclick="toggleTimeline()">Timeline Git <span>🕒</span></button>
+
         <button class="btn" style="border-left: 3px solid #00E5FF;" onclick="toggleLights()">Luces <span>💡</span></button>
         <button class="btn" style="border-left: 3px solid #B388FF;" onclick="toggleKine()">Animación <span>🎬</span></button>
         
@@ -76,7 +92,7 @@
         <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
         <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura PBR <span>🎨</span></button>
         
-        <button class="btn" style="border-left: 3px solid #00E5FF; background: #002233;" onclick="startAR()">Realidad Aumentada <span>📱</span></button>
+        <button class="btn" style="border-left: 3px solid #00E5FF; background: #002233;" onclick="startAR()">Real. Aumentada <span>📱</span></button>
 
         <button class="btn" style="border-left: 3px solid #FF3D00;" onclick="toggleStressAnalysis()">Simulación FEA <span>🔥</span></button>
         
@@ -89,6 +105,13 @@
         <button class="btn" style="border-left: 3px solid #8B949E;" onclick="toggleConsole()">Motor Logs <span>🖥️</span></button>
         
         <button class="btn" style="border-left: 3px solid #B388FF; background: #1A0D3B; margin-top: 10px;" onclick="sendToCopilot()">Copiloto IA <span>🤖</span></button>
+    </div>
+
+    <div id="timeline-panel" class="nexus-panel">
+        <div class="hud-section-title" style="color: #FFF;">🕒 Control de Versiones</div>
+        <div id="timeline-list" style="border-left: 2px solid #30363D; padding-left: 15px; margin-top: 10px;">
+            <div style="color: #8B949E; font-size: 10px; font-style: italic;">Esperando compilaciones...</div>
+        </div>
     </div>
 
     <div id="slicer-modal">
@@ -133,7 +156,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v12.1 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v13.1 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -149,6 +172,12 @@
         window.KINE_T_VALUE = 0;
         window.isWorkerBusy = false; 
         window.isKineActive = true; 
+
+        // 🔥 FASE 13: VARIABLES DE MÁQUINA DEL TIEMPO
+        let codeHistory = [];
+        let isCompareMode = false;
+        let ghostMesh = null;
+        let comparingIndex = -1;
 
         let ws = null;
         let myClientId = Math.random().toString(36).substr(2, 9); 
@@ -171,6 +200,96 @@
             document.getElementById('console').style.display = 'block';
         };
 
+        // 🔥 FASE 13: Lógica UI Timeline
+        window.toggleTimeline = () => {
+            const p = document.getElementById('timeline-panel');
+            p.style.display = (p.style.display === 'none' || p.style.display === '') ? 'block' : 'none';
+        };
+
+        function renderTimeline() {
+            const list = document.getElementById('timeline-list');
+            list.innerHTML = "";
+            for (let i = codeHistory.length - 1; i >= 0; i--) {
+                const item = codeHistory[i];
+                const polys = Math.round(item.v.length / 9);
+                
+                let btnCompareClass = "btn-sm btn-compare";
+                let btnCompareText = "Comparar Diff";
+                if (isCompareMode && comparingIndex === i) {
+                    btnCompareClass += " active";
+                    btnCompareText = "Desactivar";
+                }
+
+                list.innerHTML += `
+                    <div class="commit-card">
+                        <div class="commit-time">Commit #${i + 1} - ${item.time}</div>
+                        <div class="commit-info">📐 Polígonos: ${polys} | ⚡ CSG Time: ${item.ms}ms</div>
+                        <div class="commit-actions">
+                            <button class="btn-sm btn-restore" onclick="restoreHistory(${i})">Revertir Código</button>
+                            <button class="${btnCompareClass}" onclick="toggleCompare(${i})">${btnCompareText}</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        window.toggleCompare = (index) => {
+            if (!currentMesh) return;
+
+            if (isCompareMode && comparingIndex === index) {
+                isCompareMode = false;
+                comparingIndex = -1;
+                scene.remove(ghostMesh);
+                if (ghostMesh) {
+                    ghostMesh.geometry.dispose();
+                    ghostMesh.material.dispose();
+                    ghostMesh = null;
+                }
+                currentMesh.material = isStressMode ? stressMaterial : materialsArray[matIndex];
+                log("<span class='log-ok'>> 🔄 Diff Visual desactivado. Materiales restaurados.</span>");
+                renderTimeline();
+                return;
+            }
+
+            if (ghostMesh) scene.remove(ghostMesh);
+            isCompareMode = true;
+            comparingIndex = index;
+
+            const oldData = codeHistory[index];
+            
+            const oldGeom = new THREE.BufferGeometry();
+            oldGeom.setAttribute('position', new THREE.BufferAttribute(oldData.v, 3));
+            oldGeom.setAttribute('normal', new THREE.BufferAttribute(oldData.n, 3));
+            
+            const redMat = new THREE.MeshStandardMaterial({ color: 0xFF1111, transparent: true, opacity: 0.65, depthWrite: false, side: THREE.DoubleSide });
+            ghostMesh = new THREE.Mesh(oldGeom, redMat);
+            scene.add(ghostMesh);
+
+            const greenMat = new THREE.MeshStandardMaterial({ color: 0x00FF66, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
+            currentMesh.material = greenMat;
+
+            log(`<span class='log-warn'>> 🔍 Modo Diff Activado. (ROJO: V${index+1} / VERDE: Actual)</span>`);
+            document.getElementById('console').style.display = 'block';
+            renderTimeline();
+        };
+
+        window.restoreHistory = (index) => {
+            if (!confirm(`¿Seguro que quieres viajar al Commit #${index+1}? Reemplazará el código actual.`)) return;
+            
+            let oldCode = codeHistory[index].code;
+            
+            if (isCompareMode) toggleCompare(comparingIndex);
+            
+            fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code: oldCode }) }).catch(()=>{});
+            
+            if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'code', code: oldCode }));
+            
+            lastCode = oldCode;
+            executeCSGCode(oldCode, true);
+            log(`<span class='log-ok'>> 🕰️ Máquina del Tiempo: Código restaurado a V${index+1} con éxito.</span>`);
+        };
+
+
         let dynamicMat = null; 
         let stressMaterial = null; 
         let isStressMode = false;
@@ -191,6 +310,7 @@
 
         window.changeMaterial = () => { 
             if(currentMesh) { 
+                if (isCompareMode) toggleCompare(comparingIndex); 
                 isStressMode = false; 
                 matIndex = (matIndex + 1) % materialsArray.length; 
                 currentMesh.material = materialsArray[matIndex]; 
@@ -218,7 +338,6 @@
             }
         };
 
-        // EXTRACCIÓN DE BOUNDING BOX
         window.sendToCopilot = () => {
             if(!currentMesh) {
                 log("<span class='log-err'>> No hay pieza generada o importada.</span>");
@@ -241,7 +360,6 @@
             document.getElementById('console').style.display = 'block';
         };
 
-        // PUENTE AR
         window.startAR = () => {
             const nativeBtn = document.getElementById('ARButton');
             if(nativeBtn) {
@@ -952,7 +1070,7 @@
                 if (currentMesh) { 
                     currentMesh.geometry.dispose();
                     currentMesh.geometry = geom;
-                    currentMesh.material = isStressMode ? stressMaterial : materialsArray[matIndex];
+                    if (!isCompareMode) currentMesh.material = isStressMode ? stressMaterial : materialsArray[matIndex];
                 } else {
                     dynamicMat = new THREE.MeshPhysicalMaterial({ 
                         vertexColors: !!data.c, roughness: 0.35, metalness: 0.15,
@@ -966,11 +1084,28 @@
                 }
                 
                 const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
+                const timeMs = Math.round(performance.now() - t0);
                 document.getElementById('geo-x').innerText = size.x.toFixed(2) + " mm";
                 document.getElementById('geo-y').innerText = size.y.toFixed(2) + " mm";
                 document.getElementById('geo-z').innerText = size.z.toFixed(2) + " mm";
                 document.getElementById('geo-poly').innerText = (data.v.length / 3).toString();
-                document.getElementById('geo-time').innerText = Math.round(performance.now() - t0) + " ms";
+                document.getElementById('geo-time').innerText = timeMs + " ms";
+
+                // 🔥 FASE 13: GUARDAR EN LA MÁQUINA DEL TIEMPO
+                if (!window.isKineActive && !window.NEXUS_HD_EXPORT && !isImportingSTL) {
+                    if (codeHistory.length === 0 || codeHistory[codeHistory.length - 1].code !== lastCode) {
+                        codeHistory.push({
+                            time: new Date().toLocaleTimeString(),
+                            code: lastCode,
+                            v: new Float32Array(data.v), // Clonar buffer para que no se sobreescriba
+                            n: new Float32Array(data.n),
+                            c: data.c ? new Float32Array(data.c) : null,
+                            ms: timeMs
+                        });
+                        if (codeHistory.length > 30) codeHistory.shift(); 
+                        renderTimeline();
+                    }
+                }
 
                 if (window.IS_EXPORTING_HD) {
                     setTimeout(() => {

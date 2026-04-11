@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.13 - TRUE BAMBU GUARDRAIL</title>
+    <title>NEXUS AI v23.14 - SLICER AGENTIC CORE</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -33,6 +33,11 @@
         .toggle-container { display: flex; align-items: center; gap: 10px; background: #161B22; padding: 10px; border-radius: 6px; border: 1px solid #30363D; }
         .toggle-container input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #FFAB00; }
         .toggle-label { font-size: 12px; color: #E6EDF3; cursor: pointer; }
+
+        /* 🔥 FASE 15: Panel Slicer UI */
+        .slicer-panel { background: #161B22; padding: 12px; border: 1px solid #00E5FF; border-radius: 6px; }
+        .slicer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;}
+        .slicer-grid input { padding: 8px; font-weight: bold; color: #FFF;}
         
         .preview-container { position: relative; display: none; width: fit-content; margin-top: 5px; }
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
@@ -42,7 +47,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.13 - TRUE BAMBU GUARDRAIL)</h2>
+    <h2>🤖 Nexus AI Core (v23.14 - SLICER AGENTIC)</h2>
 </div>
 
 <div class="content">
@@ -52,7 +57,7 @@
     </div>
 
     <div>
-        <label>Motor IA (Elige de la lista o escribe a mano):</label>
+        <label>Motor IA:</label>
         <input type="text" id="modelSelector" list="modelList" value="gemini-3-flash-preview">
         <datalist id="modelList">
             <option value="gemini-3-flash-preview">
@@ -65,8 +70,18 @@
         <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
             <option value="copilot">🛠️ Copiloto Libre (Programar JS-CSG)</option>
-            <option value="agentic">🎛️ Agentic UI (Mover Sliders App)</option>
+            <option value="agentic">🎛️ Agentic UI (Mover Slicer App)</option>
         </select>
+    </div>
+
+    <div class="slicer-panel">
+        <label style="color:#00E5FF; margin:0;">⚙️ G-CODE CAM / SLICER SETTINGS</label>
+        <div class="slicer-grid">
+            <div><label>Fusor (°C):</label><input type="number" id="nozzle_temp" value="220"></div>
+            <div><label>Cama (°C):</label><input type="number" id="bed_temp" value="60"></div>
+            <div><label>Velocidad (mm/s):</label><input type="number" id="speed" value="150"></div>
+            <div><label>Relleno (%):</label><input type="number" id="infill" value="15"></div>
+        </div>
     </div>
     
     <div class="toggle-container" id="memoryContainer">
@@ -96,11 +111,11 @@
 
     <div>
         <label>Instrucción / Animación / Errores:</label>
-        <textarea id="promptInput" placeholder="Ej: Clona esta pieza asegurando bases planas y tolerancias +0.2mm para impresión FDM..."></textarea>
+        <textarea id="promptInput" placeholder="Ej: Clona esta pieza... O en Modo Agentic: Configura para imprimir TPU."></textarea>
     </div>
 
-    <button onclick="generateCode()" id="btnGenerate">⚡ Analizar / Programar Pieza</button>
-    <div id="loader">Analizando geometría visual y calculando booleanas...</div>
+    <button onclick="generateCode()" id="btnGenerate">⚡ Analizar / Ejecutar</button>
+    <div id="loader">Analizando datos y procesando lógicas...</div>
 
     <div>
         <label>Respuesta / Código JS (Editable):</label>
@@ -193,24 +208,38 @@
             const copilotData = JSON.parse(localStorage.getItem('nexus_copilot_data') || "null");
             
             if(!currentB64) {
-                alert("📷 ¡OJO! Sube primero una foto de la pieza física que quieres clonar usando el botón de 'Adjuntar Foto Local'.");
+                alert("📷 ¡OJO! Sube primero una foto de la pieza física que quieres clonar.");
                 return;
             }
 
             if(copilotData) {
-                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA TEXT-TO-PRINT!\nHe adjuntado una foto de la pieza que quiero clonar. Además, en el visor 3D tengo una referencia de escala de la que he sacado el Bounding Box exacto:\n- Ancho (X): ${copilotData.x} mm\n- Largo (Y): ${copilotData.y} mm\n- Alto (Z): ${copilotData.z} mm\n\nTu tarea:\n1. Analiza visualmente la foto.\n2. Reconstruye la pieza en código JavaScript CSG limpio (retornando la función main).\n3. Usa las dimensiones del Bounding Box como LÍMITE GENERAL para tus primitivas.\n4. IMPORTANTE PARA IMPRESIÓN FDM: Añade +0.2mm a todos los cilindros que restes (agujeros) para asegurar tolerancias. Asegúrate de que la cara más plana repose sobre Z=0.`;
+                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nB.Box:\n- X: ${copilotData.x} mm\n- Y: ${copilotData.y} mm\n- Z: ${copilotData.z} mm\nAnaliza visualmente la foto y reconstruye la pieza en JS CSG. Usa el B.Box como límite.`;
             } else {
-                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nAnaliza la pieza de la foto adjunta. Reconstruye su geometría en código CSG paramétrico puro (JavaScript, retornando main). Asume medidas proporcionales a una caja de 50x50x50mm. Añade tolerancias de impresión 3D (+0.2mm en agujeros) y usa bases planas.`;
+                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nAnaliza la pieza de la foto adjunta. Reconstruye su geometría en código CSG paramétrico puro (JavaScript, retornando main).`;
             }
         } else if (type === 'lattice') {
             document.getElementById('useMemory').checked = true;
-            promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza. Crea una red de vaciados usando CILINDROS (para que la Bambu Lab los imprima mejor) usando bucles matemáticos (for) y CSG.subtract(). El objetivo es comerse el interior de la pieza para ahorrar material, dejando las paredes exteriores y estructurales intactas.";
+            promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza. Crea una red de vaciados usando CILINDROS (para que la Bambu Lab los imprima mejor) usando bucles (for) y CSG.subtract().";
         } else if (type === 'shell') {
             document.getElementById('useMemory').checked = true;
-            promptBox.value = "Aplica un vaciado (Shell) a esta pieza. Réstale una versión de sí misma ligeramente más pequeña para que quede hueca por dentro, pero con un grosor de pared de unos 2.4mm (múltiplo exacto para extrusor 0.4mm).";
+            promptBox.value = "Aplica un vaciado (Shell) a esta pieza. Réstale una versión de sí misma ligeramente más pequeña para que quede hueca por dentro (grosor de pared 2.4mm).";
         }
         
         if (type !== 'reverse') generateCode();
+    }
+
+    // 🔥 ANIMACIÓN VISUAL PARA EL MODO AGENTIC
+    function highlightSlider(elementId) {
+        const el = document.getElementById(elementId);
+        if(el) {
+            el.style.transition = "all 0.3s";
+            el.style.backgroundColor = "#00E676";
+            el.style.color = "#000";
+            setTimeout(() => {
+                el.style.backgroundColor = "#0B0E14";
+                el.style.color = "#FFF";
+            }, 800);
+        }
     }
 
     async function generateCode() {
@@ -232,11 +261,22 @@
         let finalPrompt = prompt;
 
         if (aiMode === "agentic") {
-            systemInstruction = `Eres el Agente UI de NEXUS CAD. Tu objetivo es controlar la interfaz visual de la app devolviendo ÚNICAMENTE un JSON válido.`;
-            finalPrompt = `Instrucción: ${prompt}`;
+            // 🔥 FASE 15: CEREBRO AGENTIC PARA EL LAMINADOR
+            systemInstruction = `Eres el Agente CAM de NEXUS. Tu objetivo es configurar automáticamente los parámetros de laminado (Slicer) para la impresora Bambu Lab A1 Mini basándote en la intención del usuario.
+Devuelve ÚNICAMENTE un JSON válido. Cero explicaciones. Cero Markdown.
+
+Estructura obligatoria:
+{"tool": "slicer", "params": {"nozzle_temp": valor_numerico, "bed_temp": valor_numerico, "speed": valor_numerico, "infill": valor_numerico}}
+
+Guía de perfiles térmicos y mecánicos:
+- PLA (Prototipos rápidos, piezas estéticas): Fusor 220, Cama 60, Vel 150-200, Relleno 10-15%.
+- PETG (Mecánico, exterior, coche, calor moderado): Fusor 240-250, Cama 70-80, Vel 40-60, Relleno 30-50%.
+- TPU / Flexible (Fundas, amortiguadores): Fusor 230, Cama 40, Vel 20-30, Relleno 15-40% (determina la rigidez).
+- ABS / ASA (Alta temperatura): Fusor 260, Cama 90, Vel 50, Relleno 40%.
+- Pieza ultra resistente/sólida: Sube el infill a 80-100%.`;
+            finalPrompt = `Instrucción del usuario: "${prompt}"`;
         } 
         else {
-            // 🔥 CEREBRO ACTUALIZADO: REGLA DE 180MM INCRUSTADA
             systemInstruction = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando la librería 'csg.js' nativa de JavaScript.
 Tu ÚNICO objetivo es devolver código JavaScript puro. NUNCA uses markdown ni \`\`\`javascript.
 El código DEBE contener una función global 'main(params)' que retorne un ÚNICO objeto CSG final.
@@ -246,18 +286,12 @@ El código DEBE contener una función global 'main(params)' que retorne un ÚNIC
 2. CARAS COPLANARES: Cualquier objeto de resta (subtract) debe ser EXAGERADAMENTE MÁS LARGO que la pieza a cortar.
 
 ⛔ REGLA FÍSICA ESTRICTA (BAMBU LAB A1 MINI):
-El usuario tiene una impresora 3D con un límite absoluto de 180x180x180 mm.
-Si generas una pieza que supere los 170mm en cualquier eje (X, Y o Z), DEBES aplicar un escalado usando .scale() al objeto final justo antes de retornarlo para que encaje perfectamente.
-
-REGLAS DE RECONSTRUCCIÓN FDM:
-- Usa altas resoluciones para cilindros: {slices: 128}.
-- Agujeros (subtract): Aumenta su radio en +0.2mm para compensar la expansión térmica del FDM.
-- Tolerancias: El lado más plano debe estar en Z=0.`;
+Si generas una pieza que supere los 170mm en cualquier eje, DEBES aplicar un escalado usando .scale() al objeto final justo antes de retornarlo para que encaje perfectamente.`;
 
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE las reglas ANTI-FLIP y el LÍMITE DE 180mm.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta.`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }
@@ -277,9 +311,21 @@ REGLAS DE RECONSTRUCCIÓN FDM:
             let text = data.candidates[0].content.parts[0].text.trim();
             
             if (aiMode === "agentic") {
+                // 🔥 FASE 15: INTERCEPCIÓN Y ANIMACIÓN DEL SLICER
                 text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
                 let jsonPayload = JSON.parse(text);
-                document.getElementById('codeOutput').value = "JSON INTERCEPTADO:\n" + JSON.stringify(jsonPayload, null, 2);
+                document.getElementById('codeOutput').value = "JSON INTERCEPTADO (Slicer Actualizado):\n" + JSON.stringify(jsonPayload, null, 2);
+                
+                if (jsonPayload.tool === "slicer" && jsonPayload.params) {
+                    if(jsonPayload.params.nozzle_temp) { document.getElementById('nozzle_temp').value = jsonPayload.params.nozzle_temp; highlightSlider('nozzle_temp'); }
+                    if(jsonPayload.params.bed_temp) { document.getElementById('bed_temp').value = jsonPayload.params.bed_temp; highlightSlider('bed_temp'); }
+                    if(jsonPayload.params.speed) { document.getElementById('speed').value = jsonPayload.params.speed; highlightSlider('speed'); }
+                    if(jsonPayload.params.infill) { document.getElementById('infill').value = jsonPayload.params.infill; highlightSlider('infill'); }
+                }
+
+                // Enviar también al backend si el motor principal lo requiere
+                await fetch('/api/agentic_ui', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: text });
+
             } else {
                 text = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 document.getElementById('codeOutput').value = text;
@@ -292,14 +338,15 @@ REGLAS DE RECONSTRUCCIÓN FDM:
     }
 
     async function inject() {
-        if(document.getElementById('aiMode').value === "agentic") return;
+        if(document.getElementById('aiMode').value === "agentic") {
+            alert("⚠️ En Modo Agentic UI la IA configura el Slicer. Para inyectar piezas 3D, cambia a 'Copiloto Libre'."); return;
+        }
         const code = document.getElementById('codeOutput').value.trim();
         if(!code) return;
         const btn = document.getElementById('btnInject');
         const originalText = btn.innerHTML; btn.innerHTML = "⏳ Inyectando...";
         
         try {
-            // Mandamos el código puro. La IA ya se ha encargado de la escala matemática en el main().
             const response = await fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code }) });
             if(response.ok) { btn.innerHTML = "✅ INYECTADO"; btn.style.backgroundColor = "#00E676"; btn.style.color = "#000"; } 
             else throw new Error("Rechazado por backend.");
@@ -307,11 +354,7 @@ REGLAS DE RECONSTRUCCIÓN FDM:
             alert("Error de Red: " + error.message); btn.innerHTML = "❌ ERROR DE RED"; btn.style.backgroundColor = "#D50000";
         } finally {
             setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "#B388FF"; btn.style.color = "#FFF"; }, 2500);
-            
             removeImage();
-            if(document.getElementById('promptInput').value.includes("He recibido este error")) {
-                document.getElementById('promptInput').value = "";
-            }
             lastErrorProcessed = ""; 
         }
     }

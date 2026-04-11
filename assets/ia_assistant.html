@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.9 - VISION TO PRINT CORE (STRICT SYNTAX)</title>
+    <title>NEXUS AI v23.10 - VISION TO PRINT CORE (ANTI-FLIP GUARD)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -42,7 +42,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.9 - STRICT SYNTAX)</h2>
+    <h2>🤖 Nexus AI Core (v23.10 - ANTI-FLIP GUARD)</h2>
 </div>
 
 <div class="content">
@@ -126,9 +126,15 @@
                 currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
             }
             
+            // 🔥 FASE 13.5: Auto-corrección de errores 'flip' y genéricos
             if (data.last_error && data.last_error.trim() !== "") {
                 const promptBox = document.getElementById('promptInput');
-                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido. Recuerda NUNCA usar funciones estáticas como CSG.union() o CSG.subtract(). Usa siempre metodos de instancia como a.union(b).";
+                if(data.last_error.includes("flip")) {
+                    promptBox.value = "He recibido este error en el visor 3D al compilar: 'Cannot read properties of null (reading 'flip')'.\n\nESTO ES CRÍTICO: Has intentado pasar un Array a una operación booleana (ej: pieza.subtract([a,b])). ESTÁ PROHIBIDO en esta versión de csg.js. Para arreglarlo, debes aplicar las restas/uniones en un bucle FOR de uno en uno (ej: for(...) { pieza = pieza.subtract(agujero); }). Genera el código corregido.";
+                } else {
+                    promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido. Recuerda NUNCA usar funciones estáticas como CSG.union(). Usa siempre métodos de instancia como a.union(b).";
+                }
+                
                 document.getElementById('aiMode').value = "copilot";
                 document.getElementById('memoryContainer').style.display = 'flex';
                 document.getElementById('useMemory').checked = true;
@@ -229,17 +235,21 @@
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            // 🔥 AQUÍ ESTÁ LA MAGIA ANTI-ERRORES
+            // 🔥 AQUÍ ESTÁ LA NUEVA MAGIA ANTI-FLIP
             systemInstruction = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando la librería 'csg.js' nativa de JavaScript.
 Tu ÚNICO objetivo es devolver código JavaScript puro. NUNCA uses markdown ni \`\`\`javascript.
-El código DEBE contener una función global 'main(params)' que retorne el objeto CSG final.
+El código DEBE contener una función global 'main(params)' que retorne un ÚNICO objeto CSG final.
 
-⛔ SINTAXIS CSG.JS ESTRICTA E INQUEBRANTABLE:
-1. NUNCA uses CSG.union(a, b). ESTÁ PROHIBIDO. Usa SIEMPRE a.union(b) o a.union([b, c]).
-2. NUNCA uses CSG.subtract(a, b). ESTÁ PROHIBIDO. Usa SIEMPRE a.subtract(b) o a.subtract([b, c]).
-3. NUNCA uses CSG.intersect(a, b). ESTÁ PROHIBIDO. Usa SIEMPRE a.intersect(b).
+⛔ SINTAXIS CSG.JS ESTRICTA E INQUEBRANTABLE (EVITAR ERROR FLIP):
+1. NUNCA uses funciones globales como CSG.union(a, b). Usa SIEMPRE métodos de instancia: a.union(b).
+2. 🚨 ESTRICTAMENTE PROHIBIDO PASAR ARRAYS A BOOLEANAS. Si usas a.subtract([b, c]), el motor fallará con un error 'flip'. 
+3. CÓMO RESTAR/UNIR MÚLTIPLES OBJETOS: Debes iterar con un bucle for y actualizar la variable principal UNA A UNA. 
+   Ejemplo CORRECTO: 
+   for(let i=0; i<5; i++) { 
+       let agujero = CSG.cylinder({...}); 
+       piezaBase = piezaBase.subtract(agujero); 
+   }
 4. Para trasladar: a.translate([x, y, z]). Para rotar: a.rotateX(deg).
-Las operaciones booleanas se aplican SIEMPRE desde una instancia hacia otra.
 
 REGLAS DE RECONSTRUCCIÓN FDM:
 - Usa altas resoluciones para cilindros: {slices: 128}.
@@ -249,7 +259,7 @@ REGLAS DE RECONSTRUCCIÓN FDM:
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE la sintaxis de instancia a.union(b).`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE la regla de NO usar arrays en operaciones booleanas para evitar el error 'flip'.`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }

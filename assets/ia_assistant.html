@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.12 - VISION TO PRINT CORE (BAMBU GUARDRAIL)</title>
+    <title>NEXUS AI v23.13 - TRUE BAMBU GUARDRAIL</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -42,7 +42,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.12 - BAMBU GUARDRAIL)</h2>
+    <h2>🤖 Nexus AI Core (v23.13 - TRUE BAMBU GUARDRAIL)</h2>
 </div>
 
 <div class="content">
@@ -113,7 +113,7 @@
 <script>
     let currentB64 = null;
     let currentMimeType = null;
-    let lastErrorProcessed = ""; // Para evitar bucles infinitos de la IA
+    let lastErrorProcessed = ""; 
 
     async function checkDataBridge() {
         try {
@@ -127,38 +127,19 @@
                 currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
             }
             
-            // 🔥 FASE 14: Gestión Inteligente de Errores y Límites Físicos
             if (data.last_error && data.last_error.trim() !== "" && data.last_error !== lastErrorProcessed) {
                 lastErrorProcessed = data.last_error;
                 const promptBox = document.getElementById('promptInput');
-                let autoTrigger = false;
 
-                if (data.last_error.includes("GUARDRAIL_180")) {
-                    promptBox.value = "⚠️ ALERTA FÍSICA (BAMBU LAB A1 MINI):\n" + data.last_error + "\n\nTu tarea: Añade una operación '.scale(factor)' a la pieza final antes del 'return' para reducirla proporcionalmente y que encaje sobradamente dentro de los 170mm.";
-                    autoTrigger = true; // La IA se autocorregirá sola
-                } 
-                else if(data.last_error.includes("flip")) {
+                if(data.last_error.includes("flip")) {
                     promptBox.value = "CRÍTICO: Has causado un error 'flip' en el motor BSP de CSG.js. Evita esto:\n1. NO pases Arrays a booleanas (usa a.subtract(b).subtract(c)).\n2. Z-Fighting: Haz que los cilindros de resta sean MUCHO MÁS LARGOS que la pieza principal para que la atraviesen limpiamente.\nReescribe el código reparando esto.";
-                } 
-                else {
+                } else {
                     promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido respetando csg.js.";
                 }
                 
                 document.getElementById('aiMode').value = "copilot";
                 document.getElementById('memoryContainer').style.display = 'flex';
                 document.getElementById('useMemory').checked = true;
-
-                // Si saltó el Guardrail, simulamos un clic en 1.5 segundos para que lo veas pasar
-                if(autoTrigger) {
-                    const btn = document.getElementById('btnGenerate');
-                    btn.innerHTML = "⚠️ Auto-Corrigiendo Escala...";
-                    btn.style.backgroundColor = "#D50000";
-                    setTimeout(() => {
-                        btn.innerHTML = "⚡ Analizar / Programar Pieza";
-                        btn.style.backgroundColor = "#FFAB00";
-                        generateCode();
-                    }, 1500);
-                }
             }
         } catch(e) {}
     }
@@ -172,7 +153,7 @@
         });
 
         checkDataBridge();
-        setInterval(checkDataBridge, 1000); // Poll más agresivo para capturar el Guardrail rápido
+        setInterval(checkDataBridge, 1000); 
     });
 
     document.getElementById('imageInput').addEventListener('change', function(e) {
@@ -255,6 +236,7 @@
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
+            // 🔥 CEREBRO ACTUALIZADO: REGLA DE 180MM INCRUSTADA
             systemInstruction = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando la librería 'csg.js' nativa de JavaScript.
 Tu ÚNICO objetivo es devolver código JavaScript puro. NUNCA uses markdown ni \`\`\`javascript.
 El código DEBE contener una función global 'main(params)' que retorne un ÚNICO objeto CSG final.
@@ -262,6 +244,10 @@ El código DEBE contener una función global 'main(params)' que retorne un ÚNIC
 ⛔ REGLAS VITALES MATEMÁTICAS (ANTI-FLIP BSP ERROR):
 1. NO PASES ARRAYS a booleanas. NUNCA HAGAS a.subtract([b,c]). DEBES encadenar: a.subtract(b).subtract(c).
 2. CARAS COPLANARES: Cualquier objeto de resta (subtract) debe ser EXAGERADAMENTE MÁS LARGO que la pieza a cortar.
+
+⛔ REGLA FÍSICA ESTRICTA (BAMBU LAB A1 MINI):
+El usuario tiene una impresora 3D con un límite absoluto de 180x180x180 mm.
+Si generas una pieza que supere los 170mm en cualquier eje (X, Y o Z), DEBES aplicar un escalado usando .scale() al objeto final justo antes de retornarlo para que encaje perfectamente.
 
 REGLAS DE RECONSTRUCCIÓN FDM:
 - Usa altas resoluciones para cilindros: {slices: 128}.
@@ -271,7 +257,7 @@ REGLAS DE RECONSTRUCCIÓN FDM:
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE las reglas ANTI-FLIP.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE las reglas ANTI-FLIP y el LÍMITE DE 180mm.`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }
@@ -310,41 +296,23 @@ REGLAS DE RECONSTRUCCIÓN FDM:
         const code = document.getElementById('codeOutput').value.trim();
         if(!code) return;
         const btn = document.getElementById('btnInject');
-        const originalText = btn.innerHTML; btn.innerHTML = "⏳ Inyectando y Validando Escala...";
+        const originalText = btn.innerHTML; btn.innerHTML = "⏳ Inyectando...";
         
-        // 🔥 FASE 14: SECUESTRO DE LA FUNCIÓN MAIN() PARA EL GUARDRAIL FÍSICO
-        const safeCode = code + `
-\n// 🛡️ NEXUS GUARDRAIL INYECTADO (BAMBU LAB A1 MINI)
-if (typeof main === 'function') {
-    const _originalMain = main;
-    main = function(params) {
-        let _obj = _originalMain(params);
-        if (_obj && typeof _obj.getBounds === 'function') {
-            let _b = _obj.getBounds();
-            let _maxX = _b[1].x - _b[0].x;
-            let _maxY = _b[1].y - _b[0].y;
-            let _maxZ = _b[1].z - _b[0].z;
-            let _maxDim = Math.max(_maxX, _maxY, _maxZ);
-            
-            if (_maxDim > 180) {
-                throw new Error("GUARDRAIL_180: La pieza mide " + _maxDim.toFixed(1) + "mm. Supera el volumen de la Bambu Lab A1 Mini (180x180x180mm).");
-            }
-        }
-        return _obj;
-    };
-}
-`;
-
         try {
-            const response = await fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code: safeCode }) });
-            if(response.ok) { btn.innerHTML = "✅ INYECTADO (TAMAÑO OK)"; btn.style.backgroundColor = "#00E676"; btn.style.color = "#000"; } 
+            // Mandamos el código puro. La IA ya se ha encargado de la escala matemática en el main().
+            const response = await fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code }) });
+            if(response.ok) { btn.innerHTML = "✅ INYECTADO"; btn.style.backgroundColor = "#00E676"; btn.style.color = "#000"; } 
             else throw new Error("Rechazado por backend.");
         } catch (error) {
             alert("Error de Red: " + error.message); btn.innerHTML = "❌ ERROR DE RED"; btn.style.backgroundColor = "#D50000";
         } finally {
             setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "#B388FF"; btn.style.color = "#FFF"; }, 2500);
+            
             removeImage();
-            lastErrorProcessed = ""; // Reseteamos el gestor de errores para el siguiente inject
+            if(document.getElementById('promptInput').value.includes("He recibido este error")) {
+                document.getElementById('promptInput').value = "";
+            }
+            lastErrorProcessed = ""; 
         }
     }
 </script>

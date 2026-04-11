@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.7 - VISION TO PRINT CORE (MULTI-MODEL)</title>
+    <title>NEXUS AI v23.8 - VISION TO PRINT CORE (FREE MODEL)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -43,7 +43,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.7 MULTI-MODEL)</h2>
+    <h2>🤖 Nexus AI Core (v23.8 - MODELO LIBRE)</h2>
 </div>
 
 <div class="content">
@@ -53,11 +53,13 @@
     </div>
 
     <div>
-        <label>Motor IA (Selecciona en caso de error de tokens):</label>
-        <select id="modelSelector">
-            <option value="gemini-2.5-pro" selected>🧠 Gemini 2.5 Pro (Máximo Razonamiento - Recomendado)</option>
-            <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash Preview (Alta Velocidad - Backup)</option>
-        </select>
+        <label>Motor IA (Elige de la lista o escribe a mano):</label>
+        <input type="text" id="modelSelector" list="modelList" value="gemini-3-flash-preview">
+        <datalist id="modelList">
+            <option value="gemini-3-flash-preview">
+            <option value="gemini-3.1-flash-lite-preview">
+            <option value="gemini-2.5-flash">
+        </datalist>
     </div>
     
     <div class="toggle-container">
@@ -180,7 +182,6 @@
         return "";
     }
 
-    // 🔥 FASE 13: Lógica de Interceptación Vision-to-Print
     function applyGenerativeMacro(type) {
         document.getElementById('aiMode').value = 'copilot';
         const promptBox = document.getElementById('promptInput');
@@ -215,13 +216,14 @@
         const prompt = document.getElementById('promptInput').value.trim();
         const aiMode = document.getElementById('aiMode').value;
         const useMemory = document.getElementById('useMemory').checked;
-        const selectedModel = document.getElementById('modelSelector').value; // 🔥 Obtenemos el modelo seleccionado
+        const selectedModel = document.getElementById('modelSelector').value.trim(); // 🔥 Lee lo que haya escrito o seleccionado
         
         if(!key || (!prompt && !currentB64)) { alert("⚠️ Faltan datos."); return; }
+        if(!selectedModel) { alert("⚠️ Especifica un modelo IA."); return; }
         
         localStorage.setItem('nexus_gemini_key', key);
         document.getElementById('loader').style.display = 'block';
-        document.getElementById('loader').innerText = `Procesando con ${selectedModel}...`; // Feedback visual del modelo
+        document.getElementById('loader').innerText = `Procesando con ${selectedModel}...`;
         document.getElementById('codeOutput').value = "";
 
         let systemInstruction = "";
@@ -273,7 +275,7 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            // 🔥 Fetch dinámico usando la variable selectedModel
+            // 🔥 Fetch dinámico y agnóstico, usa lo que el usuario haya tecleado o seleccionado
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })

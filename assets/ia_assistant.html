@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.1 - REVERSE ENGINEERING CORE</title>
+    <title>NEXUS AI v23.4 - VISION TO PRINT CORE (GEMINI 2.5 PRO)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #00E676; }
-        .header h2 { margin: 0; color: #00E676; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+        .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
+        .header h2 { margin: 0; color: #FFAB00; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
         .content { padding: 15px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         label { font-size: 11px; color: #8B949E; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
         input, select, textarea { width: 100%; padding: 12px; background-color: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 6px; outline: none; font-size: 13px; box-sizing: border-box; transition: border-color 0.2s; }
-        input:focus, textarea:focus { border-color: #00E676; }
+        input:focus, textarea:focus { border-color: #FFAB00; }
         textarea { height: 90px; font-family: monospace; resize: vertical; }
-        button { background-color: #00E676; color: #0B0E14; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
-        button:hover { background-color: #00C853; transform: translateY(-1px); }
+        button { background-color: #FFAB00; color: #0B0E14; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+        button:hover { background-color: #FFC400; transform: translateY(-1px); }
         button:active { transform: translateY(1px); }
         
         .btn-inject { background-color: #B388FF; margin-top: 5px;}
@@ -22,17 +22,17 @@
         .btn-camera { background-color: #00B0FF; color: #000; margin-bottom: 5px;}
         
         .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .btn-macro { background-color: #161B22; color: #FFAB00; border: 1px solid #FFAB00; padding: 10px; font-size: 11px; }
-        .btn-macro:hover { background-color: #FFAB00; color: #000; }
+        .btn-macro { background-color: #161B22; color: #00E676; border: 1px solid #00E676; padding: 10px; font-size: 11px; }
+        .btn-macro:hover { background-color: #00E676; color: #000; }
         
-        /* 🔥 FASE 12: Estilo específico para Ingeniería Inversa */
-        .btn-reverse { background-color: #D50000; color: #FFF; border: 1px solid #FF5252; grid-column: span 2; }
-        .btn-reverse:hover { background-color: #FF5252; color: #000; }
+        /* 🔥 FASE 13: Estilo específico para Ingeniería Inversa Vision-to-Print */
+        .btn-reverse { background-color: #D50000; color: #FFF; border: 1px solid #FF5252; grid-column: span 2; font-weight: 900; }
+        .btn-reverse:hover { background-color: #FF5252; color: #000; box-shadow: 0 0 10px #FF5252; }
 
-        #loader { display: none; text-align: center; color: #00E676; font-size: 12px; font-style: italic; margin-top: 5px; }
+        #loader { display: none; text-align: center; color: #FFAB00; font-size: 12px; font-style: italic; margin-top: 5px; }
         
         .toggle-container { display: flex; align-items: center; gap: 10px; background: #161B22; padding: 10px; border-radius: 6px; border: 1px solid #30363D; }
-        .toggle-container input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #00E676; }
+        .toggle-container input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #FFAB00; }
         .toggle-label { font-size: 12px; color: #E6EDF3; cursor: pointer; }
         
         .preview-container { position: relative; display: none; width: fit-content; margin-top: 5px; }
@@ -43,7 +43,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.1 REVERSE ENGIN.)</h2>
+    <h2>🤖 Nexus AI Core (v23.4 GEMINI 2.5 PRO)</h2>
 </div>
 
 <div class="content">
@@ -53,7 +53,7 @@
     </div>
     
     <div class="toggle-container">
-        <label style="color:#00E676;">⚡ MODO:</label>
+        <label style="color:#FFAB00;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
             <option value="copilot">🛠️ Copiloto Libre (Programar JS-CSG)</option>
             <option value="agentic">🎛️ Agentic UI (Mover Sliders App)</option>
@@ -66,16 +66,16 @@
     </div>
 
     <div>
-        <label>Nexus Copilot Macros (Fase 12):</label>
+        <label>Nexus Copilot Macros (Fase 13):</label>
         <div class="macro-grid">
             <button class="btn-macro" onclick="applyGenerativeMacro('lattice')">🧬 Generative Lattice</button>
             <button class="btn-macro" onclick="applyGenerativeMacro('shell')">🔲 Shell / Vaciado</button>
-            <button class="btn-macro btn-reverse" onclick="applyGenerativeMacro('reverse')">🔄 Invertir STL a Código (Bounding Box)</button>
+            <button class="btn-macro btn-reverse" onclick="applyGenerativeMacro('reverse')">🔄 Vision-to-Print: Clonar Pieza (Pide Foto + B.Box)</button>
         </div>
     </div>
 
     <div>
-        <label>Visión Artificial (Planos / PBR Studio):</label>
+        <label>Visión Artificial (Planos / Pieza Rota):</label>
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
         <button class="btn-camera" onclick="document.getElementById('imageInput').click()">📷 Adjuntar Foto Local</button>
         
@@ -87,18 +87,18 @@
 
     <div>
         <label>Instrucción / Animación / Errores:</label>
-        <textarea id="promptInput" placeholder="Ej: Haz un soporte en U para un rodamiento de 8mm..."></textarea>
+        <textarea id="promptInput" placeholder="Ej: Clona esta pieza asegurando bases planas y tolerancias +0.2mm para impresión FDM..."></textarea>
     </div>
 
-    <button onclick="generateCode()">⚡ Generar / Ejecutar</button>
-    <div id="loader">Calculando matrices booleanas...</div>
+    <button onclick="generateCode()">⚡ Analizar / Programar Pieza</button>
+    <div id="loader">Analizando geometría visual y calculando booleanas (Gemini 2.5 Pro)...</div>
 
     <div>
         <label>Respuesta / Código JS (Editable):</label>
-        <textarea id="codeOutput" style="height: 160px; color: #00E676;"></textarea>
+        <textarea id="codeOutput" style="height: 160px; color: #FFAB00;"></textarea>
     </div>
 
-    <button class="btn-inject" id="btnInject" onclick="inject()">⚙️ Inyectar (Solo Modo Copiloto)</button>
+    <button class="btn-inject" id="btnInject" onclick="inject()">⚙️ Inyectar al Visor 3D</button>
 </div>
 
 <script>
@@ -123,7 +123,7 @@
             
             if (data.last_error && data.last_error.trim() !== "") {
                 const promptBox = document.getElementById('promptInput');
-                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido que solucione esto manteniendo la estructura.";
+                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido que solucione esto manteniendo la estructura base plana.";
                 document.getElementById('aiMode').value = "copilot";
                 document.getElementById('memoryContainer').style.display = 'flex';
                 document.getElementById('useMemory').checked = true;
@@ -172,27 +172,31 @@
         return "";
     }
 
-    // 🔥 FASE 12: Lógica de Interceptación del LocalStorage
+    // 🔥 FASE 13: Lógica de Interceptación Vision-to-Print
     function applyGenerativeMacro(type) {
         document.getElementById('aiMode').value = 'copilot';
-        
         const promptBox = document.getElementById('promptInput');
         
         if (type === 'reverse') {
             document.getElementById('useMemory').checked = false; 
             const copilotData = JSON.parse(localStorage.getItem('nexus_copilot_data') || "null");
             
+            if(!currentB64) {
+                alert("📷 ¡OJO! Sube primero una foto de la pieza física que quieres clonar usando el botón de 'Adjuntar Foto Local'.");
+                return;
+            }
+
             if(copilotData) {
-                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nHe importado una malla STL estática ("puré de polígonos") de ${copilotData.polys} triángulos.\n\nHe calculado su Bounding Box exacta:\n- Ancho (X): ${copilotData.x} mm\n- Largo (Y): ${copilotData.y} mm\n- Alto (Z): ${copilotData.z} mm\n\nTu tarea: Genera desde cero un código paramétrico CSG limpio (retornando la función main) que englobe exactamente este volumen. Asume que es una carcasa mecánica o soporte. No uses la variable IMPORTED_STL, usa prismas o cilindros generados matemáticamente.`;
+                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA TEXT-TO-PRINT!\nHe adjuntado una foto de la pieza que quiero clonar. Además, en el visor 3D tengo una referencia de escala de la que he sacado el Bounding Box exacto:\n- Ancho (X): ${copilotData.x} mm\n- Largo (Y): ${copilotData.y} mm\n- Alto (Z): ${copilotData.z} mm\n\nTu tarea:\n1. Analiza visualmente la foto.\n2. Reconstruye la pieza en código JavaScript CSG limpio (retornando la función main).\n3. Usa las dimensiones del Bounding Box como LÍMITE GENERAL para tus primitivas.\n4. IMPORTANTE PARA IMPRESIÓN FDM: Añade +0.2mm a todos los cilindros que restes (agujeros) para asegurar tolerancias. Asegúrate de que la cara más plana repose sobre Z=0.`;
             } else {
-                alert("⚠️ Primero tienes que ir a la pestaña del VISOR 3D (o PBR Studio) y pulsar el botón 'Copiloto IA' para que yo pueda escanear la pieza.");
+                promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nAnaliza la pieza de la foto adjunta. Reconstruye su geometría en código CSG paramétrico puro (JavaScript, retornando main). Asume medidas proporcionales a una caja de 50x50x50mm. Añade tolerancias de impresión 3D (+0.2mm en agujeros) y usa bases planas.`;
             }
         } else if (type === 'lattice') {
             document.getElementById('useMemory').checked = true;
-            promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza. Crea una red de vaciados (Lattice/Honeycomb) usando bucles matemáticos (for) y CSG.subtract(). El objetivo es comerse el interior de la pieza para ahorrar un 30-40% de material, dejando las paredes exteriores y estructurales intactas.";
+            promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza. Crea una red de vaciados usando CILINDROS (para que la Bambu Lab los imprima mejor) usando bucles matemáticos (for) y CSG.subtract(). El objetivo es comerse el interior de la pieza para ahorrar material, dejando las paredes exteriores y estructurales intactas.";
         } else if (type === 'shell') {
             document.getElementById('useMemory').checked = true;
-            promptBox.value = "Aplica un vaciado (Shell) a esta pieza. Réstale una versión de sí misma ligeramente más pequeña para que quede hueca por dentro, pero con un grosor de pared de unos 2mm. Esto ahorrará material y tiempo de impresión.";
+            promptBox.value = "Aplica un vaciado (Shell) a esta pieza. Réstale una versión de sí misma ligeramente más pequeña para que quede hueca por dentro, pero con un grosor de pared de unos 2.4mm (múltiplo exacto para extrusor 0.4mm).";
         }
         
         if (type !== 'reverse') generateCode();
@@ -228,17 +232,17 @@ Ejemplo si piden "engranaje de 45 dientes con hueco de 5": {"tool": "gear", "par
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            systemInstruction = `Eres NEXUS TITAN AI, un experto en geometría 3D, optimización topológica y cinemática matemática.
+            systemInstruction = `Eres NEXUS TITAN AI, un experto global en Ingeniería Inversa, Diseño Paramétrico 3D y Fabricación Aditiva (FDM para Bambu Lab).
 Tu ÚNICO objetivo es devolver código JavaScript puro usando CSG.js.
-NO uses bloques de markdown (no pongas \`\`\`javascript).
-NO des explicaciones ni saludos.
-El código DEBE contener una función global 'main(params)' que retorne un objeto CSG válido y bien formado.
+NO uses bloques de markdown (no pongas \`\`\`javascript). NO des explicaciones.
 
-REGLAS DE OPTIMIZACIÓN Y BOOLEANAS:
-Si el usuario pide aligerar, optimización topológica o "lattice", usa bucles for() para crear un array de primitivas y aplícale .subtract() a la pieza principal para generar celosías paramétricas estables.
-
-REGLAS DE INGENIERÍA INVERSA:
-Si el usuario te da un Bounding Box (X, Y, Z), tu código CSG debe generar una forma base cuyo volumen respete EXTREMADAMENTE esas medidas.
+REGLAS DE RECONSTRUCCIÓN FDM Y BOOLEANAS:
+1. Si analizas una foto, descompón la forma en primitivas básicas: bloques (cubos) y cilindros.
+2. Usa altas resoluciones para los cilindros redondos: {slices: 128}.
+3. Tolerancias: Los agujeros (operadores subtract) deben tener su radio aumentado en +0.1mm o +0.2mm para compensar la expansión térmica del plástico.
+4. Orientación: Las piezas deben diseñarse para imprimirse sin soportes (Zero-Support Design). El lado más plano y ancho debe estar alineado horizontalmente.
+5. El código DEBE contener una función global 'main(params)' que retorne el objeto CSG final.
+6. Si el usuario pide aligerar ("lattice"), usa bucles for() para crear un array de primitivas y aplícale .subtract() a la pieza principal.
 
 REGLA ESTRICTA DE ANIMACIÓN (KINE_T):
 El motor inyectará un parámetro continuo. Usa programación defensiva SIEMPRE:
@@ -259,8 +263,8 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            // 🔥 CORRECCIÓN: Restaurado al endpoint funcional
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${key}`, {
+            // 🔥 CORRECCIÓN: Actualizado a Gemini 2.5 Pro para maximizar el razonamiento espacial y deducción de imágenes.
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })
             });
@@ -300,12 +304,12 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         
         try {
             const response = await fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code }) });
-            if(response.ok) { btn.innerHTML = "✅ INYECTADO"; btn.style.backgroundColor = "#2E7D32"; } 
+            if(response.ok) { btn.innerHTML = "✅ INYECTADO"; btn.style.backgroundColor = "#00E676"; btn.style.color = "#000"; } 
             else throw new Error("Rechazado por backend.");
         } catch (error) {
             alert("Error: " + error.message); btn.innerHTML = "❌ ERROR"; btn.style.backgroundColor = "#D50000";
         } finally {
-            setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "#B388FF"; }, 2500);
+            setTimeout(() => { btn.innerHTML = originalText; btn.style.backgroundColor = "#B388FF"; btn.style.color = "#FFF"; }, 2500);
             
             removeImage();
             if(document.getElementById('promptInput').value.includes("He recibido este error")) {

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.15 - DOUBLE AGENT CORE</title>
+    <title>NEXUS AI v23.17 - CLOUD LIBRARY (CONNECTED)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -20,8 +21,11 @@
         .btn-inject { background-color: #B388FF; margin-top: 5px;}
         .btn-inject:hover { background-color: #9575CD; }
         .btn-camera { background-color: #00B0FF; color: #000; margin-bottom: 5px;}
+        .btn-cloud { background-color: #2E7D32; color: #FFF; font-weight: bold; }
+        .btn-cloud:hover { background-color: #4CAF50; }
         
         .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .api-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .btn-macro { background-color: #161B22; color: #00E676; border: 1px solid #00E676; padding: 10px; font-size: 11px; }
         .btn-macro:hover { background-color: #00E676; color: #000; }
         
@@ -41,18 +45,34 @@
         .preview-container { position: relative; display: none; width: fit-content; margin-top: 5px; }
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
         .btn-remove-img { position: absolute; top: -5px; right: -5px; background: #D50000; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);}
+
+        .library-panel { background: #0D1117; border: 1px solid #30363D; border-radius: 6px; padding: 10px; max-height: 200px; overflow-y: auto; display: none; }
+        .library-item { background: #161B22; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #2E7D32; display: flex; justify-content: space-between; align-items: center;}
+        .library-item-title { font-size: 12px; color: #E6EDF3; font-weight: bold; }
+        .library-item-btn { background: #B388FF; color: #FFF; padding: 5px 10px; font-size: 10px; border-radius: 4px; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.15 - DOUBLE AGENT)</h2>
+    <h2>🤖 Nexus AI Core (v23.17 - CONNECTED TO CLOUD)</h2>
 </div>
 
 <div class="content">
     <div>
-        <label>API Key (Google Gemini):</label>
+        <label>Google Gemini API Key:</label>
         <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
+    </div>
+
+    <div class="api-grid">
+        <div>
+            <label>Supabase URL:</label>
+            <input type="text" id="supaUrl" value="https://kggoqfvegxkmbpskxfzw.supabase.co" placeholder="https://xxxx.supabase.co">
+        </div>
+        <div>
+            <label>Supabase ANON KEY:</label>
+            <input type="password" id="supaKey" value="sb_publishable_0Dgflxpjh5vXVYs-SBQu4Q_D_pqHJ4I" placeholder="eyJhbG...">
+        </div>
     </div>
 
     <div>
@@ -110,7 +130,7 @@
     </div>
 
     <div>
-        <label>Instrucción / Animación / Errores:</label>
+        <label>Instrucción / Petición:</label>
         <textarea id="promptInput" placeholder="Ej: Hazme una base para mi smartphone para ver vídeos en horizontal..."></textarea>
     </div>
 
@@ -121,15 +141,112 @@
         <label>Respuesta / Código JS (Editable):</label>
         <textarea id="codeOutput" style="height: 160px; color: #FFAB00;"></textarea>
     </div>
-
+    
     <button class="btn-inject" id="btnInject" onclick="inject()">⚙️ Inyectar al Visor 3D</button>
+
+    <button class="btn-cloud" onclick="saveToCloud()" style="margin-top: 5px;">💾 Guardar Receta en Supabase</button>
+    <button onclick="toggleLibrary()" style="margin-top: 5px; background: #30363D; color: #FFF;">📚 Ver Mi Biblioteca de Piezas</button>
+    
+    <div id="libraryPanel" class="library-panel">
+        </div>
 </div>
 
 <script>
     let currentB64 = null;
     let currentMimeType = null;
     let lastErrorProcessed = ""; 
+    let supaClient = null; 
 
+    function initSupabase() {
+        const url = document.getElementById('supaUrl').value.trim();
+        const key = document.getElementById('supaKey').value.trim();
+        if (url && key) {
+            supaClient = supabase.createClient(url, key);
+            // Guardamos localmente por si el usuario decide sobrescribir los valores por defecto
+            localStorage.setItem('nexus_supa_url', url);
+            localStorage.setItem('nexus_supa_key', key);
+            return true;
+        }
+        return false;
+    }
+
+    async function saveToCloud() {
+        if (!initSupabase()) { alert("⚠️ Faltan datos de Supabase."); return; }
+        const prompt = document.getElementById('promptInput').value.trim() || "Pieza sin título";
+        const code = document.getElementById('codeOutput').value.trim();
+        if (!code || code.includes("JSON INTERCEPTADO")) { 
+            alert("⚠️ No hay código válido generado para guardar."); return; 
+        }
+
+        const btn = document.querySelector('.btn-cloud');
+        btn.innerHTML = "⏳ Guardando en la nube...";
+
+        try {
+            const { data, error } = await supaClient.from('nexus_library').insert([{ prompt: prompt, codigo: code }]);
+            if (error) throw error;
+            btn.innerHTML = "✅ ¡Guardado Exitosamente!";
+            btn.style.backgroundColor = "#00E676";
+            btn.style.color = "#000";
+            setTimeout(() => { btn.innerHTML = "💾 Guardar Receta en Supabase"; btn.style.backgroundColor = "#2E7D32"; btn.style.color = "#FFF"; }, 2500);
+            
+            // Refrescar la lista si está abierta
+            if(document.getElementById('libraryPanel').style.display === "block") {
+                loadLibrary(); 
+            }
+        } catch (err) {
+            alert("Error guardando en Supabase: " + err.message + "\n\n¿Creaste la tabla 'nexus_library' en el SQL Editor?");
+            btn.innerHTML = "💾 Guardar Receta en Supabase";
+        }
+    }
+
+    async function loadLibrary() {
+        if (!initSupabase()) return;
+        const panel = document.getElementById('libraryPanel');
+        panel.innerHTML = "<div style='color:#8B949E; font-size: 11px; text-align:center;'>Conectando con Supabase...</div>";
+        
+        try {
+            const { data, error } = await supaClient.from('nexus_library').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            
+            panel.innerHTML = "";
+            if(data.length === 0) {
+                panel.innerHTML = "<div style='color:#8B949E; font-size: 11px; text-align:center;'>Tu biblioteca está vacía.</div>";
+                return;
+            }
+
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "library-item";
+                
+                const title = item.prompt.length > 40 ? item.prompt.substring(0, 40) + "..." : item.prompt;
+                
+                div.innerHTML = `
+                    <div class="library-item-title">${title}</div>
+                    <button class="library-item-btn" onclick="loadPiece('${btoa(unescape(encodeURIComponent(item.codigo)))}')">Cargar</button>
+                `;
+                panel.appendChild(div);
+            });
+        } catch (err) {
+            panel.innerHTML = "<div style='color:#D50000; font-size: 11px; text-align:center;'>Error de Red/Tabla: " + err.message + "</div>";
+        }
+    }
+
+    function toggleLibrary() {
+        const panel = document.getElementById('libraryPanel');
+        if(panel.style.display === "block") {
+            panel.style.display = "none";
+        } else {
+            panel.style.display = "block";
+            loadLibrary();
+        }
+    }
+
+    function loadPiece(b64Code) {
+        const decoded = decodeURIComponent(escape(atob(b64Code)));
+        document.getElementById('codeOutput').value = decoded;
+        alert("✅ Código cargado desde tu Nube. Pulsa '⚙️ Inyectar al Visor 3D' para previsualizarlo.");
+    }
+    
     async function checkDataBridge() {
         try {
             const res = await fetch('/api/get_vision.json');
@@ -160,8 +277,14 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        const savedKey = localStorage.getItem('nexus_gemini_key');
-        if(savedKey) document.getElementById('apiKey').value = savedKey;
+        const savedGemini = localStorage.getItem('nexus_gemini_key');
+        const savedSupaUrl = localStorage.getItem('nexus_supa_url');
+        const savedSupaKey = localStorage.getItem('nexus_supa_key');
+        
+        if(savedGemini) document.getElementById('apiKey').value = savedGemini;
+        // Si el usuario guardó otra URL en el pasado, la carga. Si no, usa la tuya por defecto del HTML.
+        if(savedSupaUrl) document.getElementById('supaUrl').value = savedSupaUrl;
+        if(savedSupaKey) document.getElementById('supaKey').value = savedSupaKey;
         
         document.getElementById('aiMode').addEventListener('change', (e) => {
             const val = e.target.value;
@@ -243,7 +366,6 @@
         }
     }
 
-    // Función auxiliar para llamar a la API de Gemini
     async function fetchGemini(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
         let payloadParts = [{ text: systemInstruction + "\n\n" + promptText }];
         if (imageB64) payloadParts.push({ inlineData: { mimeType: mimeType, data: imageB64 } });
@@ -274,54 +396,35 @@
         try {
             let finalCodeText = "";
 
-            // 🔥 FASE 16: DOBLE AGENTE (Traductor Natural -> Ingeniero 3D)
             if (aiMode === "architect") {
                 document.getElementById('loader').innerText = "🧠 Arquitecto: Traduciendo a especificaciones mecánicas...";
-                
-                const archSystem = `Eres el Arquitecto Mecánico Jefe. El usuario te pedirá objetos cotidianos en lenguaje natural. 
-Tu tarea: Traducir su deseo a un pliego técnico estricto de diseño 3D.
-Debes detallar: 
-1. Primitivas base a usar (cubos, cilindros).
-2. Medidas lógicas en milímetros (dedúcelas: ej. un vaso mide 80x80x100mm, un móvil 75x150x10mm).
-3. Operaciones booleanas requeridas (cortes, uniones).
-Devuelve SOLO la especificación técnica en 3-4 viñetas. Nada más.`;
+                const archSystem = `Eres el Arquitecto Mecánico Jefe. El usuario te pedirá objetos cotidianos. 
+Traduce su deseo a un pliego técnico estricto de diseño 3D:
+1. Primitivas base.
+2. Medidas en milímetros lógicas deducidas.
+3. Operaciones booleanas requeridas.
+Devuelve SOLO la especificación en 3-4 viñetas.`;
                 
                 let techPlan = await fetchGemini("gemini-3-flash-preview", key, archSystem, `Deseo del usuario: "${prompt}"`, currentB64, currentMimeType);
                 
                 document.getElementById('loader').innerText = `⚙️ Programador: Escribiendo código CSG con ${selectedModel}...`;
-                
-                const coderSystem = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando 'csg.js'.
-Tu objetivo es devolver código JavaScript puro basado EXACTAMENTE en la especificación técnica dada.
-NUNCA uses markdown ni \`\`\`javascript.
-El código DEBE contener una función global 'main(params)'.
-
-⛔ REGLAS VITALES:
-1. NO PASES ARRAYS a booleanas (usa a.subtract(b).subtract(c)).
-2. CARAS COPLANARES: Objetos de resta deben ser MUCHO MÁS LARGOS que la pieza a cortar.
-3. LÍMITE FÍSICO 180mm: Si excede 170mm, usa .scale() antes de retornar.`;
+                const coderSystem = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro basado EXACTAMENTE en la especificación técnica. NUNCA uses markdown. El código DEBE contener 'main(params)'.
+⛔ REGLAS: 1. NO ARRAYS en booleanas. 2. CARAS COPLANARES: Objetos de resta MUCHO MÁS LARGOS. 3. LÍMITE FÍSICO 180mm: Usa .scale() si excede 170mm.`;
 
                 let rawCode = await fetchGemini(selectedModel, key, coderSystem, `Escribe el código para este plan técnico:\n\n${techPlan}`);
-                
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                // Formateamos la salida para que el usuario vea la magia del Doble Agente
-                finalCodeText = `/* ========================================\n   🧠 PLAN TÉCNICO DEL ARQUITECTO:\n----------------------------------------\n${techPlan}\n======================================== */\n\n${rawCode}`;
+                finalCodeText = `/* ========================================\n   🧠 PLAN TÉCNICO:\n----------------------------------------\n${techPlan}\n======================================== */\n\n${rawCode}`;
                 document.getElementById('codeOutput').value = finalCodeText;
             } 
             else if (aiMode === "agentic") {
                 document.getElementById('loader').innerText = `🎛️ Agente Slicer analizando perfil de material...`;
-                const slicerSystem = `Eres el Agente CAM de NEXUS. Configura los parámetros de laminado (Slicer) para la Bambu Lab A1 Mini. Devuelve ÚNICAMENTE un JSON válido.
-Estructura: {"tool": "slicer", "params": {"nozzle_temp": num, "bed_temp": num, "speed": num, "infill": num}}
-Perfiles:
-- PLA: Fusor 220, Cama 60, Vel 150-200, Relleno 10-15%.
-- PETG: Fusor 240, Cama 70, Vel 60, Relleno 30-50%.
-- TPU: Fusor 230, Cama 40, Vel 30, Relleno 20%.
-- ABS: Fusor 260, Cama 90, Vel 50, Relleno 40%.`;
+                const slicerSystem = `Eres el Agente CAM de NEXUS. Devuelve ÚNICAMENTE un JSON válido: {"tool": "slicer", "params": {"nozzle_temp": num, "bed_temp": num, "speed": num, "infill": num}}. Ajusta valores para PLA, PETG, TPU o ABS según lo que pida el usuario.`;
                 
                 let text = await fetchGemini("gemini-3-flash-preview", key, slicerSystem, prompt);
                 text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
                 let jsonPayload = JSON.parse(text);
-                document.getElementById('codeOutput').value = "JSON INTERCEPTADO (Slicer Actualizado):\n" + JSON.stringify(jsonPayload, null, 2);
+                document.getElementById('codeOutput').value = "JSON INTERCEPTADO:\n" + JSON.stringify(jsonPayload, null, 2);
                 
                 if (jsonPayload.tool === "slicer" && jsonPayload.params) {
                     if(jsonPayload.params.nozzle_temp) { document.getElementById('nozzle_temp').value = jsonPayload.params.nozzle_temp; highlightSlider('nozzle_temp'); }
@@ -354,9 +457,7 @@ Perfiles:
     }
 
     async function inject() {
-        if(document.getElementById('aiMode').value === "agentic") {
-            alert("⚠️ En Modo Agentic UI la IA configura el Slicer. No hay modelo 3D que inyectar."); return;
-        }
+        if(document.getElementById('aiMode').value === "agentic") return;
         const code = document.getElementById('codeOutput').value.trim();
         if(!code) return;
         const btn = document.getElementById('btnInject');

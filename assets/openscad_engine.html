@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.3 (AR FIX FINAL)</title>
+    <title>NEXUS CAD PRO - TITAN SPACE ENGINE v13.4 (AR FIX V9 MERGE)</title>
     <style>
         :root { --nexus-cyan: #00E5FF; --nexus-green: #00E676; --nexus-purple: #B388FF; --nexus-bg: rgba(11, 14, 20, 0.85); --nexus-border: #30363D; }
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; color: #E6EDF3; }
@@ -32,32 +32,8 @@
         .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* 🔥 FASE 13.3: BOTÓN AR NATIVO ESTILIZADO, FLOTANTE, CENTRADO Y 100% VISIBLE */
-        #ARButton {
-            display: block !important;
-            position: absolute !important;
-            bottom: 30px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            background: var(--nexus-cyan) !important;
-            color: #000 !important;
-            border: 2px solid #FFF !important;
-            border-radius: 8px !important;
-            padding: 12px 24px !important;
-            font-weight: 900 !important;
-            font-family: 'Segoe UI', sans-serif !important;
-            letter-spacing: 1px !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            z-index: 99999 !important;
-            box-shadow: 0 0 15px var(--nexus-cyan) !important;
-            cursor: pointer !important;
-            transition: all 0.3s ease !important;
-            text-align: center;
-        }
-        #ARButton:active {
-            transform: translateX(-50%) scale(0.95) !important;
-        }
+        /* 🔥 CSS EXACTO DE LA V9.0 RESTAURADO */
+        #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
 
         #slicer-modal { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; background: #161B22; border: 2px solid #00E676; border-radius: 8px; padding: 20px; z-index: 100; box-shadow: 0 10px 30px rgba(0,230,118,0.2); }
         .slicer-title { color: #00E676; font-weight: bold; font-size: 14px; text-transform: uppercase; margin-bottom: 15px; text-align: center; letter-spacing: 1px; }
@@ -85,7 +61,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/ARButton.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
 </head>
 <body>
@@ -176,7 +151,7 @@
     </div>
 
     <div id="console" class="nexus-panel">
-        <div class="log-sys">> TITAN SPACE ENGINE v13.3 Iniciado...</div>
+        <div class="log-sys">> TITAN SPACE ENGINE v13.4 Iniciado...</div>
         <div id="log-content"></div>
     </div>
 
@@ -185,7 +160,9 @@
         <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
     </div>
 
-    <script>
+    <script type="module">
+        import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
+
         window.NEXUS_HD_EXPORT = false;
         window.IS_EXPORTING_HD = false;
         
@@ -243,8 +220,8 @@
                         <div class="commit-time">Commit #${i + 1} - ${item.time}</div>
                         <div class="commit-info">📐 Polígonos: ${polys} | ⚡ CSG Time: ${item.ms}ms</div>
                         <div class="commit-actions">
-                            <button class="btn-sm btn-restore" onclick="restoreHistory(${i})">Revertir Código</button>
-                            <button class="${btnCompareClass}" onclick="toggleCompare(${i})">${btnCompareText}</button>
+                            <button class="btn-sm btn-restore" onclick="window.restoreHistory(${i})">Revertir Código</button>
+                            <button class="${btnCompareClass}" onclick="window.toggleCompare(${i})">${btnCompareText}</button>
                         </div>
                     </div>
                 `;
@@ -296,7 +273,7 @@
             
             let oldCode = codeHistory[index].code;
             
-            if (isCompareMode) toggleCompare(comparingIndex);
+            if (isCompareMode) window.toggleCompare(comparingIndex);
             
             fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code: oldCode }) }).catch(()=>{});
             
@@ -328,7 +305,7 @@
 
         window.changeMaterial = () => { 
             if(currentMesh) { 
-                if (isCompareMode) toggleCompare(comparingIndex); 
+                if (isCompareMode) window.toggleCompare(comparingIndex); 
                 isStressMode = false; 
                 matIndex = (matIndex + 1) % materialsArray.length; 
                 currentMesh.material = materialsArray[matIndex]; 
@@ -676,7 +653,20 @@
         
         window.toggleCamera = () => { camera.fov = camera.fov === 45 ? 10 : 45; camera.updateProjectionMatrix(); };
         window.toggleConsole = () => { const c = document.getElementById('console'); c.style.display = c.style.display === 'none' || c.style.display === '' ? 'block' : 'none'; };
-        window.exportFile = exportFile;
+        
+        window.exportFile = function(format) {
+            if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
+            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + " (PUEDE TARDAR)..."; document.getElementById('loader').style.display = 'flex';
+            setTimeout(() => {
+                try {
+                    let pos = currentMesh.geometry.attributes.position.array; let nor = currentMesh.geometry.attributes.normal.array; let fileParts = []; let ext = "";
+                    if (format === 'stl') { ext = ".stl"; fileParts.push("solid nexus_export\n"); for(let i=0; i<pos.length; i+=9) { fileParts.push("facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n  outer loop\n    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n  endloop\nendfacet\n"); } fileParts.push("endsolid nexus_export\n"); } else if (format === 'obj') { ext = ".obj"; fileParts.push("# NEXUS CAD Export\n"); for(let i=0; i<pos.length; i+=3) fileParts.push("v " + pos[i] + " " + pos[i+1] + " " + pos[i+2] + "\n"); for(let i=0; i<nor.length; i+=3) fileParts.push("vn " + nor[i] + " " + nor[i+1] + " " + nor[i+2] + "\n"); for(let i=1; i<=(pos.length/3); i+=3) fileParts.push("f " + i + "//" + i + " " + (i+1) + "//" + (i+1) + " " + (i+2) + "//" + (i+2) + "\n"); }
+                    let filename = "nexus_model_" + Math.floor(Date.now()/1000) + ext; let blob = new Blob(fileParts, {type: 'text/plain'}); let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); 
+                    log("<span class='log-ok'>> ¡" + format.toUpperCase() + " GUARDADO EN DESCARGAS!</span>");
+                    if (numPolys < 500000) { let dataString = fileParts.join(""); fetch(window.location.origin + '/api/save_export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: filename, data: dataString }) }).then(r => r.json()).then(res => { log("<span class='log-ok'>> Sincronizado con la pestaña DB.</span>"); }).catch(err => { log("<span class='log-warn'>> Aviso DB: Ignora esto, el archivo ya está en tus Descargas.</span>"); }); } else { log("<span class='log-warn'>> 🛡️ Render Extremo (> 500k polígonos). Se omite el envío a DB para proteger el servidor local.</span>"); }
+                } catch(e) { log("<span class='log-err'>> ERROR EXPORTACIÓN: " + e.message + "</span>"); } finally { document.getElementById('loader').style.display = 'none'; }
+            }, 150); 
+        };
 
         window.changeLOD = () => {
             if (lastCode !== "") {
@@ -841,13 +831,8 @@
             world.addBody(floorBody);
 
             renderer.xr.enabled = true; 
-            
-            // 🔥 FASE 13.3: Inyección garantizada con ID para cazar siempre nuestro CSS
-            if(typeof ARButton !== 'undefined') {
-                const arBtn = ARButton.createButton( renderer );
-                arBtn.id = "ARButton"; 
-                document.body.appendChild( arBtn );
-            }
+            // 🔥 El botón AR EXACTAMENTE como en la versión V9
+            document.body.appendChild( ARButton.createButton( renderer ) );
 
             renderer.xr.addEventListener('sessionstart', () => {
                 scene.background = null; 
@@ -1120,7 +1105,7 @@
 
                 if (window.IS_EXPORTING_HD) {
                     setTimeout(() => {
-                        exportFile('stl'); window.IS_EXPORTING_HD = false; window.NEXUS_HD_EXPORT = false; executeCSGCode(lastCode, true); 
+                        window.exportFile('stl'); window.IS_EXPORTING_HD = false; window.NEXUS_HD_EXPORT = false; executeCSGCode(lastCode, true); 
                     }, 500);
                 }
 
@@ -1184,20 +1169,6 @@
         function loadAndSendSTL(url) {
             isImportingSTL = true; document.getElementById('loader-txt').innerText = "DESCARGANDO STL LOCAL..."; document.getElementById('loader').style.display = 'flex';
             new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "TRIANGULIZANDO A NODO CSG..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
-        }
-
-        function exportFile(format) {
-            if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
-            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + " (PUEDE TARDAR)..."; document.getElementById('loader').style.display = 'flex';
-            setTimeout(() => {
-                try {
-                    let pos = currentMesh.geometry.attributes.position.array; let nor = currentMesh.geometry.attributes.normal.array; let fileParts = []; let ext = "";
-                    if (format === 'stl') { ext = ".stl"; fileParts.push("solid nexus_export\n"); for(let i=0; i<pos.length; i+=9) { fileParts.push("facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n  outer loop\n    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n  endloop\nendfacet\n"); } fileParts.push("endsolid nexus_export\n"); } else if (format === 'obj') { ext = ".obj"; fileParts.push("# NEXUS CAD Export\n"); for(let i=0; i<pos.length; i+=3) fileParts.push("v " + pos[i] + " " + pos[i+1] + " " + pos[i+2] + "\n"); for(let i=0; i<nor.length; i+=3) fileParts.push("vn " + nor[i] + " " + nor[i+1] + " " + nor[i+2] + "\n"); for(let i=1; i<=(pos.length/3); i+=3) fileParts.push("f " + i + "//" + i + " " + (i+1) + "//" + (i+1) + " " + (i+2) + "//" + (i+2) + "\n"); }
-                    let filename = "nexus_model_" + Math.floor(Date.now()/1000) + ext; let blob = new Blob(fileParts, {type: 'text/plain'}); let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); 
-                    log("<span class='log-ok'>> ¡" + format.toUpperCase() + " GUARDADO EN DESCARGAS!</span>");
-                    if (numPolys < 500000) { let dataString = fileParts.join(""); fetch(window.location.origin + '/api/save_export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: filename, data: dataString }) }).then(r => r.json()).then(res => { log("<span class='log-ok'>> Sincronizado con la pestaña DB.</span>"); }).catch(err => { log("<span class='log-warn'>> Aviso DB: Ignora esto, el archivo ya está en tus Descargas.</span>"); }); } else { log("<span class='log-warn'>> 🛡️ Render Extremo (> 500k polígonos). Se omite el envío a DB para proteger el servidor local.</span>"); }
-                } catch(e) { log("<span class='log-err'>> ERROR EXPORTACIÓN: " + e.message + "</span>"); } finally { document.getElementById('loader').style.display = 'none'; }
-            }, 150); 
         }
 
         let lastCode = ""; let currentStlHash = "";

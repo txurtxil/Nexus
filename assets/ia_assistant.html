@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.10 - VISION TO PRINT CORE (ANTI-FLIP GUARD)</title>
+    <title>NEXUS AI v23.11 - VISION TO PRINT CORE (BSP SHIELD)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -42,7 +42,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.10 - ANTI-FLIP GUARD)</h2>
+    <h2>🤖 Nexus AI Core (v23.11 - BSP SHIELD)</h2>
 </div>
 
 <div class="content">
@@ -126,13 +126,13 @@
                 currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
             }
             
-            // 🔥 FASE 13.5: Auto-corrección de errores 'flip' y genéricos
+            // 🔥 FASE 13.6: Auto-corrección blindada contra errores BSP (Flip)
             if (data.last_error && data.last_error.trim() !== "") {
                 const promptBox = document.getElementById('promptInput');
                 if(data.last_error.includes("flip")) {
-                    promptBox.value = "He recibido este error en el visor 3D al compilar: 'Cannot read properties of null (reading 'flip')'.\n\nESTO ES CRÍTICO: Has intentado pasar un Array a una operación booleana (ej: pieza.subtract([a,b])). ESTÁ PROHIBIDO en esta versión de csg.js. Para arreglarlo, debes aplicar las restas/uniones en un bucle FOR de uno en uno (ej: for(...) { pieza = pieza.subtract(agujero); }). Genera el código corregido.";
+                    promptBox.value = "CRÍTICO: Has causado un error 'flip' en el motor BSP de CSG.js. Esto pasa por 3 motivos que DEBES evitar ahora mismo:\n1. Has pasado un Array a un boolean (ej: a.subtract([b])). ¡PROHIBIDO! Usa a.subtract(b).subtract(c) o bucles for.\n2. Caras Coplanares (Z-Fighting): Tus herramientas de resta (agujeros) son exactamente del mismo tamaño que la pieza. Haz que los cilindros/cubos de resta sean MUCHO MÁS LARGOS que la pieza principal para que atraviesen limpiamente sin tocar los bordes.\n3. Una de tus variables era nula/undefined. Decláralas bien.\nReescribe el código reparando esto de forma estricta.";
                 } else {
-                    promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido. Recuerda NUNCA usar funciones estáticas como CSG.union(). Usa siempre métodos de instancia como a.union(b).";
+                    promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido. Recuerda encadenar métodos (a.union(b).subtract(c)) en vez de arrays o funciones estáticas.";
                 }
                 
                 document.getElementById('aiMode').value = "copilot";
@@ -235,31 +235,26 @@
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            // 🔥 AQUÍ ESTÁ LA NUEVA MAGIA ANTI-FLIP
+            // 🔥 AQUÍ ESTÁ EL NUEVO BLINDAJE MATEMÁTICO
             systemInstruction = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando la librería 'csg.js' nativa de JavaScript.
 Tu ÚNICO objetivo es devolver código JavaScript puro. NUNCA uses markdown ni \`\`\`javascript.
 El código DEBE contener una función global 'main(params)' que retorne un ÚNICO objeto CSG final.
 
-⛔ SINTAXIS CSG.JS ESTRICTA E INQUEBRANTABLE (EVITAR ERROR FLIP):
-1. NUNCA uses funciones globales como CSG.union(a, b). Usa SIEMPRE métodos de instancia: a.union(b).
-2. 🚨 ESTRICTAMENTE PROHIBIDO PASAR ARRAYS A BOOLEANAS. Si usas a.subtract([b, c]), el motor fallará con un error 'flip'. 
-3. CÓMO RESTAR/UNIR MÚLTIPLES OBJETOS: Debes iterar con un bucle for y actualizar la variable principal UNA A UNA. 
-   Ejemplo CORRECTO: 
-   for(let i=0; i<5; i++) { 
-       let agujero = CSG.cylinder({...}); 
-       piezaBase = piezaBase.subtract(agujero); 
-   }
-4. Para trasladar: a.translate([x, y, z]). Para rotar: a.rotateX(deg).
+⛔ REGLAS VITALES MATEMÁTICAS (ANTI-FLIP BSP ERROR):
+1. NO PASES ARRAYS a booleanas. NUNCA HAGAS a.subtract([b,c]). DEBES encadenar: a.subtract(b).subtract(c).
+2. CARAS COPLANARES: Para evitar el fallo matemático 'z-fighting', cualquier objeto que vayas a RESTAR (subtract) debe ser EXAGERADAMENTE MÁS LARGO que la pieza a cortar, para que sobresalga por ambos lados de la intersección.
+3. VARIABLES NULAS: Asegúrate de que las primitivas se hayan instanciado correctamente antes de unirlas.
 
-REGLAS DE RECONSTRUCCIÓN FDM:
-- Usa altas resoluciones para cilindros: {slices: 128}.
-- Agujeros (subtract): Aumenta su radio en +0.2mm para compensar la expansión térmica del FDM.
-- Tolerancias: El lado más plano debe estar en Z=0.`;
+ESTRUCTURA OBLIGATORIA DE EJEMPLO:
+let pieza = CSG.cube({radius: [10, 10, 10]}); // Centro en 0,0,0
+let agujero = CSG.cylinder({start: [0,0,-20], end: [0,0,20], radius: 2, resolution: 128}); // Mucho más largo que el cubo
+pieza = pieza.subtract(agujero); // Encadenado o sobreescrito limpiamente
+return pieza;`;
 
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE la regla de NO usar arrays en operaciones booleanas para evitar el error 'flip'.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE las reglas ANTI-FLIP (agujeros largos y cero arrays).`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }

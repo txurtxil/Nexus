@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.8 - VISION TO PRINT CORE (FREE MODEL)</title>
+    <title>NEXUS AI v23.9 - VISION TO PRINT CORE (STRICT SYNTAX)</title>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
         .header { background-color: #161B22; padding: 15px; text-align: center; border-bottom: 2px solid #FFAB00; }
@@ -25,7 +25,6 @@
         .btn-macro { background-color: #161B22; color: #00E676; border: 1px solid #00E676; padding: 10px; font-size: 11px; }
         .btn-macro:hover { background-color: #00E676; color: #000; }
         
-        /* 🔥 FASE 13: Estilo específico para Ingeniería Inversa Vision-to-Print */
         .btn-reverse { background-color: #D50000; color: #FFF; border: 1px solid #FF5252; grid-column: span 2; font-weight: 900; }
         .btn-reverse:hover { background-color: #FF5252; color: #000; box-shadow: 0 0 10px #FF5252; }
 
@@ -43,7 +42,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.8 - MODELO LIBRE)</h2>
+    <h2>🤖 Nexus AI Core (v23.9 - STRICT SYNTAX)</h2>
 </div>
 
 <div class="content">
@@ -125,15 +124,11 @@
                 document.getElementById('previewContainer').style.display = 'block';
                 currentB64 = data.image_b64.split(',')[1];
                 currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
-                
-                if (document.getElementById('promptInput').value === "") {
-                    document.getElementById('promptInput').value = "Analiza esta captura del visor 3D y descríbeme qué mejoras geométricas le harías o genera el código para replicarla.";
-                }
             }
             
             if (data.last_error && data.last_error.trim() !== "") {
                 const promptBox = document.getElementById('promptInput');
-                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido que solucione esto manteniendo la estructura base plana.";
+                promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido. Recuerda NUNCA usar funciones estáticas como CSG.union() o CSG.subtract(). Usa siempre metodos de instancia como a.union(b).";
                 document.getElementById('aiMode').value = "copilot";
                 document.getElementById('memoryContainer').style.display = 'flex';
                 document.getElementById('useMemory').checked = true;
@@ -216,7 +211,7 @@
         const prompt = document.getElementById('promptInput').value.trim();
         const aiMode = document.getElementById('aiMode').value;
         const useMemory = document.getElementById('useMemory').checked;
-        const selectedModel = document.getElementById('modelSelector').value.trim(); // 🔥 Lee lo que haya escrito o seleccionado
+        const selectedModel = document.getElementById('modelSelector').value.trim(); 
         
         if(!key || (!prompt && !currentB64)) { alert("⚠️ Faltan datos."); return; }
         if(!selectedModel) { alert("⚠️ Especifica un modelo IA."); return; }
@@ -230,42 +225,31 @@
         let finalPrompt = prompt;
 
         if (aiMode === "agentic") {
-            systemInstruction = `Eres el Agente UI de NEXUS CAD. Tu objetivo es controlar la interfaz visual de la app devolviendo ÚNICAMENTE un JSON válido.
-No devuelvas markdown, ni explicaciones, ni código JS. SOLO JSON.
-Estructura OBLIGATORIA: {"tool": "nombre_herramienta", "params": {"nombre_slider": valor_numerico}}
-
-Herramientas disponibles en nexus_ui_tools.py y sus parámetros:
-- "gear" (Engranajes): "gear_n" (dientes 5-100), "gear_p" (paso 1-10), "gear_t" (grosor 1-50), "gear_h" (agujero centro 0-20)
-- "box" (Cajas/Carcasas): "box_w" (ancho), "box_d" (fondo), "box_h" (alto), "box_r" (radio esquinas), "box_th" (grosor pared)
-- "drone" (Drones): "drn_r" (radio central), "drn_l" (longitud brazo), "drn_mot" (montura motor), "drn_h" (altura)
-- "naca" (Alas/Perfiles): "naca_m", "naca_p", "naca_t", "naca_c" (cuerda), "naca_w" (envergadura)
-
-Ejemplo si piden "engranaje de 45 dientes con hueco de 5": {"tool": "gear", "params": {"gear_n": 45, "gear_h": 5}}`;
+            systemInstruction = `Eres el Agente UI de NEXUS CAD. Tu objetivo es controlar la interfaz visual de la app devolviendo ÚNICAMENTE un JSON válido.`;
             finalPrompt = `Instrucción: ${prompt}`;
         } 
         else {
-            systemInstruction = `Eres NEXUS TITAN AI, un experto global en Ingeniería Inversa, Diseño Paramétrico 3D y Fabricación Aditiva (FDM para Bambu Lab).
-Tu ÚNICO objetivo es devolver código JavaScript puro usando CSG.js.
-NO uses bloques de markdown (no pongas \`\`\`javascript). NO des explicaciones.
+            // 🔥 AQUÍ ESTÁ LA MAGIA ANTI-ERRORES
+            systemInstruction = `Eres NEXUS TITAN AI, experto en Diseño Paramétrico 3D usando la librería 'csg.js' nativa de JavaScript.
+Tu ÚNICO objetivo es devolver código JavaScript puro. NUNCA uses markdown ni \`\`\`javascript.
+El código DEBE contener una función global 'main(params)' que retorne el objeto CSG final.
 
-REGLAS DE RECONSTRUCCIÓN FDM Y BOOLEANAS:
-1. Si analizas una foto, descompón la forma en primitivas básicas: bloques (cubos) y cilindros.
-2. Usa altas resoluciones para los cilindros redondos: {slices: 128}.
-3. Tolerancias: Los agujeros (operadores subtract) deben tener su radio aumentado en +0.1mm o +0.2mm para compensar la expansión térmica del plástico.
-4. Orientación: Las piezas deben diseñarse para imprimirse sin soportes (Zero-Support Design). El lado más plano y ancho debe estar alineado horizontalmente.
-5. El código DEBE contener una función global 'main(params)' que retorne el objeto CSG final.
-6. Si el usuario pide aligerar ("lattice"), usa bucles for() para crear un array de primitivas y aplícale .subtract() a la pieza principal.
+⛔ SINTAXIS CSG.JS ESTRICTA E INQUEBRANTABLE:
+1. NUNCA uses CSG.union(a, b). ESTÁ PROHIBIDO. Usa SIEMPRE a.union(b) o a.union([b, c]).
+2. NUNCA uses CSG.subtract(a, b). ESTÁ PROHIBIDO. Usa SIEMPRE a.subtract(b) o a.subtract([b, c]).
+3. NUNCA uses CSG.intersect(a, b). ESTÁ PROHIBIDO. Usa SIEMPRE a.intersect(b).
+4. Para trasladar: a.translate([x, y, z]). Para rotar: a.rotateX(deg).
+Las operaciones booleanas se aplican SIEMPRE desde una instancia hacia otra.
 
-REGLA ESTRICTA DE ANIMACIÓN (KINE_T):
-El motor inyectará un parámetro continuo. Usa programación defensiva SIEMPRE:
-  params = params || {};
-  var KINE_T = params.KINE_T || 0;
-Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
+REGLAS DE RECONSTRUCCIÓN FDM:
+- Usa altas resoluciones para cilindros: {slices: 128}.
+- Agujeros (subtract): Aumenta su radio en +0.2mm para compensar la expansión térmica del FDM.
+- Tolerancias: El lado más plano debe estar en Z=0.`;
 
             if (useMemory) {
                 let currentCode = await getCurrentCode();
                 if (currentCode && currentCode.trim() !== "") {
-                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Añade el mecanizado, lattice o vaciado usando operaciones booleanas.`;
+                    systemInstruction += `\n\nATENCIÓN: Mantén la estructura base actual intacta. Modifícalo según se pida, respetando SIEMPRE la sintaxis de instancia a.union(b).`;
                     finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\n\nINSTRUCCIÓN: Modifica este código para cumplir: "${prompt}".`;
                 }
             }
@@ -275,7 +259,6 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
         if (currentB64) payloadParts.push({ inlineData: { mimeType: currentMimeType, data: currentB64 } });
 
         try {
-            // 🔥 Fetch dinámico y agnóstico, usa lo que el usuario haya tecleado o seleccionado
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: payloadParts }] })
@@ -289,10 +272,6 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
                 text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
                 let jsonPayload = JSON.parse(text);
                 document.getElementById('codeOutput').value = "JSON INTERCEPTADO:\n" + JSON.stringify(jsonPayload, null, 2);
-                
-                document.getElementById('loader').innerText = "Moviendo Sliders en la App...";
-                await fetch('/api/agentic_ui', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: text });
-                alert("🎛️ ¡Hecho! La IA ha movido los controles. Ve a la pestaña PARAM o 3D.");
             } else {
                 text = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 document.getElementById('codeOutput').value = text;
@@ -305,9 +284,7 @@ Si se requiere, anímalo. Ejemplo: .rotateZ(KINE_T).`;
     }
 
     async function inject() {
-        if(document.getElementById('aiMode').value === "agentic") {
-            alert("⚠️ En Modo Agentic UI la IA mueve la app automáticamente. No es necesario inyectar."); return;
-        }
+        if(document.getElementById('aiMode').value === "agentic") return;
         const code = document.getElementById('codeOutput').value.trim();
         if(!code) return;
         const btn = document.getElementById('btnInject');

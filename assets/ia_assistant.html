@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.20 - OMNI CORE (OPENROUTER)</title>
+    <title>NEXUS AI v23.21 - OMNI CORE (OPENROUTER FIXED)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -65,7 +65,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.20 - OPENROUTER OMNI)</h2>
+    <h2>🤖 Nexus AI Core (v23.21 - OPENROUTER FIXED)</h2>
 </div>
 
 <div class="content">
@@ -348,21 +348,27 @@
         }
     }
 
-    // 🔥 Petición Unificada a OpenRouter (Soporta Multimodal/Visión y Texto de forma nativa)
+    // 🔥 Petición Unificada y Corregida a OpenRouter
     async function fetchOpenRouter(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
-        let contentArray = [];
-        if (promptText) {
-            contentArray.push({ type: "text", text: promptText });
-        }
+        let userContent;
+
+        // CORRECCIÓN: Diferenciar formato de payload si hay imagen vs solo texto
         if (imageB64 && mimeType) {
-            contentArray.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${imageB64}` } });
+            // Modo Multimodal (Array)
+            userContent = [
+                { type: "text", text: promptText },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageB64}` } }
+            ];
+        } else {
+            // Modo Texto Plano (String). Evita el error "Provider returned error" en modelos sin visión
+            userContent = promptText;
         }
 
         const payload = {
             model: model,
             messages: [
                 { role: "system", content: systemInstruction },
-                { role: "user", content: contentArray }
+                { role: "user", content: userContent }
             ],
             temperature: 0.2
         };
@@ -372,13 +378,24 @@
             headers: { 
                 "Authorization": `Bearer ${key}`, 
                 "Content-Type": "application/json",
-                "HTTP-Referer": window.location.href,
+                "HTTP-Referer": window.location.href || "https://nexus.local", // Corrección para WebViews Android
                 "X-Title": "NEXUS AI 3D"
             },
             body: JSON.stringify(payload)
         });
+        
         const data = await res.json();
-        if(!res.ok) throw new Error(data.error?.message || "Error en OpenRouter API");
+        
+        // Manejo de errores profundo para capturar qué falló exactamente
+        if(!res.ok) {
+            const exactError = (data.error && data.error.message) ? data.error.message : JSON.stringify(data.error || "Error de proveedor");
+            throw new Error(`OpenRouter Error: ${exactError}`);
+        }
+
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error("El modelo generó una respuesta vacía o inválida.");
+        }
+
         return data.choices[0].message.content.trim();
     }
 
@@ -401,7 +418,6 @@
 
         try {
             if (aiMode === "architect") {
-                // FASE A: El Arquitecto (Gemma 4 Multimodal) mira y razona
                 document.getElementById('loader').innerText = "🧠 Arquitecto (Visión Activa): Analizando geometría y medidas...";
                 const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Analiza la petición (y la foto si se incluye) con máxima precisión geométrica. Deduce medidas estándar en milímetros. Debes devolver ÚNICAMENTE un JSON válido con esta estructura: {"analisis": "tu deduccion logica y visual", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}. NO escribas markdown ni texto fuera del JSON.`;
                 
@@ -410,14 +426,11 @@
                     archPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción del usuario: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
                 }
 
-                // Usamos siempre Gemma 4 31B para el Arquitecto por su potencia visual y de razonamiento
+                // Arquitecto siempre usa Gemma 4 para razonar/ver
                 let techPlanStr = await fetchOpenRouter("google/gemma-4-31b-it:free", orKey, archSystem, archPrompt, currentB64, currentMimeType);
-                
-                // Limpiamos la respuesta por si el modelo metió markdown
                 techPlanStr = techPlanStr.replace(/```json/gi, "").replace(/```/g, "").trim();
                 lastTechPlan = techPlanStr; 
                 
-                // FASE B: Compilador (Modelo Elegido)
                 document.getElementById('loader').innerText = `⚙️ Compilador (${selectedModel}): Generando código CAD estricto...`;
                 const coderSystem = `Eres NEXUS TITAN AI, compilador experto de 'csg.js'. 
 Traduce el siguiente JSON técnico a código JavaScript puro (retornando la función main(params)). NUNCA uses bloques de código markdown ni texto adicional.
@@ -434,7 +447,8 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando la func
                     }
                 }
 
-                let rawCode = await fetchOpenRouter(selectedModel, orKey, coderSystem, coderPrompt);
+                // El compilador no necesita volver a recibir la foto
+                let rawCode = await fetchOpenRouter(selectedModel, orKey, coderSystem, coderPrompt, null, null);
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
                 document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;

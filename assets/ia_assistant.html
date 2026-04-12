@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.21 - OMNI CORE (OPENROUTER FIXED)</title>
+    <title>NEXUS AI v23.22 - OMNI CORE (OPENROUTER ULTRA STABLE)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -65,7 +65,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.21 - OPENROUTER FIXED)</h2>
+    <h2>🤖 Nexus AI Core (v23.22 - OPENROUTER ULTRA STABLE)</h2>
 </div>
 
 <div class="content">
@@ -237,7 +237,7 @@
                 
                 div.innerHTML = `
                     <div class="library-item-title">${title}</div>
-                    <button class="library-item-btn" onclick="loadPiece('${encodedCode}', '${encodedPlan}')">Cargar</button>
+                    <button class="library-item-btn" onclick="loadPiece('\( {encodedCode}', ' \){encodedPlan}')">Cargar</button>
                 `;
                 panel.appendChild(div);
             });
@@ -348,15 +348,14 @@
         }
     }
 
-    // 🔥 Petición Unificada y Corregida a OpenRouter + RETRY automático + Referer seguro para Android
+    // 🔥 FETCH ULTRA STABLE (con fallback automático a openrouter/free)
     async function fetchOpenRouter(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
         let userContent;
 
-        // Formato estricto para evitar "Provider returned error"
         if (imageB64 && mimeType) {
             userContent = [
                 { type: "text", text: promptText },
-                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageB64}` } }
+                { type: "image_url", image_url: { url: `data:\( {mimeType};base64, \){imageB64}` } }
             ];
         } else {
             userContent = promptText;
@@ -371,14 +370,14 @@
             temperature: 0.2
         };
 
-        // PARCHE ANDROID: Forzar un referer válido si estamos en un APK/WebView local
+        // PARCHE ANDROID / WebView
         let safeReferer = window.location.href;
         if (!safeReferer || safeReferer.startsWith('file:') || safeReferer.startsWith('content:') || safeReferer === 'about:blank') {
             safeReferer = "https://nexus-3d.app"; 
         }
 
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 4;
 
         while (attempts < maxAttempts) {
             try {
@@ -397,11 +396,16 @@
                 
                 if (!res.ok) {
                     const exactError = (data.error && data.error.message) ? data.error.message : JSON.stringify(data.error || "Error de proveedor");
-                    
-                    if (exactError.includes("Provider returned error") && attempts < maxAttempts - 1) {
+                    console.error("[OpenRouter Full Error]", data);
+
+                    // FALLBACK AUTOMÁTICO a openrouter/free cuando falla cualquier modelo gratuito
+                    if ((exactError.includes("Provider returned error") || exactError.includes("502")) && 
+                        model !== "openrouter/free" && attempts < maxAttempts - 1) {
+                        
+                        console.log(`[OpenRouter] Fallback automático → openrouter/free (intento ${attempts+1})`);
+                        payload.model = "openrouter/free";
                         attempts++;
-                        console.log(`[OpenRouter Retry] Provider returned error - Intento ${attempts}/${maxAttempts}`);
-                        await new Promise(r => setTimeout(r, 900 * attempts));
+                        await new Promise(r => setTimeout(r, 1400 * attempts));
                         continue;
                     }
                     throw new Error(`OpenRouter Error: ${exactError}`);
@@ -413,20 +417,17 @@
 
                 return data.choices[0].message.content.trim();
             } catch (err) {
-                if (attempts < maxAttempts - 1 && 
-                    (err.message.includes("Provider returned error") || 
-                     err.message.includes("Failed to fetch") || 
-                     err.message.includes("network"))) {
-                    attempts++;
-                    console.log(`[OpenRouter Retry] Error de conexión - Intento ${attempts}/${maxAttempts}: ${err.message}`);
-                    await new Promise(r => setTimeout(r, 1200 * attempts));
+                attempts++;
+                if (attempts < maxAttempts) {
+                    console.log(`[OpenRouter Retry \( {attempts}/ \){maxAttempts}]`, err.message);
+                    await new Promise(r => setTimeout(r, 1500 * attempts));
                     continue;
                 }
                 throw err;
             }
         }
         
-        throw new Error("OpenRouter Error: Máximo de reintentos alcanzado. Prueba con 'openrouter/free' o espera unos segundos.");
+        throw new Error("OpenRouter Error: Máximo de reintentos alcanzado.");
     }
 
     async function generateCode() {
@@ -479,7 +480,7 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando la func
                 let rawCode = await fetchOpenRouter(selectedModel, orKey, coderSystem, coderPrompt, null, null);
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
+                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n\( {techPlanStr}\n======================================== */\n\n \){rawCode}`;
             } 
             else if (aiMode === "agentic") {
                 document.getElementById('loader').innerText = `🎛️ Agente Slicer analizando requerimientos térmicos...`;
@@ -514,7 +515,11 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando la func
                 document.getElementById('codeOutput').value = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
             }
         } catch(e) { 
-            document.getElementById('codeOutput').value = "// ERROR:\n" + e.message + "\n\n💡 Consejo: Usa el modelo 'openrouter/free' si persiste el error (es más estable en free tier).";
+            let errorText = e.message;
+            if (errorText.includes("Provider returned error") || errorText.includes("502")) {
+                errorText += "\n\n🔴 Los modelos gratuitos están saturados.\n💡 Prueba seleccionar 'openrouter/free' manualmente o espera 30-60 segundos.";
+            }
+            document.getElementById('codeOutput').value = "// ERROR:\n" + errorText;
         } finally {
             document.getElementById('loader').style.display = 'none';
         }

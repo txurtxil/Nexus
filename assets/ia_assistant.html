@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.18 - HYBRID CORE (GROQ + GEMINI)</title>
+    <title>NEXUS AI v23.19 - HYBRID CORE (GROQ FALLBACK)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -46,7 +46,18 @@
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
         .btn-remove-img { position: absolute; top: -5px; right: -5px; background: #D50000; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);}
 
-        .library-panel { background: #0D1117; border: 1px solid #30363D; border-radius: 6px; padding: 10px; max-height: 200px; overflow-y: auto; display: none; }
+        /* 🔥 FASE 17: CSS Mejorado para scroll nativo en Android */
+        .library-panel { 
+            background: #0D1117; 
+            border: 1px solid #30363D; 
+            border-radius: 6px; 
+            padding: 10px; 
+            max-height: 40vh; /* Se adapta a la altura de la pantalla del móvil */
+            overflow-y: auto; 
+            -webkit-overflow-scrolling: touch; /* Scroll suave en Android/iOS */
+            display: none; 
+            margin-bottom: 25px; /* Espacio extra al final para que no se pegue abajo */
+        }
         .library-item { background: #161B22; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #2E7D32; display: flex; justify-content: space-between; align-items: center;}
         .library-item-title { font-size: 12px; color: #E6EDF3; font-weight: bold; }
         .library-item-btn { background: #B388FF; color: #FFF; padding: 5px 10px; font-size: 10px; border-radius: 4px; cursor: pointer; border: none; }
@@ -55,7 +66,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.18 - HYBRID GROQ+GEMINI)</h2>
+    <h2>🤖 Nexus AI Core (v23.19 - GROQ FALLBACK)</h2>
 </div>
 
 <div class="content">
@@ -82,18 +93,13 @@
     </div>
 
     <div>
-        <label>Motor IA (Compilador Gemini):</label>
+        <label>Motor IA (Compilador / Creador de Código):</label>
         <select id="modelSelector" onchange="toggleManualModel()">
-            <optgroup label="Gemini 3.1 (Última Generación)">
-                <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
-                <option value="gemini-3.1-flash-live-preview">Gemini 3.1 Flash Live</option>
-                <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash Image</option>
-                <option value="gemini-3.1-flash-preview" selected>Gemini 3.1 Flash (Predeterminado)</option>
+            <optgroup label="Principal (Google)">
+                <option value="gemini-3.1-flash-lite-preview" selected>Gemini 3.1 Flash Lite (Estable)</option>
             </optgroup>
-            <optgroup label="Gemini 2.5 (Estables)">
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Potencia Máxima)</option>
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+            <optgroup label="Alternativa (Groq Fallback)">
+                <option value="groq-llama-3.3-70b-versatile">Groq: Llama 3.3 70B (Rápido y Gratis)</option>
             </optgroup>
             <option value="manual">⚙️ Otro (Introducir manualmente)...</option>
         </select>
@@ -103,8 +109,8 @@
     <div class="toggle-container">
         <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
-            <option value="architect">🧠 Doble Agente (Groq Razona -> Gemini Programa)</option>
-            <option value="copilot">🛠️ Copiloto Libre (Solo Gemini)</option>
+            <option value="architect">🧠 Doble Agente (Groq Razona -> Motor Programa)</option>
+            <option value="copilot">🛠️ Copiloto Libre (Solo Motor Seleccionado)</option>
             <option value="agentic">🎛️ Agentic UI (Slicer App)</option>
         </select>
     </div>
@@ -214,7 +220,7 @@
             setTimeout(() => { btn.innerHTML = "💾 Guardar Receta en Supabase"; btn.style.backgroundColor = "#2E7D32"; btn.style.color = "#FFF"; }, 2500);
             if(document.getElementById('libraryPanel').style.display === "block") loadLibrary(); 
         } catch (err) {
-            alert("Error guardando en Supabase: " + err.message + "\n\n¿Ejecutaste el ALTER TABLE para añadir 'plan_tecnico'?");
+            alert("Error guardando en Supabase: " + err.message);
             btn.innerHTML = "💾 Guardar Receta en Supabase";
         }
     }
@@ -352,20 +358,22 @@
         }
     }
 
-    // 🔥 Petición a Groq API
-    async function fetchGroq(model, key, systemInstruction, promptText) {
+    // 🔥 Petición a Groq API adaptada para poder desactivar el modo JSON estricto
+    async function fetchGroq(model, key, systemInstruction, promptText, jsonMode = true) {
+        const payload = {
+            model: model,
+            messages: [
+                { role: "system", content: systemInstruction },
+                { role: "user", content: promptText }
+            ],
+            temperature: 0.2
+        };
+        if (jsonMode) payload.response_format = { type: "json_object" };
+
         const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: 'POST',
             headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: model,
-                messages: [
-                    { role: "system", content: systemInstruction },
-                    { role: "user", content: promptText }
-                ],
-                temperature: 0.2,
-                response_format: { type: "json_object" }
-            })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         if(!res.ok) throw new Error(data.error?.message || "Error en Groq");
@@ -395,9 +403,11 @@
         let selectedModel = document.getElementById('modelSelector').value;
         if(selectedModel === 'manual') selectedModel = document.getElementById('manualModelInput').value.trim();
         
-        if(!geminiKey || (!prompt && !currentB64)) { alert("⚠️ Faltan datos básicos (Clave Gemini o Prompt)."); return; }
+        if(!prompt && !currentB64) { alert("⚠️ El Prompt está vacío."); return; }
+        if(!selectedModel.startsWith('groq-') && !geminiKey) { alert("⚠️ Faltan datos: Clave Gemini requerida."); return; }
+        if(selectedModel.startsWith('groq-') && !groqKey) { alert("⚠️ Faltan datos: Clave Groq requerida para usar este modelo."); return; }
         
-        localStorage.setItem('nexus_gemini_key', geminiKey);
+        if(geminiKey) localStorage.setItem('nexus_gemini_key', geminiKey);
         if(groqKey) localStorage.setItem('nexus_groq_key', groqKey);
 
         document.getElementById('loader').style.display = 'block';
@@ -407,7 +417,7 @@
             if (aiMode === "architect") {
                 if(!groqKey) { alert("⚠️ El modo Doble Agente requiere la API Key de Groq."); throw new Error("Falta Groq Key"); }
                 
-                // FASE A: Groq (Arquitecto)
+                // FASE A: Groq (Arquitecto) - Siempre en modo JSON
                 document.getElementById('loader').innerText = "🧠 Arquitecto (Groq): Pensando la geometría...";
                 const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Deduce las medidas estándar en milímetros del objeto que pida el usuario. Debes devolver ÚNICAMENTE un JSON válido con esta estructura estricta: {"analisis": "tu deduccion logica", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}`;
                 
@@ -416,11 +426,12 @@
                     groqPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción del usuario: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
                 }
 
-                let techPlanStr = await fetchGroq("llama-3.3-70b-versatile", groqKey, archSystem, groqPrompt);
+                let techPlanStr = await fetchGroq("llama-3.3-70b-versatile", groqKey, archSystem, groqPrompt, true);
                 lastTechPlan = techPlanStr; // Guardamos en memoria global
                 
-                // FASE B: Gemini (Compilador)
-                document.getElementById('loader').innerText = `⚙️ Compilador (${selectedModel}): Generando CSG.js...`;
+                // FASE B: Compilador (Gemini o Groq Fallback)
+                let modelLabel = selectedModel.startsWith('groq-') ? 'Groq' : selectedModel;
+                document.getElementById('loader').innerText = `⚙️ Compilador (${modelLabel}): Generando CSG.js...`;
                 const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
 Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(params)). NUNCA uses markdown.
 ⛔ REGLAS VITALES ANTI-FLIP:
@@ -436,10 +447,17 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                     }
                 }
 
-                let rawCode = await fetchGemini(selectedModel, geminiKey, coderSystem, geminiPrompt, currentB64, currentMimeType);
+                let rawCode = "";
+                // Si el usuario eligió Groq como motor de código (Fallback), se enruta hacia allá y se apaga el modo JSON estricto
+                if (selectedModel.startsWith("groq-")) {
+                    const groqModelName = selectedModel.replace("groq-", "");
+                    rawCode = await fetchGroq(groqModelName, groqKey, coderSystem, geminiPrompt, false);
+                } else {
+                    rawCode = await fetchGemini(selectedModel, geminiKey, coderSystem, geminiPrompt, currentB64, currentMimeType);
+                }
+
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                // Formateo visual para el usuario
                 document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GROQ LLAMA 3.3):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
             } 
             else if (aiMode === "agentic") {
@@ -447,7 +465,7 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                 if(!groqKey) { alert("⚠️ Usa Groq Key para el Slicer ultrarrápido."); throw new Error("Falta Groq Key"); }
                 
                 const slicerSystem = `Eres el Agente CAM. Devuelve ÚNICAMENTE un JSON válido: {"tool": "slicer", "params": {"nozzle_temp": num, "bed_temp": num, "speed": num, "infill": num}}. Ajustes base: PLA (220/60), PETG (240/70), TPU (230/40), ABS (260/90).`;
-                let text = await fetchGroq("llama-3.3-70b-versatile", groqKey, slicerSystem, prompt);
+                let text = await fetchGroq("llama-3.3-70b-versatile", groqKey, slicerSystem, prompt, true);
                 let jsonPayload = JSON.parse(text);
                 
                 document.getElementById('codeOutput').value = "JSON INTERCEPTADO:\n" + JSON.stringify(jsonPayload, null, 2);
@@ -460,7 +478,7 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                 await fetch('/api/agentic_ui', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: text });
             } 
             else {
-                document.getElementById('loader').innerText = `🛠️ Copiloto (${selectedModel}) procesando...`;
+                document.getElementById('loader').innerText = `🛠️ Copiloto procesando...`;
                 let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm.`;
                 let finalPrompt = prompt;
                 if (useMemory) {
@@ -470,7 +488,15 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                         finalPrompt = `--- CÓDIGO ACTUAL ---\n${currentCode}\n---------------------\nINSTRUCCIÓN: ${prompt}`;
                     }
                 }
-                let text = await fetchGemini(selectedModel, geminiKey, sys, finalPrompt, currentB64, currentMimeType);
+                
+                let text = "";
+                if (selectedModel.startsWith("groq-")) {
+                    const groqModelName = selectedModel.replace("groq-", "");
+                    text = await fetchGroq(groqModelName, groqKey, sys, finalPrompt, false);
+                } else {
+                    text = await fetchGemini(selectedModel, geminiKey, sys, finalPrompt, currentB64, currentMimeType);
+                }
+
                 document.getElementById('codeOutput').value = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
             }
         } catch(e) { 

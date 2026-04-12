@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.19 - HYBRID CORE (GROQ FALLBACK)</title>
+    <title>NEXUS AI v23.20 - OMNI CORE (OPENROUTER)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -46,17 +46,16 @@
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
         .btn-remove-img { position: absolute; top: -5px; right: -5px; background: #D50000; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);}
 
-        /* 🔥 FASE 17: CSS Mejorado para scroll nativo en Android */
         .library-panel { 
             background: #0D1117; 
             border: 1px solid #30363D; 
             border-radius: 6px; 
             padding: 10px; 
-            max-height: 40vh; /* Se adapta a la altura de la pantalla del móvil */
+            max-height: 40vh; 
             overflow-y: auto; 
-            -webkit-overflow-scrolling: touch; /* Scroll suave en Android/iOS */
+            -webkit-overflow-scrolling: touch; 
             display: none; 
-            margin-bottom: 25px; /* Espacio extra al final para que no se pegue abajo */
+            margin-bottom: 25px; 
         }
         .library-item { background: #161B22; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #2E7D32; display: flex; justify-content: space-between; align-items: center;}
         .library-item-title { font-size: 12px; color: #E6EDF3; font-weight: bold; }
@@ -66,19 +65,13 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.19 - GROQ FALLBACK)</h2>
+    <h2>🤖 Nexus AI Core (v23.20 - OPENROUTER OMNI)</h2>
 </div>
 
 <div class="content">
-    <div class="api-grid">
-        <div>
-            <label>Groq API Key (Cerebro Lógico):</label>
-            <input type="password" id="groqKey" placeholder="gsk_..." value="">
-        </div>
-        <div>
-            <label>Gemini API Key (Compilador):</label>
-            <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
-        </div>
+    <div>
+        <label>OpenRouter API Key (Modelo Centralizado):</label>
+        <input type="password" id="openRouterKey" placeholder="sk-or-v1-..." value="">
     </div>
 
     <div class="api-grid">
@@ -95,22 +88,21 @@
     <div>
         <label>Motor IA (Compilador / Creador de Código):</label>
         <select id="modelSelector" onchange="toggleManualModel()">
-            <optgroup label="Principal (Google)">
-                <option value="gemini-3.1-flash-lite-preview" selected>Gemini 3.1 Flash Lite (Estable)</option>
+            <optgroup label="Modelos Gratis en OpenRouter">
+                <option value="google/gemma-4-31b-it:free" selected>Gemma 4 31B (Mejor Visión y CAD)</option>
+                <option value="google/gemma-4-26b-a4b-it:free">Gemma 4 26B (Muy Rápido)</option>
+                <option value="openrouter/free">Auto Router (Elige el mejor gratis disponible)</option>
             </optgroup>
-            <optgroup label="Alternativa (Groq Fallback)">
-                <option value="groq-llama-3.3-70b-versatile">Groq: Llama 3.3 70B (Rápido y Gratis)</option>
-            </optgroup>
-            <option value="manual">⚙️ Otro (Introducir manualmente)...</option>
+            <option value="manual">⚙️ Otro (Introducir manualmente ID de OpenRouter)...</option>
         </select>
-        <input type="text" id="manualModelInput" placeholder="Ej: gemini-experimental" style="display:none; margin-top:5px;">
+        <input type="text" id="manualModelInput" placeholder="Ej: anthropic/claude-3-haiku" style="display:none; margin-top:5px;">
     </div>
     
     <div class="toggle-container">
         <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
-            <option value="architect">🧠 Doble Agente (Groq Razona -> Motor Programa)</option>
-            <option value="copilot">🛠️ Copiloto Libre (Solo Motor Seleccionado)</option>
+            <option value="architect">🧠 Doble Agente (Gemma Razona -> Gemma Programa)</option>
+            <option value="copilot">🛠️ Copiloto Libre (Acceso Directo)</option>
             <option value="agentic">🎛️ Agentic UI (Slicer App)</option>
         </select>
     </div>
@@ -152,11 +144,11 @@
 
     <div>
         <label>Instrucción / Petición:</label>
-        <textarea id="promptInput" placeholder="Ej: Hazme una base para mi smartphone para ver vídeos en horizontal..."></textarea>
+        <textarea id="promptInput" placeholder="Ej: Analiza la foto y genérame el código CSG para esta pieza..."></textarea>
     </div>
 
     <button onclick="generateCode()" id="btnGenerate">⚡ Analizar / Ejecutar</button>
-    <div id="loader">Iniciando flujos neuronales...</div>
+    <div id="loader">Iniciando red neuronal OpenRouter...</div>
 
     <div>
         <label>Respuesta / Código JS (Editable):</label>
@@ -176,7 +168,7 @@
     let currentMimeType = null;
     let lastErrorProcessed = ""; 
     let supaClient = null; 
-    let lastTechPlan = ""; // Memoria de Arquitecto
+    let lastTechPlan = "";
 
     function toggleManualModel() {
         const sel = document.getElementById('modelSelector');
@@ -205,16 +197,16 @@
         }
 
         const btn = document.querySelector('.btn-cloud');
-        btn.innerHTML = "⏳ Guardando en la nube...";
+        btn.innerHTML = "⏳ Guardando...";
 
         try {
             const { data, error } = await supaClient.from('nexus_library').insert([{ 
                 prompt: prompt, 
                 codigo: code,
-                plan_tecnico: lastTechPlan // 🔥 Guardamos el plano de Groq
+                plan_tecnico: lastTechPlan 
             }]);
             if (error) throw error;
-            btn.innerHTML = "✅ ¡Guardado Exitosamente!";
+            btn.innerHTML = "✅ ¡Guardado!";
             btn.style.backgroundColor = "#00E676";
             btn.style.color = "#000";
             setTimeout(() => { btn.innerHTML = "💾 Guardar Receta en Supabase"; btn.style.backgroundColor = "#2E7D32"; btn.style.color = "#FFF"; }, 2500);
@@ -228,7 +220,7 @@
     async function loadLibrary() {
         if (!initSupabase()) return;
         const panel = document.getElementById('libraryPanel');
-        panel.innerHTML = "<div style='color:#8B949E; font-size: 11px; text-align:center;'>Conectando con Supabase...</div>";
+        panel.innerHTML = "<div style='color:#8B949E; font-size: 11px; text-align:center;'>Conectando...</div>";
         try {
             const { data, error } = await supaClient.from('nexus_library').select('*').order('created_at', { ascending: false });
             if (error) throw error;
@@ -240,7 +232,6 @@
                 div.className = "library-item";
                 const title = item.prompt.length > 40 ? item.prompt.substring(0, 40) + "..." : item.prompt;
                 
-                // Pasamos el plan_tecnico al botón para restaurar la memoria
                 const encodedCode = btoa(unescape(encodeURIComponent(item.codigo)));
                 const encodedPlan = btoa(unescape(encodeURIComponent(item.plan_tecnico || "")));
                 
@@ -261,7 +252,7 @@
 
     function loadPiece(b64Code, b64Plan) {
         document.getElementById('codeOutput').value = decodeURIComponent(escape(atob(b64Code)));
-        lastTechPlan = decodeURIComponent(escape(atob(b64Plan))); // 🔥 Restaurar memoria de Groq
+        lastTechPlan = decodeURIComponent(escape(atob(b64Plan)));
         alert("✅ Pieza y plano cargados desde la Nube. Pulsa 'Inyectar' para verla.");
     }
     
@@ -289,8 +280,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        if(localStorage.getItem('nexus_gemini_key')) document.getElementById('apiKey').value = localStorage.getItem('nexus_gemini_key');
-        if(localStorage.getItem('nexus_groq_key')) document.getElementById('groqKey').value = localStorage.getItem('nexus_groq_key');
+        if(localStorage.getItem('nexus_or_key')) document.getElementById('openRouterKey').value = localStorage.getItem('nexus_or_key');
         if(localStorage.getItem('nexus_supa_url')) document.getElementById('supaUrl').value = localStorage.getItem('nexus_supa_url');
         if(localStorage.getItem('nexus_supa_key')) document.getElementById('supaKey').value = localStorage.getItem('nexus_supa_key');
         
@@ -339,7 +329,7 @@
             if(!currentB64) { alert("📷 ¡OJO! Sube primero una foto de la pieza física que quieres clonar."); return; }
             if(copilotData) {
                 promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nB.Box:\n- X: ${copilotData.x} mm\n- Y: ${copilotData.y} mm\n- Z: ${copilotData.z} mm\nAnaliza visualmente la foto y reconstruye la pieza en JS CSG. Usa el B.Box como límite.`;
-            } else { promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nAnaliza la pieza de la foto adjunta y reconstrúyela.`; }
+            } else { promptBox.value = `¡ALERTA DE INGENIERÍA INVERSA!\nAnaliza la pieza de la foto adjunta y reconstrúyela con máxima precisión geométrica.`; }
         } else if (type === 'lattice') {
             document.getElementById('useMemory').checked = true;
             promptBox.value = "Aplica Optimización Topológica (Generative Design) a esta pieza con cilindros y CSG.subtract().";
@@ -358,44 +348,42 @@
         }
     }
 
-    // 🔥 Petición a Groq API adaptada para poder desactivar el modo JSON estricto
-    async function fetchGroq(model, key, systemInstruction, promptText, jsonMode = true) {
+    // 🔥 Petición Unificada a OpenRouter (Soporta Multimodal/Visión y Texto de forma nativa)
+    async function fetchOpenRouter(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
+        let contentArray = [];
+        if (promptText) {
+            contentArray.push({ type: "text", text: promptText });
+        }
+        if (imageB64 && mimeType) {
+            contentArray.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${imageB64}` } });
+        }
+
         const payload = {
             model: model,
             messages: [
                 { role: "system", content: systemInstruction },
-                { role: "user", content: promptText }
+                { role: "user", content: contentArray }
             ],
             temperature: 0.2
         };
-        if (jsonMode) payload.response_format = { type: "json_object" };
 
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: 'POST',
-            headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+            headers: { 
+                "Authorization": `Bearer ${key}`, 
+                "Content-Type": "application/json",
+                "HTTP-Referer": window.location.href,
+                "X-Title": "NEXUS AI 3D"
+            },
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if(!res.ok) throw new Error(data.error?.message || "Error en Groq");
+        if(!res.ok) throw new Error(data.error?.message || "Error en OpenRouter API");
         return data.choices[0].message.content.trim();
     }
 
-    // 🔥 Petición a Gemini API
-    async function fetchGemini(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
-        let payloadParts = [{ text: systemInstruction + "\n\n" + promptText }];
-        if (imageB64) payloadParts.push({ inlineData: { mimeType: mimeType, data: imageB64 } });
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ contents: [{ parts: payloadParts }] })
-        });
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.error?.message);
-        return data.candidates[0].content.parts[0].text.trim();
-    }
-
     async function generateCode() {
-        const geminiKey = document.getElementById('apiKey').value.trim();
-        const groqKey = document.getElementById('groqKey').value.trim();
+        const orKey = document.getElementById('openRouterKey').value.trim();
         const prompt = document.getElementById('promptInput').value.trim();
         const aiMode = document.getElementById('aiMode').value;
         const useMemory = document.getElementById('useMemory').checked;
@@ -404,68 +392,59 @@
         if(selectedModel === 'manual') selectedModel = document.getElementById('manualModelInput').value.trim();
         
         if(!prompt && !currentB64) { alert("⚠️ El Prompt está vacío."); return; }
-        if(!selectedModel.startsWith('groq-') && !geminiKey) { alert("⚠️ Faltan datos: Clave Gemini requerida."); return; }
-        if(selectedModel.startsWith('groq-') && !groqKey) { alert("⚠️ Faltan datos: Clave Groq requerida para usar este modelo."); return; }
+        if(!orKey) { alert("⚠️ Faltan datos: API Key de OpenRouter requerida."); return; }
         
-        if(geminiKey) localStorage.setItem('nexus_gemini_key', geminiKey);
-        if(groqKey) localStorage.setItem('nexus_groq_key', groqKey);
+        localStorage.setItem('nexus_or_key', orKey);
 
         document.getElementById('loader').style.display = 'block';
         document.getElementById('codeOutput').value = "";
 
         try {
             if (aiMode === "architect") {
-                if(!groqKey) { alert("⚠️ El modo Doble Agente requiere la API Key de Groq."); throw new Error("Falta Groq Key"); }
+                // FASE A: El Arquitecto (Gemma 4 Multimodal) mira y razona
+                document.getElementById('loader').innerText = "🧠 Arquitecto (Visión Activa): Analizando geometría y medidas...";
+                const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Analiza la petición (y la foto si se incluye) con máxima precisión geométrica. Deduce medidas estándar en milímetros. Debes devolver ÚNICAMENTE un JSON válido con esta estructura: {"analisis": "tu deduccion logica y visual", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}. NO escribas markdown ni texto fuera del JSON.`;
                 
-                // FASE A: Groq (Arquitecto) - Siempre en modo JSON
-                document.getElementById('loader').innerText = "🧠 Arquitecto (Groq): Pensando la geometría...";
-                const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Deduce las medidas estándar en milímetros del objeto que pida el usuario. Debes devolver ÚNICAMENTE un JSON válido con esta estructura estricta: {"analisis": "tu deduccion logica", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}`;
-                
-                let groqPrompt = `Petición: "${prompt}"`;
+                let archPrompt = `Petición: "${prompt}"`;
                 if (useMemory && lastTechPlan) {
-                    groqPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción del usuario: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
+                    archPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción del usuario: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
                 }
 
-                let techPlanStr = await fetchGroq("llama-3.3-70b-versatile", groqKey, archSystem, groqPrompt, true);
-                lastTechPlan = techPlanStr; // Guardamos en memoria global
+                // Usamos siempre Gemma 4 31B para el Arquitecto por su potencia visual y de razonamiento
+                let techPlanStr = await fetchOpenRouter("google/gemma-4-31b-it:free", orKey, archSystem, archPrompt, currentB64, currentMimeType);
                 
-                // FASE B: Compilador (Gemini o Groq Fallback)
-                let modelLabel = selectedModel.startsWith('groq-') ? 'Groq' : selectedModel;
-                document.getElementById('loader').innerText = `⚙️ Compilador (${modelLabel}): Generando CSG.js...`;
-                const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
-Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(params)). NUNCA uses markdown.
+                // Limpiamos la respuesta por si el modelo metió markdown
+                techPlanStr = techPlanStr.replace(/```json/gi, "").replace(/```/g, "").trim();
+                lastTechPlan = techPlanStr; 
+                
+                // FASE B: Compilador (Modelo Elegido)
+                document.getElementById('loader').innerText = `⚙️ Compilador (${selectedModel}): Generando código CAD estricto...`;
+                const coderSystem = `Eres NEXUS TITAN AI, compilador experto de 'csg.js'. 
+Traduce el siguiente JSON técnico a código JavaScript puro (retornando la función main(params)). NUNCA uses bloques de código markdown ni texto adicional.
 ⛔ REGLAS VITALES ANTI-FLIP:
 1. NUNCA ARRAYS en booleanas (usa a.subtract(b).subtract(c)).
-2. Z-FIGHTING: Objetos de resta deben ser EXAGERADAMENTE más largos que la pieza.
-3. LÍMITE FÍSICO: Usa .scale() si pasa de 180mm.`;
+2. Z-FIGHTING: Objetos de resta deben ser EXAGERADAMENTE más largos que la pieza que cortan.
+3. LÍMITE FÍSICO: Usa .scale() si el volumen supera 180mm.`;
 
-                let geminiPrompt = `PLAN TÉCNICO (JSON):\n${techPlanStr}`;
+                let coderPrompt = `PLAN TÉCNICO ESTRUCTURADO (JSON):\n${techPlanStr}`;
                 if (useMemory) {
                     let currentCode = await getCurrentCode();
                     if (currentCode && currentCode.trim() !== "") {
-                        geminiPrompt += `\n\n--- CÓDIGO ACTUAL ---\n${currentCode}\n\nINSTRUCCIÓN: Reescribe el código para aplicar las medidas y cambios definidos en el JSON técnico.`;
+                        coderPrompt += `\n\n--- CÓDIGO JS ACTUAL ---\n${currentCode}\n\nINSTRUCCIÓN: Reescribe el código JavaScript para aplicar las medidas exactas y cambios definidos en el JSON técnico.`;
                     }
                 }
 
-                let rawCode = "";
-                // Si el usuario eligió Groq como motor de código (Fallback), se enruta hacia allá y se apaga el modo JSON estricto
-                if (selectedModel.startsWith("groq-")) {
-                    const groqModelName = selectedModel.replace("groq-", "");
-                    rawCode = await fetchGroq(groqModelName, groqKey, coderSystem, geminiPrompt, false);
-                } else {
-                    rawCode = await fetchGemini(selectedModel, geminiKey, coderSystem, geminiPrompt, currentB64, currentMimeType);
-                }
-
+                let rawCode = await fetchOpenRouter(selectedModel, orKey, coderSystem, coderPrompt);
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GROQ LLAMA 3.3):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
+                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
             } 
             else if (aiMode === "agentic") {
-                document.getElementById('loader').innerText = `🎛️ Agente Slicer (Groq) analizando material...`;
-                if(!groqKey) { alert("⚠️ Usa Groq Key para el Slicer ultrarrápido."); throw new Error("Falta Groq Key"); }
+                document.getElementById('loader').innerText = `🎛️ Agente Slicer analizando requerimientos térmicos...`;
                 
                 const slicerSystem = `Eres el Agente CAM. Devuelve ÚNICAMENTE un JSON válido: {"tool": "slicer", "params": {"nozzle_temp": num, "bed_temp": num, "speed": num, "infill": num}}. Ajustes base: PLA (220/60), PETG (240/70), TPU (230/40), ABS (260/90).`;
-                let text = await fetchGroq("llama-3.3-70b-versatile", groqKey, slicerSystem, prompt, true);
+                let text = await fetchOpenRouter("google/gemma-4-31b-it:free", orKey, slicerSystem, prompt);
+                text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
                 let jsonPayload = JSON.parse(text);
                 
                 document.getElementById('codeOutput').value = "JSON INTERCEPTADO:\n" + JSON.stringify(jsonPayload, null, 2);
@@ -478,7 +457,7 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                 await fetch('/api/agentic_ui', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: text });
             } 
             else {
-                document.getElementById('loader').innerText = `🛠️ Copiloto procesando...`;
+                document.getElementById('loader').innerText = `🛠️ Copiloto procesando con ${selectedModel}...`;
                 let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm.`;
                 let finalPrompt = prompt;
                 if (useMemory) {
@@ -489,14 +468,7 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                     }
                 }
                 
-                let text = "";
-                if (selectedModel.startsWith("groq-")) {
-                    const groqModelName = selectedModel.replace("groq-", "");
-                    text = await fetchGroq(groqModelName, groqKey, sys, finalPrompt, false);
-                } else {
-                    text = await fetchGemini(selectedModel, geminiKey, sys, finalPrompt, currentB64, currentMimeType);
-                }
-
+                let text = await fetchOpenRouter(selectedModel, orKey, sys, finalPrompt, currentB64, currentMimeType);
                 document.getElementById('codeOutput').value = text.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
             }
         } catch(e) { 

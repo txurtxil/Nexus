@@ -370,7 +370,6 @@
             temperature: 0.2
         };
 
-        // PARCHE ANDROID / WebView
         let safeReferer = window.location.href;
         if (!safeReferer || safeReferer.startsWith('file:') || safeReferer.startsWith('content:') || safeReferer === 'about:blank') {
             safeReferer = "https://nexus-3d.app"; 
@@ -398,7 +397,6 @@
                     const exactError = (data.error && data.error.message) ? data.error.message : JSON.stringify(data.error || "Error de proveedor");
                     console.error("[OpenRouter Full Error]", data);
 
-                    // FALLBACK AUTOMÁTICO a openrouter/free cuando falla cualquier modelo gratuito
                     if ((exactError.includes("Provider returned error") || exactError.includes("502")) && 
                         model !== "openrouter/free" && attempts < maxAttempts - 1) {
                         
@@ -480,7 +478,14 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando la func
                 let rawCode = await fetchOpenRouter(selectedModel, orKey, coderSystem, coderPrompt, null, null);
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n\( {techPlanStr}\n======================================== */\n\n \){rawCode}`;
+                // ✅ CORRECCIÓN: Template literal correcto (backticks) para que no aparezca literal {techPlanStr}
+                document.getElementById('codeOutput').value = `/* ========================================
+   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):
+----------------------------------------
+${techPlanStr}
+======================================== */
+
+${rawCode}`;
             } 
             else if (aiMode === "agentic") {
                 document.getElementById('loader').innerText = `🎛️ Agente Slicer analizando requerimientos térmicos...`;

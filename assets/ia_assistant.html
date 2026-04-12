@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.19 - HYBRID CORE (GROQ FALLBACK)</title>
+    <title>NEXUS AI v23.23 - HYBRID CORE (VISION PROMPT)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -20,7 +20,13 @@
         
         .btn-inject { background-color: #B388FF; margin-top: 5px;}
         .btn-inject:hover { background-color: #9575CD; }
-        .btn-camera { background-color: #00B0FF; color: #000; margin-bottom: 5px;}
+        .btn-camera { background-color: #00B0FF; color: #000; }
+        
+        /* 🔥 NUEVO: Botón Mágico de Auto-Visión */
+        .btn-magic { background-color: #FFD600; color: #000; border: 1px solid #FFAB00; box-shadow: 0 0 8px rgba(255, 214, 0, 0.4);}
+        .btn-magic:hover { background-color: #FFF59D; }
+        .btn-magic:disabled { background-color: #555; color: #888; cursor: not-allowed; box-shadow: none; border-color: #444; }
+
         .btn-cloud { background-color: #2E7D32; color: #FFF; font-weight: bold; }
         .btn-cloud:hover { background-color: #4CAF50; }
         
@@ -46,17 +52,16 @@
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
         .btn-remove-img { position: absolute; top: -5px; right: -5px; background: #D50000; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);}
 
-        /* 🔥 FASE 17: CSS Mejorado para scroll nativo en Android */
         .library-panel { 
             background: #0D1117; 
             border: 1px solid #30363D; 
             border-radius: 6px; 
             padding: 10px; 
-            max-height: 40vh; /* Se adapta a la altura de la pantalla del móvil */
+            max-height: 40vh; 
             overflow-y: auto; 
-            -webkit-overflow-scrolling: touch; /* Scroll suave en Android/iOS */
+            -webkit-overflow-scrolling: touch; 
             display: none; 
-            margin-bottom: 25px; /* Espacio extra al final para que no se pegue abajo */
+            margin-bottom: 25px; 
         }
         .library-item { background: #161B22; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #2E7D32; display: flex; justify-content: space-between; align-items: center;}
         .library-item-title { font-size: 12px; color: #E6EDF3; font-weight: bold; }
@@ -66,7 +71,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.19 - GROQ FALLBACK)</h2>
+    <h2>🤖 Nexus AI Core (v23.23 - HYBRID CORE)</h2>
 </div>
 
 <div class="content">
@@ -76,7 +81,7 @@
             <input type="password" id="groqKey" placeholder="gsk_..." value="">
         </div>
         <div>
-            <label>Gemini API Key (Compilador):</label>
+            <label>Gemini API Key (Compilador & Visión):</label>
             <input type="password" id="apiKey" placeholder="AIzaSy..." value="">
         </div>
     </div>
@@ -142,7 +147,11 @@
     <div>
         <label>Visión Artificial (Planos / Pieza Rota):</label>
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
-        <button class="btn-camera" onclick="document.getElementById('imageInput').click()">📷 Adjuntar Foto Local</button>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+            <button class="btn-camera" style="flex: 1; margin: 0;" onclick="document.getElementById('imageInput').click()">📷 Adjuntar Foto</button>
+            <button class="btn-magic" id="btnAutoDescribe" style="flex: 1; margin: 0; display: none;" onclick="autoDescribeImage()">✨ Auto-Describir Pieza</button>
+        </div>
         
         <div class="preview-container" id="previewContainer">
             <img id="imagePreview" src="">
@@ -272,6 +281,7 @@
             if (data.image_b64 && data.image_b64.trim() !== "") {
                 document.getElementById('imagePreview').src = data.image_b64;
                 document.getElementById('previewContainer').style.display = 'block';
+                document.getElementById('btnAutoDescribe').style.display = 'block'; // FASE 18
                 currentB64 = data.image_b64.split(',')[1];
                 currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
             }
@@ -310,6 +320,7 @@
         reader.onload = function(event) {
             document.getElementById('imagePreview').src = event.target.result;
             document.getElementById('previewContainer').style.display = 'block';
+            document.getElementById('btnAutoDescribe').style.display = 'block'; // FASE 18
             currentB64 = event.target.result.split(',')[1];
         };
         reader.readAsDataURL(file);
@@ -319,6 +330,7 @@
         currentB64 = null; currentMimeType = null;
         document.getElementById('imageInput').value = "";
         document.getElementById('previewContainer').style.display = 'none';
+        document.getElementById('btnAutoDescribe').style.display = 'none'; // FASE 18
     }
 
     async function getCurrentCode() {
@@ -355,6 +367,37 @@
         if(el) {
             el.style.transition = "all 0.3s"; el.style.backgroundColor = "#00E676"; el.style.color = "#000";
             setTimeout(() => { el.style.backgroundColor = "#0B0E14"; el.style.color = "#FFF"; }, 800);
+        }
+    }
+
+    // 🔥 FASE 18: Función de Auto-Visión (Prompt Chaining)
+    async function autoDescribeImage() {
+        if (!currentB64) { alert("📷 ¡Por favor, adjunta una foto primero!"); return; }
+        
+        const geminiKey = document.getElementById('apiKey').value.trim();
+        if (!geminiKey) { alert("⚠️ Se requiere la Gemini API Key para analizar la imagen."); return; }
+        
+        const btn = document.getElementById('btnAutoDescribe');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "⏳ Analizando pieza...";
+        btn.disabled = true;
+
+        try {
+            const sys = "Eres un Ingeniero Experto en Diseño 3D y CAD. Tu tarea es mirar la foto adjunta y redactar el 'Prompt Maestro' perfecto para que otro modelo de IA programe esta pieza en código JavaScript (CSG.js). Describe la pieza de forma técnica y estructurada: desglosa las primitivas necesarias (cajas, cilindros, esferas), operaciones booleanas (uniones, restas para agujeros), proporciones visuales relativas, chaflanes y su orientación en los ejes X,Y,Z. NO generes código, SOLAMENTE devuelve el texto hiperdetallado y claro en español para ser usado como prompt directo.";
+            const prompt = "Por favor, analiza la geometría de esta pieza y redacta las instrucciones de diseño 3D.";
+            
+            // Usamos Gemini Flash Lite como el "Ojo Analítico"
+            let text = await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, sys, prompt, currentB64, currentMimeType);
+            
+            const promptBox = document.getElementById('promptInput');
+            promptBox.value = text;
+            highlightSlider('promptInput'); 
+            
+        } catch (error) {
+            alert("Error analizando la imagen: " + error.message);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
         }
     }
 

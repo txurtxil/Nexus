@@ -237,7 +237,7 @@
                 
                 div.innerHTML = `
                     <div class="library-item-title">${title}</div>
-                    <button class="library-item-btn" onclick="loadPiece('\( {encodedCode}', ' \){encodedPlan}')">Cargar</button>
+                    <button class="library-item-btn" onclick="loadPiece('${encodedCode}', '${encodedPlan}')">Cargar</button>
                 `;
                 panel.appendChild(div);
             });
@@ -348,15 +348,15 @@
         }
     }
 
-    // 🔥 Petición Unificada y Corregida a OpenRouter + RETRY automático contra "Provider returned error"
+    // 🔥 Petición Unificada y Corregida a OpenRouter + RETRY automático + Referer seguro para Android
     async function fetchOpenRouter(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
         let userContent;
 
-        // CORRECCIÓN: Diferenciar formato de payload si hay imagen vs solo texto
+        // Formato estricto para evitar "Provider returned error"
         if (imageB64 && mimeType) {
             userContent = [
                 { type: "text", text: promptText },
-                { type: "image_url", image_url: { url: `data:\( {mimeType};base64, \){imageB64}` } }
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageB64}` } }
             ];
         } else {
             userContent = promptText;
@@ -371,6 +371,12 @@
             temperature: 0.2
         };
 
+        // PARCHE ANDROID: Forzar un referer válido si estamos en un APK/WebView local
+        let safeReferer = window.location.href;
+        if (!safeReferer || safeReferer.startsWith('file:') || safeReferer.startsWith('content:') || safeReferer === 'about:blank') {
+            safeReferer = "https://nexus-3d.app"; 
+        }
+
         let attempts = 0;
         const maxAttempts = 3;
 
@@ -381,7 +387,7 @@
                     headers: { 
                         "Authorization": `Bearer ${key}`, 
                         "Content-Type": "application/json",
-                        "HTTP-Referer": window.location.href || "https://nexus.local",
+                        "HTTP-Referer": safeReferer,
                         "X-Title": "NEXUS AI 3D"
                     },
                     body: JSON.stringify(payload)
@@ -392,10 +398,9 @@
                 if (!res.ok) {
                     const exactError = (data.error && data.error.message) ? data.error.message : JSON.stringify(data.error || "Error de proveedor");
                     
-                    // Reintento automático en errores típicos de sobrecarga del proveedor gratuito
                     if (exactError.includes("Provider returned error") && attempts < maxAttempts - 1) {
                         attempts++;
-                        console.log(`[OpenRouter Retry] Provider returned error - Intento \( {attempts}/ \){maxAttempts}`);
+                        console.log(`[OpenRouter Retry] Provider returned error - Intento ${attempts}/${maxAttempts}`);
                         await new Promise(r => setTimeout(r, 900 * attempts));
                         continue;
                     }
@@ -408,13 +413,12 @@
 
                 return data.choices[0].message.content.trim();
             } catch (err) {
-                // Reintento también en errores de red / fetch (comunes en free tier)
                 if (attempts < maxAttempts - 1 && 
                     (err.message.includes("Provider returned error") || 
                      err.message.includes("Failed to fetch") || 
                      err.message.includes("network"))) {
                     attempts++;
-                    console.log(`[OpenRouter Retry] Error de conexión - Intento \( {attempts}/ \){maxAttempts}: ${err.message}`);
+                    console.log(`[OpenRouter Retry] Error de conexión - Intento ${attempts}/${maxAttempts}: ${err.message}`);
                     await new Promise(r => setTimeout(r, 1200 * attempts));
                     continue;
                 }
@@ -475,7 +479,7 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando la func
                 let rawCode = await fetchOpenRouter(selectedModel, orKey, coderSystem, coderPrompt, null, null);
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n\( {techPlanStr}\n======================================== */\n\n \){rawCode}`;
+                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMMA 4 VISIÓN):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
             } 
             else if (aiMode === "agentic") {
                 document.getElementById('loader').innerText = `🎛️ Agente Slicer analizando requerimientos térmicos...`;

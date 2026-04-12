@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.23 - HYBRID CORE (VISION PROMPT)</title>
+    <title>NEXUS AI v23.24 - HYBRID CORE (STRICT CSG SYNTAX)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -71,7 +71,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.23 - HYBRID CORE)</h2>
+    <h2>🤖 Nexus AI Core (v23.24 - HYBRID CORE)</h2>
 </div>
 
 <div class="content">
@@ -288,10 +288,13 @@
             if (data.last_error && data.last_error.trim() !== "" && data.last_error !== lastErrorProcessed) {
                 lastErrorProcessed = data.last_error;
                 const promptBox = document.getElementById('promptInput');
+                // 🔥 PROTECCIÓN EXTRA CONTRA ERRORES DE SINTAXIS
                 if(data.last_error.includes("flip")) {
                     promptBox.value = "CRÍTICO: Has causado un error 'flip' en el motor BSP de CSG.js. Evita esto:\n1. NO pases Arrays a booleanas (usa a.subtract(b).subtract(c)).\n2. Z-Fighting: Haz que los cilindros de resta sean MUCHO MÁS LARGOS que la pieza principal para que la atraviesen limpiamente.\nReescribe el código reparando esto.";
+                } else if(data.last_error.includes("is not defined")) {
+                    promptBox.value = "CRÍTICO: Error '" + data.last_error + "'. Recuerda usar SIEMPRE el prefijo 'CSG.' para las primitivas (ej: CSG.cube(), CSG.cylinder(), CSG.sphere()). Reescribe el código corrigiendo la sintaxis estricta.";
                 } else {
-                    promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido respetando csg.js.";
+                    promptBox.value = "He recibido este error en el visor 3D al compilar mi código JS-CSG:\n\n" + data.last_error + "\n\nPor favor, genérame el código corregido asegurando respetar csg.js y el prefijo CSG.";
                 }
                 document.getElementById('aiMode').value = "copilot";
             }
@@ -472,15 +475,16 @@
                 let techPlanStr = await fetchGroq("llama-3.3-70b-versatile", groqKey, archSystem, groqPrompt, true);
                 lastTechPlan = techPlanStr; // Guardamos en memoria global
                 
-                // FASE B: Compilador (Gemini o Groq Fallback)
+                // FASE B: Compilador (Gemini o Groq Fallback) - 🔥 AHORA CON SINTAXIS ESTRICTA
                 let modelLabel = selectedModel.startsWith('groq-') ? 'Groq' : selectedModel;
                 document.getElementById('loader').innerText = `⚙️ Compilador (${modelLabel}): Generando CSG.js...`;
                 const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
 Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(params)). NUNCA uses markdown.
-⛔ REGLAS VITALES ANTI-FLIP:
-1. NUNCA ARRAYS en booleanas (usa a.subtract(b).subtract(c)).
-2. Z-FIGHTING: Objetos de resta deben ser EXAGERADAMENTE más largos que la pieza.
-3. LÍMITE FÍSICO: Usa .scale() si pasa de 180mm.`;
+⛔ REGLAS VITALES ANTI-FLIP Y SINTAXIS:
+1. SINTAXIS ESTRICTA: SIEMPRE usa el prefijo CSG. (ej: CSG.cube(), CSG.cylinder(), CSG.sphere()). NUNCA los llames sin 'CSG.'.
+2. NUNCA ARRAYS en booleanas (usa a.subtract(b).subtract(c)).
+3. Z-FIGHTING: Objetos de resta deben ser EXAGERADAMENTE más largos que la pieza.
+4. LÍMITE FÍSICO: Usa .scale() si pasa de 180mm.`;
 
                 let geminiPrompt = `PLAN TÉCNICO (JSON):\n${techPlanStr}`;
                 if (useMemory) {
@@ -522,7 +526,8 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
             } 
             else {
                 document.getElementById('loader').innerText = `🛠️ Copiloto procesando...`;
-                let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm.`;
+                // 🔥 SINTAXIS ESTRICTA TAMBIÉN EN COPILOTO
+                let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm. OBLIGATORIO: Usa siempre CSG.cube() y CSG.cylinder() con el prefijo CSG.`;
                 let finalPrompt = prompt;
                 if (useMemory) {
                     let currentCode = await getCurrentCode();

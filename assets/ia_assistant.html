@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.24 - HYBRID CORE (STRICT CSG SYNTAX)</title>
+    <title>NEXUS AI v23.25 - HYBRID CORE (ANTI-HALLUCINATION)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -22,7 +22,6 @@
         .btn-inject:hover { background-color: #9575CD; }
         .btn-camera { background-color: #00B0FF; color: #000; }
         
-        /* 🔥 NUEVO: Botón Mágico de Auto-Visión */
         .btn-magic { background-color: #FFD600; color: #000; border: 1px solid #FFAB00; box-shadow: 0 0 8px rgba(255, 214, 0, 0.4);}
         .btn-magic:hover { background-color: #FFF59D; }
         .btn-magic:disabled { background-color: #555; color: #888; cursor: not-allowed; box-shadow: none; border-color: #444; }
@@ -71,7 +70,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.24 - HYBRID CORE)</h2>
+    <h2>🤖 Nexus AI Core (v23.25 - HYBRID CORE)</h2>
 </div>
 
 <div class="content">
@@ -185,7 +184,7 @@
     let currentMimeType = null;
     let lastErrorProcessed = ""; 
     let supaClient = null; 
-    let lastTechPlan = ""; // Memoria de Arquitecto
+    let lastTechPlan = ""; 
 
     function toggleManualModel() {
         const sel = document.getElementById('modelSelector');
@@ -220,7 +219,7 @@
             const { data, error } = await supaClient.from('nexus_library').insert([{ 
                 prompt: prompt, 
                 codigo: code,
-                plan_tecnico: lastTechPlan // 🔥 Guardamos el plano de Groq
+                plan_tecnico: lastTechPlan 
             }]);
             if (error) throw error;
             btn.innerHTML = "✅ ¡Guardado Exitosamente!";
@@ -249,7 +248,6 @@
                 div.className = "library-item";
                 const title = item.prompt.length > 40 ? item.prompt.substring(0, 40) + "..." : item.prompt;
                 
-                // Pasamos el plan_tecnico al botón para restaurar la memoria
                 const encodedCode = btoa(unescape(encodeURIComponent(item.codigo)));
                 const encodedPlan = btoa(unescape(encodeURIComponent(item.plan_tecnico || "")));
                 
@@ -270,7 +268,7 @@
 
     function loadPiece(b64Code, b64Plan) {
         document.getElementById('codeOutput').value = decodeURIComponent(escape(atob(b64Code)));
-        lastTechPlan = decodeURIComponent(escape(atob(b64Plan))); // 🔥 Restaurar memoria de Groq
+        lastTechPlan = decodeURIComponent(escape(atob(b64Plan))); 
         alert("✅ Pieza y plano cargados desde la Nube. Pulsa 'Inyectar' para verla.");
     }
     
@@ -281,16 +279,18 @@
             if (data.image_b64 && data.image_b64.trim() !== "") {
                 document.getElementById('imagePreview').src = data.image_b64;
                 document.getElementById('previewContainer').style.display = 'block';
-                document.getElementById('btnAutoDescribe').style.display = 'block'; // FASE 18
+                document.getElementById('btnAutoDescribe').style.display = 'block';
                 currentB64 = data.image_b64.split(',')[1];
                 currentMimeType = data.image_b64.split(';')[0].split(':')[1] || "image/jpeg";
             }
             if (data.last_error && data.last_error.trim() !== "" && data.last_error !== lastErrorProcessed) {
                 lastErrorProcessed = data.last_error;
                 const promptBox = document.getElementById('promptInput');
-                // 🔥 PROTECCIÓN EXTRA CONTRA ERRORES DE SINTAXIS
+                // 🔥 PUENTE DE ERRORES AMPLIADO
                 if(data.last_error.includes("flip")) {
                     promptBox.value = "CRÍTICO: Has causado un error 'flip' en el motor BSP de CSG.js. Evita esto:\n1. NO pases Arrays a booleanas (usa a.subtract(b).subtract(c)).\n2. Z-Fighting: Haz que los cilindros de resta sean MUCHO MÁS LARGOS que la pieza principal para que la atraviesen limpiamente.\nReescribe el código reparando esto.";
+                } else if(data.last_error.includes("CSG.torus is not a function")) {
+                    promptBox.value = "CRÍTICO: Has intentado usar CSG.torus() pero NO EXISTE en esta librería. OBLIGATORIO: Para hacer aros o anillos, usa CSG.cylinder() y réstale otro cilindro más pequeño usando .subtract(). Reescribe el código con esta corrección.";
                 } else if(data.last_error.includes("is not defined")) {
                     promptBox.value = "CRÍTICO: Error '" + data.last_error + "'. Recuerda usar SIEMPRE el prefijo 'CSG.' para las primitivas (ej: CSG.cube(), CSG.cylinder(), CSG.sphere()). Reescribe el código corrigiendo la sintaxis estricta.";
                 } else {
@@ -323,7 +323,7 @@
         reader.onload = function(event) {
             document.getElementById('imagePreview').src = event.target.result;
             document.getElementById('previewContainer').style.display = 'block';
-            document.getElementById('btnAutoDescribe').style.display = 'block'; // FASE 18
+            document.getElementById('btnAutoDescribe').style.display = 'block';
             currentB64 = event.target.result.split(',')[1];
         };
         reader.readAsDataURL(file);
@@ -333,7 +333,7 @@
         currentB64 = null; currentMimeType = null;
         document.getElementById('imageInput').value = "";
         document.getElementById('previewContainer').style.display = 'none';
-        document.getElementById('btnAutoDescribe').style.display = 'none'; // FASE 18
+        document.getElementById('btnAutoDescribe').style.display = 'none'; 
     }
 
     async function getCurrentCode() {
@@ -373,7 +373,6 @@
         }
     }
 
-    // 🔥 FASE 18: Función de Auto-Visión (Prompt Chaining)
     async function autoDescribeImage() {
         if (!currentB64) { alert("📷 ¡Por favor, adjunta una foto primero!"); return; }
         
@@ -389,7 +388,6 @@
             const sys = "Eres un Ingeniero Experto en Diseño 3D y CAD. Tu tarea es mirar la foto adjunta y redactar el 'Prompt Maestro' perfecto para que otro modelo de IA programe esta pieza en código JavaScript (CSG.js). Describe la pieza de forma técnica y estructurada: desglosa las primitivas necesarias (cajas, cilindros, esferas), operaciones booleanas (uniones, restas para agujeros), proporciones visuales relativas, chaflanes y su orientación en los ejes X,Y,Z. NO generes código, SOLAMENTE devuelve el texto hiperdetallado y claro en español para ser usado como prompt directo.";
             const prompt = "Por favor, analiza la geometría de esta pieza y redacta las instrucciones de diseño 3D.";
             
-            // Usamos Gemini Flash Lite como el "Ojo Analítico"
             let text = await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, sys, prompt, currentB64, currentMimeType);
             
             const promptBox = document.getElementById('promptInput');
@@ -404,7 +402,6 @@
         }
     }
 
-    // 🔥 Petición a Groq API adaptada para poder desactivar el modo JSON estricto
     async function fetchGroq(model, key, systemInstruction, promptText, jsonMode = true) {
         const payload = {
             model: model,
@@ -426,7 +423,6 @@
         return data.choices[0].message.content.trim();
     }
 
-    // 🔥 Petición a Gemini API
     async function fetchGemini(model, key, systemInstruction, promptText, imageB64 = null, mimeType = null) {
         let payloadParts = [{ text: systemInstruction + "\n\n" + promptText }];
         if (imageB64) payloadParts.push({ inlineData: { mimeType: mimeType, data: imageB64 } });
@@ -463,7 +459,6 @@
             if (aiMode === "architect") {
                 if(!groqKey) { alert("⚠️ El modo Doble Agente requiere la API Key de Groq."); throw new Error("Falta Groq Key"); }
                 
-                // FASE A: Groq (Arquitecto) - Siempre en modo JSON
                 document.getElementById('loader').innerText = "🧠 Arquitecto (Groq): Pensando la geometría...";
                 const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Deduce las medidas estándar en milímetros del objeto que pida el usuario. Debes devolver ÚNICAMENTE un JSON válido con esta estructura estricta: {"analisis": "tu deduccion logica", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}`;
                 
@@ -473,18 +468,20 @@
                 }
 
                 let techPlanStr = await fetchGroq("llama-3.3-70b-versatile", groqKey, archSystem, groqPrompt, true);
-                lastTechPlan = techPlanStr; // Guardamos en memoria global
+                lastTechPlan = techPlanStr; 
                 
-                // FASE B: Compilador (Gemini o Groq Fallback) - 🔥 AHORA CON SINTAXIS ESTRICTA
                 let modelLabel = selectedModel.startsWith('groq-') ? 'Groq' : selectedModel;
                 document.getElementById('loader').innerText = `⚙️ Compilador (${modelLabel}): Generando CSG.js...`;
+                
+                // 🔥 INSTRUCCIONES SUPER ESTRICTAS PARA COMPILADOR
                 const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
 Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(params)). NUNCA uses markdown.
 ⛔ REGLAS VITALES ANTI-FLIP Y SINTAXIS:
 1. SINTAXIS ESTRICTA: SIEMPRE usa el prefijo CSG. (ej: CSG.cube(), CSG.cylinder(), CSG.sphere()). NUNCA los llames sin 'CSG.'.
 2. NUNCA ARRAYS en booleanas (usa a.subtract(b).subtract(c)).
 3. Z-FIGHTING: Objetos de resta deben ser EXAGERADAMENTE más largos que la pieza.
-4. LÍMITE FÍSICO: Usa .scale() si pasa de 180mm.`;
+4. LÍMITE FÍSICO: Usa .scale() si pasa de 180mm.
+5. PROHIBIDO USAR CSG.torus() o torus(). Esta función NO existe. Para crear aros o anillos, DEBES restar un cilindro interno de un cilindro externo (ej: cilindroGrande.subtract(cilindroPequeño)).`;
 
                 let geminiPrompt = `PLAN TÉCNICO (JSON):\n${techPlanStr}`;
                 if (useMemory) {
@@ -495,7 +492,6 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                 }
 
                 let rawCode = "";
-                // Si el usuario eligió Groq como motor de código (Fallback), se enruta hacia allá y se apaga el modo JSON estricto
                 if (selectedModel.startsWith("groq-")) {
                     const groqModelName = selectedModel.replace("groq-", "");
                     rawCode = await fetchGroq(groqModelName, groqKey, coderSystem, geminiPrompt, false);
@@ -526,8 +522,8 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
             } 
             else {
                 document.getElementById('loader').innerText = `🛠️ Copiloto procesando...`;
-                // 🔥 SINTAXIS ESTRICTA TAMBIÉN EN COPILOTO
-                let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm. OBLIGATORIO: Usa siempre CSG.cube() y CSG.cylinder() con el prefijo CSG.`;
+                // 🔥 SINTAXIS ESTRICTA Y ANTI-TOROIDE TAMBIÉN EN COPILOTO
+                let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm. OBLIGATORIO: Usa siempre CSG.cube() y CSG.cylinder() con el prefijo CSG. PROHIBIDO usar CSG.torus() (usa resta de cilindros para aros).`;
                 let finalPrompt = prompt;
                 if (useMemory) {
                     let currentCode = await getCurrentCode();

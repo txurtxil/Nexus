@@ -401,8 +401,10 @@ def main(page: ft.Page):
                 if INJECTED_CODE_IA:
                     txt_code.value = INJECTED_CODE_IA
                     INJECTED_CODE_IA = ""
-                    if txt_code.page:
+                    try:
                         txt_code.update()
+                    except Exception:
+                        pass
                     status.value = "✓ Código inyectado y compilado."
                     status.color = "#00E5FF"
                     page.update()
@@ -439,8 +441,10 @@ def main(page: ft.Page):
             ensamble_stack = []
             txt_code.value = "function main() {\n  return CSG.cube({radius:[0.01,0.01,0.01]});\n}"
             status.value = "✓ Código borrado."; status.color = "#B71C1C"
-            if txt_code.page:
+            try:
                 txt_code.update()
+            except Exception:
+                pass
             page.update()
 
         def update_code_wrapper(e=None): 
@@ -488,7 +492,7 @@ def main(page: ft.Page):
             js_payload = prepare_js_payload()
             LATEST_CODE_B64 = base64.b64encode(js_payload.encode('utf-8')).decode()
             LATEST_NEEDS_STL = ("IMPORTED_STL" in js_payload) or herramienta_actual.startswith("stl")
-            set_tab(3); page.update() # <-- CORREGIDO ÍNDICE VISOR (Ahora es 3)
+            set_tab(3); page.update()
 
         sw_ensamble = ft.Switch(label="Manejo Código Ensamblador", value=False, active_color="#FFAB00")
         
@@ -520,8 +524,10 @@ def main(page: ft.Page):
                 elif item["op"] == "subtract": final_code += f"  {final_var} = {final_var}.subtract({item['var']});\n"
             final_code += f"  return UTILS.mat({final_var});\n}}"
             txt_code.value = final_code
-            if txt_code.page:
+            try:
                 txt_code.update()
+            except Exception:
+                pass
             page.update()
 
         panel_ensamble_ops = ft.Row([
@@ -545,9 +551,7 @@ def main(page: ft.Page):
             panel_ensamble_ops
         ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
 
-        # --- AÑADIDO: Puente de traducción de índices para compatibilidad con plugins externos ---
         def set_tab_wrapper(idx): 
-            # Si nexus_ui_tools.py llama a índices antiguos (0=CODE, 1=PARAM, 2=3D...), los traducimos.
             traduccion_indices = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 0}
             set_tab(traduccion_indices.get(idx, idx))
         
@@ -570,8 +574,10 @@ def main(page: ft.Page):
             if h == "custom": return
             p_dict = tools_lib.get_p_dict()
             txt_code.value = param_generators.get_code(h, p_dict)
-            if txt_code.page:
+            try:
                 txt_code.update()
+            except Exception:
+                pass
 
         view_constructor = ft.Column([
             panel_globales, 
@@ -682,7 +688,7 @@ def main(page: ft.Page):
                 for i, card in enumerate(col_assembly_cards):
                     if ASSEMBLY_PARTS_STATE[i]["active"]: card.data["refresh"]()
 
-        view_ensamble = ft.Column([ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"), ft.Text("Une hasta 10 STLs. Se reflejará instantáneamente en PBR.", color="#8B949E", size=11), ft.Row([ft.ElevatedButton("➕ AÑADIR PIEZA", on_click=add_assembly_part, bgcolor="#1B5E20", color="white"), ft.ElevatedButton("👁️ ABRIR PBR", on_click=lambda _: set_tab(5), bgcolor="#C51162", color="white")]), ft.Divider(), col_assembly], expand=True) # <-- CORREGIDO ÍNDICE PBR (Ahora es 5)
+        view_ensamble = ft.Column([ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"), ft.Text("Une hasta 10 STLs. Se reflejará instantáneamente en PBR.", color="#8B949E", size=11), ft.Row([ft.ElevatedButton("➕ AÑADIR PIEZA", on_click=add_assembly_part, bgcolor="#1B5E20", color="white"), ft.ElevatedButton("👁️ ABRIR PBR", on_click=lambda _: set_tab(5), bgcolor="#C51162", color="white")]), ft.Divider(), col_assembly], expand=True)
 
         view_pbr = ft.Column([ft.Container(height=20), ft.Text("🎨 PBR STUDIO PRO", size=24, color="#FF007F", weight="bold", text_align="center"), ft.Text("Renderizado Físico Realista con Shaders Procedurales.", color="#E6EDF3", text_align="center"), ft.Container(height=20), ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")), ft.Container(height=20), ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))], expand=True, horizontal_alignment="center")
 
@@ -744,8 +750,8 @@ def main(page: ft.Page):
                     txt_dim_x.value = f"{metrics['dx']} mm"; txt_dim_y.value = f"{metrics['dy']} mm"; txt_dim_z.value = f"{metrics['dz']} mm"
                     txt_vol.value = f"{metrics['vol_cm3']} cm³"; txt_peso.value = f"{metrics['weight_g']} g"
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl")); lbl_stl_status = tools_lib.lbl_stl_status; lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
-                select_tool("stl"); set_tab(2); update_code_wrapper(); status.value = f"✓ STL Inyectado en Memoria" # <-- CORREGIDO ÍNDICE PARAM (Ahora es 2)
-            elif ext == "jscad": txt_code.value = open(filepath).read(); set_tab(1); status.value = "✓ Código Cargado" # <-- CORREGIDO ÍNDICE CODE (Ahora es 1)
+                select_tool("stl"); set_tab(2); update_code_wrapper(); status.value = f"✓ STL Inyectado en Memoria"
+            elif ext == "jscad": txt_code.value = open(filepath).read(); set_tab(1); status.value = "✓ Código Cargado"
             page.update()
 
         current_android_dir = ANDROID_ROOT
@@ -806,20 +812,16 @@ def main(page: ft.Page):
             ft.Container(height=30), ft.Text("🤖 MOTOR IA MULTI-AGENTE v21.2", size=24, color="#B388FF", weight="bold", text_align="center"), ft.Text("Ingeniería Paramétrica y Control Total.", color="#E6EDF3", text_align="center"), ft.Container(height=30), ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')), ft.Container(height=20), ft.Text("💡 El análisis 3D y las inyecciones Agentic ocurren en segundo plano.", color="#8B949E", size=12, text_align="center")
         ], expand=True, horizontal_alignment="center")
 
-        # --- AÑADIDO: El contenedor principal inicia con la vista de IA en vez de CODE ---
         main_container = ft.Container(content=view_ia, expand=True)
 
         def set_tab(idx):
             global PBR_STATE, LATEST_CODE_B64, LATEST_NEEDS_STL
-            # --- CORREGIDO: Lógica de índices actualizada a la nueva disposición ---
-            # 0=IA, 1=CODE, 2=PARAM, 3=3D, 4=ENS, 5=PBR, 6=FILES
             if idx in [0, 1, 2, 3]: PBR_STATE["mode"] = "single"
             if idx == 4: render_assembly_ui()
             if idx == 6: refresh_nexus_db(); refresh_explorer(current_android_dir)
             main_container.content = [view_ia, view_editor, view_constructor, view_visor, view_ensamble, view_pbr, view_archivos][idx]
             page.update()
 
-        # --- AÑADIDO: Nuevo orden visual en la barra de navegación ---
         nav_bar = ft.Row([
             ft.ElevatedButton("🤖 IA", on_click=lambda _: set_tab(0), bgcolor="#B388FF", color="black"),
             ft.ElevatedButton("💻 CODE", on_click=lambda _: set_tab(1), bgcolor="#21262D", color="white"), 

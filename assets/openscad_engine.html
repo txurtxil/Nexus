@@ -11,7 +11,7 @@
         
         .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        /* 🔥 NUEVO ESTILO BARRA RETRÁCTIL */
+        /* 🔥 BARRA LATERAL IZQUIERDA (CONTRAÍDA POR DEFECTO) */
         #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; width: 160px; max-height: 90vh; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
         #toolbar.collapsed { width: 45px; padding: 8px; background: rgba(11, 14, 20, 0.5); border-color: transparent; box-shadow: none; }
         #toolbar.collapsed #toolbar-content { display: none; }
@@ -19,7 +19,7 @@
         #toolbar-content::-webkit-scrollbar { width: 3px; }
         #toolbar-content::-webkit-scrollbar-thumb { background: var(--nexus-cyan); border-radius: 3px; }
         
-        #btn-toggle-menu { background: var(--nexus-cyan); color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 10px; transition: all 0.2s; white-space: nowrap; }
+        #btn-toggle-menu { background: var(--nexus-cyan); color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 10px; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;}
         #toolbar.collapsed #btn-toggle-menu { background: #21262D; color: #FFF; border: 1px solid var(--nexus-border); padding: 10px 0; }
         #btn-toggle-menu:active { transform: scale(0.95); }
 
@@ -27,19 +27,38 @@
         .btn:hover { background: #30363D; }
         .btn:active { transform: scale(0.95); }
         
-        #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); pointer-events: none;}
-        .hud-section-title { color: var(--nexus-cyan); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--nexus-border); letter-spacing: 1px; }
+        /* 🔥 NUEVO PANEL TELEMETRÍA RETRÁCTIL (ABAJO DERECHA) */
+        #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); transition: all 0.3s; overflow: hidden; pointer-events: none; }
+        #hud-panel.collapsed { width: 45px; height: 45px; padding: 0; background: rgba(11, 14, 20, 0.5); border: none; border-radius: 50%; bottom: 10px; right: 10px; pointer-events: auto; }
+        
+        #btn-toggle-hud { display: none; background: #21262D; color: #FFF; border: 1px solid var(--nexus-border); border-radius: 50%; font-size: 16px; cursor: pointer; transition: all 0.2s; width: 45px; height: 45px; align-items: center; justify-content: center; position: absolute; top: 0; left: 0;}
+        #hud-panel.collapsed #btn-toggle-hud { display: flex; }
+        #btn-toggle-hud:active { transform: scale(0.9); }
+
+        /* Contenido del HUD que se oculta */
+        #hud-content { transition: opacity 0.2s; height: 100%; display: flex; flex-direction: column; pointer-events: auto;}
+        #hud-panel.collapsed #hud-content { opacity: 0; pointer-events: none; height: 0;}
+
+        /* Botón de cierre interno para cuando el HUD está desplegado */
+        #btn-close-hud { background: none; border: none; color: #8B949E; cursor: pointer; font-weight: bold; font-size: 12px;}
+        #btn-close-hud:hover { color: #FFF; }
+
+        .hud-section-title { color: var(--nexus-cyan); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--nexus-border); letter-spacing: 1px; display: flex; justify-content: space-between; align-items: center;}
         .hud-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .hud-label { color: #8B949E; }
         .hud-value { color: #fff; font-family: 'Courier New', monospace; text-align: right; }
         .hud-value.highlight { color: var(--nexus-green); font-weight: bold; }
         .hud-value.purple { color: var(--nexus-purple); font-weight: bold; }
         
-        #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; }
+        #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
         #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
         
+        /* 🔥 NUEVO SPINNER EN EL FONDO (ABAJO IZQUIERDA) */
+        #spinner-background { display: flex; position: absolute; bottom: 15px; left: 15px; z-index: 5; background: none; padding: 0; box-shadow: none; backdrop-filter: none; border: none;}
+        #spinner-background .gear-spinner { font-size: 24px; color: rgba(0, 229, 255, 0.4); } /* Translúcido para el fondo */
+
         .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -55,7 +74,7 @@
         .btn-close { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #8B949E; cursor: pointer; font-weight: bold; }
         .btn-close:hover { color: #FFF; }
 
-        #timeline-panel { top: 15px; left: 180px; width: 280px; max-height: 80vh; overflow-y: auto; display: none; border-top: 3px solid #FFF; z-index: 9;}
+        #timeline-panel { top: 15px; left: 180px; width: 280px; max-height: 80vh; overflow-y: auto; display: none; border-top: 3px solid #FFF; z-index: 10; pointer-events: auto;}
         .commit-card { background: #161B22; border: 1px solid #30363D; border-radius: 6px; padding: 10px; margin-bottom: 8px; position: relative; }
         .commit-card::before { content: ''; position: absolute; left: -13px; top: 15px; width: 12px; height: 2px; background: #30363D; }
         .commit-time { color: #00E5FF; font-size: 10px; font-family: monospace; margin-bottom: 5px; font-weight: bold; }
@@ -150,21 +169,29 @@
         <button class="btn-generate" onclick="generateGCode()">Generar y Descargar</button>
     </div>
 
-    <div id="hud-panel" class="nexus-panel">
-        <div class="hud-section-title">🔌 Telemetría GPU & Red</div>
-        <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
-        <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
-        <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
-        <div class="hud-row"><span class="hud-label">Reloj (KINE_T):</span> <span class="hud-value" style="color: #00E676;" id="hw-kinet">0</span></div>
-        <div class="hud-row"><span class="hud-label">Sincronización:</span> <span class="hud-value" id="hw-net">LOCAL</span></div>
-        <div class="hud-row"><span class="hud-label">Usuarios Sala:</span> <span class="hud-value highlight" id="hud-users">1</span></div>
-        <div style="height: 10px;"></div>
-        <div class="hud-section-title">📐 Análisis Sólido</div>
-        <div class="hud-row"><span class="hud-label">Eje X (Ancho):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
-        <div class="hud-row"><span class="hud-label">Eje Y (Largo):</span> <span class="hud-value" id="geo-y">0.00 mm</span></div>
-        <div class="hud-row"><span class="hud-label">Eje Z (Alto):</span> <span class="hud-value" id="geo-z">0.00 mm</span></div>
-        <div class="hud-row"><span class="hud-label">Polígonos:</span> <span class="hud-value highlight" id="geo-poly">0</span></div>
-        <div class="hud-row"><span class="hud-label">Tiempo CSG:</span> <span class="hud-value" id="geo-time">0 ms</span></div>
+    <div id="hud-panel" class="nexus-panel collapsed">
+        
+        <button id="btn-toggle-hud" onclick="toggleHudPanel()">📊</button>
+
+        <div id="hud-content">
+            <div class="hud-section-title">
+                🔌 Telemetría GPU & Red
+                <button id="btn-close-hud" onclick="toggleHudPanel()">✖</button>
+            </div>
+            <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
+            <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
+            <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
+            <div class="hud-row"><span class="hud-label">Reloj (KINE_T):</span> <span class="hud-value" style="color: #00E676;" id="hw-kinet">0</span></div>
+            <div class="hud-row"><span class="hud-label">Sincronización:</span> <span class="hud-value" id="hw-net">LOCAL</span></div>
+            <div class="hud-row"><span class="hud-label">Usuarios Sala:</span> <span class="hud-value highlight" id="hud-users">1</span></div>
+            <div style="height: 10px;"></div>
+            <div class="hud-section-title">📐 Análisis Sólido</div>
+            <div class="hud-row"><span class="hud-label">Ancho (X):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
+            <div class="hud-row"><span class="hud-label">Largo (Y):</span> <span class="hud-value" id="geo-y">0.00 mm</span></div>
+            <div class="hud-row"><span class="hud-label">Alto (Z):</span> <span class="hud-value" id="geo-z">0.00 mm</span></div>
+            <div class="hud-row"><span class="hud-label">Polígonos:</span> <span class="hud-value highlight" id="geo-poly">0</span></div>
+            <div class="hud-row"><span class="hud-label">Tiempo CSG:</span> <span class="hud-value" id="geo-time">0 ms</span></div>
+        </div>
     </div>
 
     <div id="console" class="nexus-panel">
@@ -177,10 +204,15 @@
         <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
     </div>
 
+    <div id="spinner-background">
+        <div class="gear-spinner">⚙️</div>
+    </div>
+
     <script type="module">
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
-        // 🔥 LÓGICA DEL MENÚ RETRÁCTIL
+        //🔥 LÓGICA DE LOS MENÚS RETRÁCTILES
+        // Pestaña lateral izquierda (Herramientas)
         window.toggleSidebarMenu = () => {
             const tb = document.getElementById('toolbar');
             const iconText = document.getElementById('toggle-icon-text');
@@ -195,6 +227,11 @@
                 iconText.innerHTML = "✖";
                 textLabel.style.display = "inline";
             }
+        };
+
+        // Panel HUD de telemetría (abajo derecha)
+        window.toggleHudPanel = () => {
+            document.getElementById('hud-panel').classList.toggle('collapsed');
         };
 
         window.NEXUS_HD_EXPORT = false;
@@ -577,11 +614,11 @@
             
             ctx.font = "16px 'Segoe UI', sans-serif";
             ctx.fillStyle = "#00E676";
-            ctx.fillText(`↔ Eje X (Ancho) : ${size.x.toFixed(2)} mm`, 40, 170);
+            ctx.fillText(`↔ Ancho (X) : ${size.x.toFixed(2)} mm`, 40, 170);
             ctx.fillStyle = "#FFAB00";
-            ctx.fillText(`↕ Eje Y (Largo) : ${size.y.toFixed(2)} mm`, 40, 195);
+            ctx.fillText(`↕ Largo (Y) : ${size.y.toFixed(2)} mm`, 40, 195);
             ctx.fillStyle = "#B388FF";
-            ctx.fillText(`↨ Eje Z (Alto)  : ${size.z.toFixed(2)} mm`, 40, 220);
+            ctx.fillText(`↨ Alto (Z)  : ${size.z.toFixed(2)} mm`, 40, 220);
 
             ctx.strokeStyle = "#00E5FF";
             ctx.lineWidth = 4;

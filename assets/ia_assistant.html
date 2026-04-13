@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEXUS AI v23.25 - HYBRID CORE (ANTI-HALLUCINATION)</title>
+    <title>NEXUS AI v23.26 - PRO CORE (GPT-OSS & GEMINI)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; background-color: #0B0E14; color: #E6EDF3; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -70,7 +70,7 @@
 <body>
 
 <div class="header">
-    <h2>🤖 Nexus AI Core (v23.25 - HYBRID CORE)</h2>
+    <h2>🤖 Nexus AI Core (v23.26 - PRO CORE)</h2>
 </div>
 
 <div class="content">
@@ -103,7 +103,7 @@
                 <option value="gemini-3.1-flash-lite-preview" selected>Gemini 3.1 Flash Lite (Estable)</option>
             </optgroup>
             <optgroup label="Alternativa (Groq Fallback)">
-                <option value="groq-llama-3.3-70b-versatile">Groq: Llama 3.3 70B (Rápido y Gratis)</option>
+                <option value="groq-openai/gpt-oss-120b">Groq: GPT-OSS 120B (Mejor en Código)</option>
             </optgroup>
             <option value="manual">⚙️ Otro (Introducir manualmente)...</option>
         </select>
@@ -114,6 +114,7 @@
         <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
             <option value="architect">🧠 Doble Agente (Groq Razona -> Motor Programa)</option>
+            <option value="gemini_only">👁️ Gemini Puro (Visión -> Código sin Groq)</option>
             <option value="copilot">🛠️ Copiloto Libre (Solo Motor Seleccionado)</option>
             <option value="agentic">🎛️ Agentic UI (Slicer App)</option>
         </select>
@@ -446,8 +447,6 @@
         if(selectedModel === 'manual') selectedModel = document.getElementById('manualModelInput').value.trim();
         
         if(!prompt && !currentB64) { alert("⚠️ El Prompt está vacío."); return; }
-        if(!selectedModel.startsWith('groq-') && !geminiKey) { alert("⚠️ Faltan datos: Clave Gemini requerida."); return; }
-        if(selectedModel.startsWith('groq-') && !groqKey) { alert("⚠️ Faltan datos: Clave Groq requerida para usar este modelo."); return; }
         
         if(geminiKey) localStorage.setItem('nexus_gemini_key', geminiKey);
         if(groqKey) localStorage.setItem('nexus_groq_key', groqKey);
@@ -459,7 +458,7 @@
             if (aiMode === "architect") {
                 if(!groqKey) { alert("⚠️ El modo Doble Agente requiere la API Key de Groq."); throw new Error("Falta Groq Key"); }
                 
-                document.getElementById('loader').innerText = "🧠 Arquitecto (Groq): Pensando la geometría...";
+                document.getElementById('loader').innerText = "🧠 Arquitecto (GPT-OSS 120B): Pensando la geometría...";
                 const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Deduce las medidas estándar en milímetros del objeto que pida el usuario. Debes devolver ÚNICAMENTE un JSON válido con esta estructura estricta: {"analisis": "tu deduccion logica", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}`;
                 
                 let groqPrompt = `Petición: "${prompt}"`;
@@ -467,13 +466,12 @@
                     groqPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción del usuario: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
                 }
 
-                let techPlanStr = await fetchGroq("llama-3.3-70b-versatile", groqKey, archSystem, groqPrompt, true);
+                let techPlanStr = await fetchGroq("openai/gpt-oss-120b", groqKey, archSystem, groqPrompt, true);
                 lastTechPlan = techPlanStr; 
                 
-                let modelLabel = selectedModel.startsWith('groq-') ? 'Groq' : selectedModel;
+                let modelLabel = selectedModel.startsWith('groq-') ? 'GPT-OSS' : selectedModel;
                 document.getElementById('loader').innerText = `⚙️ Compilador (${modelLabel}): Generando CSG.js...`;
                 
-                // 🔥 INSTRUCCIONES SUPER ESTRICTAS PARA COMPILADOR
                 const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
 Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(params)). NUNCA uses markdown.
 ⛔ REGLAS VITALES ANTI-FLIP Y SINTAXIS:
@@ -501,14 +499,52 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
 
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
-                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GROQ LLAMA 3.3):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
+                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GPT-OSS 120B):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
             } 
+            else if (aiMode === "gemini_only") {
+                if(!geminiKey) { alert("⚠️ El modo Gemini Puro requiere la API Key de Gemini."); throw new Error("Falta Gemini Key"); }
+
+                document.getElementById('loader').innerText = "🧠 Arquitecto (Gemini): Analizando geometría visual...";
+                const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Deduce las medidas estándar en milímetros del objeto que pida el usuario o de la foto. Debes devolver ÚNICAMENTE un JSON válido con esta estructura estricta: {"analisis": "tu deduccion logica", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}. NO añadas markdown ni bloques de código.`;
+                
+                let geminiArchPrompt = `Petición: "${prompt}"`;
+                if (useMemory && lastTechPlan) {
+                    geminiArchPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
+                }
+
+                let techPlanStr = await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, archSystem, geminiArchPrompt, currentB64, currentMimeType);
+                techPlanStr = techPlanStr.replace(/```json/gi, "").replace(/```/g, "").trim();
+                lastTechPlan = techPlanStr; 
+                
+                document.getElementById('loader').innerText = `⚙️ Compilador (Gemini): Escribiendo CSG.js...`;
+                const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
+Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(params)). NUNCA uses markdown.
+⛔ REGLAS VITALES ANTI-FLIP Y SINTAXIS:
+1. SINTAXIS ESTRICTA: SIEMPRE usa el prefijo CSG. (ej: CSG.cube(), CSG.cylinder(), CSG.sphere()). NUNCA los llames sin 'CSG.'.
+2. NUNCA ARRAYS en booleanas (usa a.subtract(b).subtract(c)).
+3. Z-FIGHTING: Objetos de resta deben ser EXAGERADAMENTE más largos que la pieza.
+4. LÍMITE FÍSICO: Usa .scale() si pasa de 180mm.
+5. PROHIBIDO USAR CSG.torus() o torus(). Esta función NO existe. Para crear aros o anillos, DEBES restar un cilindro interno de un cilindro externo.`;
+
+                let geminiCoderPrompt = `PLAN TÉCNICO (JSON):\n${techPlanStr}`;
+                if (useMemory) {
+                    let currentCode = await getCurrentCode();
+                    if (currentCode && currentCode.trim() !== "") {
+                        geminiCoderPrompt += `\n\n--- CÓDIGO ACTUAL ---\n${currentCode}\n\nINSTRUCCIÓN: Reescribe el código para aplicar las medidas y cambios definidos en el JSON técnico.`;
+                    }
+                }
+
+                let rawCode = await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, coderSystem, geminiCoderPrompt, null, null);
+                rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
+                
+                document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMINI PURO):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
+            }
             else if (aiMode === "agentic") {
-                document.getElementById('loader').innerText = `🎛️ Agente Slicer (Groq) analizando material...`;
+                document.getElementById('loader').innerText = `🎛️ Agente Slicer (GPT-OSS) analizando material...`;
                 if(!groqKey) { alert("⚠️ Usa Groq Key para el Slicer ultrarrápido."); throw new Error("Falta Groq Key"); }
                 
                 const slicerSystem = `Eres el Agente CAM. Devuelve ÚNICAMENTE un JSON válido: {"tool": "slicer", "params": {"nozzle_temp": num, "bed_temp": num, "speed": num, "infill": num}}. Ajustes base: PLA (220/60), PETG (240/70), TPU (230/40), ABS (260/90).`;
-                let text = await fetchGroq("llama-3.3-70b-versatile", groqKey, slicerSystem, prompt, true);
+                let text = await fetchGroq("openai/gpt-oss-120b", groqKey, slicerSystem, prompt, true);
                 let jsonPayload = JSON.parse(text);
                 
                 document.getElementById('codeOutput').value = "JSON INTERCEPTADO:\n" + JSON.stringify(jsonPayload, null, 2);
@@ -522,7 +558,6 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
             } 
             else {
                 document.getElementById('loader').innerText = `🛠️ Copiloto procesando...`;
-                // 🔥 SINTAXIS ESTRICTA Y ANTI-TOROIDE TAMBIÉN EN COPILOTO
                 let sys = `Eres NEXUS TITAN AI, experto en 'csg.js'. Devuelve JS puro sin markdown. Retorna main(params). Reglas Anti-Flip estrictas. Límite: 180mm. OBLIGATORIO: Usa siempre CSG.cube() y CSG.cylinder() con el prefijo CSG. PROHIBIDO usar CSG.torus() (usa resta de cilindros para aros).`;
                 let finalPrompt = prompt;
                 if (useMemory) {
@@ -571,4 +606,4 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
     }
 </script>
 </body>
-</html> 
+</html>

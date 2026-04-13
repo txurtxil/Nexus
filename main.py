@@ -401,7 +401,8 @@ def main(page: ft.Page):
                 if INJECTED_CODE_IA:
                     txt_code.value = INJECTED_CODE_IA
                     INJECTED_CODE_IA = ""
-                    txt_code.update()
+                    if txt_code.page:
+                        txt_code.update()
                     status.value = "✓ Código inyectado y compilado."
                     status.color = "#00E5FF"
                     page.update()
@@ -438,7 +439,9 @@ def main(page: ft.Page):
             ensamble_stack = []
             txt_code.value = "function main() {\n  return CSG.cube({radius:[0.01,0.01,0.01]});\n}"
             status.value = "✓ Código borrado."; status.color = "#B71C1C"
-            txt_code.update(); page.update()
+            if txt_code.page:
+                txt_code.update()
+            page.update()
 
         def update_code_wrapper(e=None): 
             if not modo_ensamble: generate_param_code()
@@ -516,7 +519,10 @@ def main(page: ft.Page):
                 elif item["op"] == "union": final_code += f"  {final_var} = {final_var}.union({item['var']});\n"
                 elif item["op"] == "subtract": final_code += f"  {final_var} = {final_var}.subtract({item['var']});\n"
             final_code += f"  return UTILS.mat({final_var});\n}}"
-            txt_code.value = final_code; txt_code.update(); page.update()
+            txt_code.value = final_code
+            if txt_code.page:
+                txt_code.update()
+            page.update()
 
         panel_ensamble_ops = ft.Row([
             ft.ElevatedButton(content=ft.Text("➕ UNIR PIEZA", color="white"), on_click=lambda _: add_to_stack("union"), bgcolor="#1B5E20", expand=True),
@@ -564,7 +570,8 @@ def main(page: ft.Page):
             if h == "custom": return
             p_dict = tools_lib.get_p_dict()
             txt_code.value = param_generators.get_code(h, p_dict)
-            txt_code.update()
+            if txt_code.page:
+                txt_code.update()
 
         view_constructor = ft.Column([
             panel_globales, 

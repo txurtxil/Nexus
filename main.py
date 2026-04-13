@@ -335,7 +335,6 @@ class NexusHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_response(500); self._send_cors(); self.end_headers(); self.wfile.write(str(e).encode())
 
-        # --- AÑADIDO: Intercepción limpia para el Cloud Studio del PC ---
         elif parsed.path == '/nexus_pc.html':
             filepath = os.path.join(ASSETS_DIR, "nexus_pc.html")
             if not os.path.exists(filepath): 
@@ -399,7 +398,6 @@ def main(page: ft.Page):
             while True:
                 time.sleep(1)
                 
-                # Revisa Inyección de Código (Modo Copiloto / o desde el PC)
                 if INJECTED_CODE_IA:
                     txt_code.value = INJECTED_CODE_IA
                     INJECTED_CODE_IA = ""
@@ -408,7 +406,6 @@ def main(page: ft.Page):
                     status.color = "#00E5FF"
                     page.update()
                 
-                # Revisa Movimiento de Sliders (Modo Agentic)
                 if AGENTIC_PAYLOAD is not None:
                     try:
                         payload = AGENTIC_PAYLOAD
@@ -488,7 +485,7 @@ def main(page: ft.Page):
             js_payload = prepare_js_payload()
             LATEST_CODE_B64 = base64.b64encode(js_payload.encode('utf-8')).decode()
             LATEST_NEEDS_STL = ("IMPORTED_STL" in js_payload) or herramienta_actual.startswith("stl")
-            set_tab(2); page.update()
+            set_tab(3); page.update() # <-- CORREGIDO ÍNDICE VISOR (Ahora es 3)
 
         sw_ensamble = ft.Switch(label="Manejo Código Ensamblador", value=False, active_color="#FFAB00")
         
@@ -542,7 +539,11 @@ def main(page: ft.Page):
             panel_ensamble_ops
         ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
 
-        def set_tab_wrapper(idx): set_tab(idx)
+        # --- AÑADIDO: Puente de traducción de índices para compatibilidad con plugins externos ---
+        def set_tab_wrapper(idx): 
+            # Si nexus_ui_tools.py llama a índices antiguos (0=CODE, 1=PARAM, 2=3D...), los traducimos.
+            traduccion_indices = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 0}
+            set_tab(traduccion_indices.get(idx, idx))
         
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
@@ -607,7 +608,6 @@ def main(page: ft.Page):
                 except: pass
         threading.Thread(target=hw_monitor_loop, daemon=True).start()
 
-        # --- AÑADIDO: Interfaz actualizada para mostrar URL de Nexus PC ---
         view_visor = ft.Column([
             ft.Container(height=5), hw_panel, ft.Container(height=5),
             ft.Container(content=ft.Column([
@@ -675,7 +675,7 @@ def main(page: ft.Page):
                 for i, card in enumerate(col_assembly_cards):
                     if ASSEMBLY_PARTS_STATE[i]["active"]: card.data["refresh"]()
 
-        view_ensamble = ft.Column([ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"), ft.Text("Une hasta 10 STLs. Se reflejará instantáneamente en PBR.", color="#8B949E", size=11), ft.Row([ft.ElevatedButton("➕ AÑADIR PIEZA", on_click=add_assembly_part, bgcolor="#1B5E20", color="white"), ft.ElevatedButton("👁️ ABRIR PBR", on_click=lambda _: set_tab(4), bgcolor="#C51162", color="white")]), ft.Divider(), col_assembly], expand=True)
+        view_ensamble = ft.Column([ft.Text("🧩 MESA DE ENSAMBLAJE", size=20, color="#FFAB00", weight="bold"), ft.Text("Une hasta 10 STLs. Se reflejará instantáneamente en PBR.", color="#8B949E", size=11), ft.Row([ft.ElevatedButton("➕ AÑADIR PIEZA", on_click=add_assembly_part, bgcolor="#1B5E20", color="white"), ft.ElevatedButton("👁️ ABRIR PBR", on_click=lambda _: set_tab(5), bgcolor="#C51162", color="white")]), ft.Divider(), col_assembly], expand=True) # <-- CORREGIDO ÍNDICE PBR (Ahora es 5)
 
         view_pbr = ft.Column([ft.Container(height=20), ft.Text("🎨 PBR STUDIO PRO", size=24, color="#FF007F", weight="bold", text_align="center"), ft.Text("Renderizado Físico Realista con Shaders Procedurales.", color="#E6EDF3", text_align="center"), ft.Container(height=20), ft.Container(content=ft.Column([ft.Text("Soporta la Pieza Única (PARAM) o Ensamble (MESA).", color="#00E676"), ft.Text("El botón 'Tomar Foto' guarda el render en NEXUS DB.", color="#00E676", weight="bold")]), bgcolor="#161B22", padding=15, border_radius=8, border=ft.border.all(1, "#C51162")), ft.Container(height=20), ft.ElevatedButton("🚀 ABRIR PBR STUDIO", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", color="white", height=80, width=float('inf'))], expand=True, horizontal_alignment="center")
 
@@ -737,8 +737,8 @@ def main(page: ft.Page):
                     txt_dim_x.value = f"{metrics['dx']} mm"; txt_dim_y.value = f"{metrics['dy']} mm"; txt_dim_z.value = f"{metrics['dz']} mm"
                     txt_vol.value = f"{metrics['vol_cm3']} cm³"; txt_peso.value = f"{metrics['weight_g']} g"
                 shutil.copy(filepath, os.path.join(EXPORT_DIR, "imported.stl")); lbl_stl_status = tools_lib.lbl_stl_status; lbl_stl_status.value = f"✓ Activo: {fn}"; lbl_stl_status.color = "#00E676"
-                select_tool("stl"); set_tab(1); update_code_wrapper(); status.value = f"✓ STL Inyectado en Memoria"
-            elif ext == "jscad": txt_code.value = open(filepath).read(); set_tab(0); status.value = "✓ Código Cargado"
+                select_tool("stl"); set_tab(2); update_code_wrapper(); status.value = f"✓ STL Inyectado en Memoria" # <-- CORREGIDO ÍNDICE PARAM (Ahora es 2)
+            elif ext == "jscad": txt_code.value = open(filepath).read(); set_tab(1); status.value = "✓ Código Cargado" # <-- CORREGIDO ÍNDICE CODE (Ahora es 1)
             page.update()
 
         current_android_dir = ANDROID_ROOT
@@ -799,18 +799,28 @@ def main(page: ft.Page):
             ft.Container(height=30), ft.Text("🤖 MOTOR IA MULTI-AGENTE v21.2", size=24, color="#B388FF", weight="bold", text_align="center"), ft.Text("Ingeniería Paramétrica y Control Total.", color="#E6EDF3", text_align="center"), ft.Container(height=30), ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=80, width=float('inf')), ft.Container(height=20), ft.Text("💡 El análisis 3D y las inyecciones Agentic ocurren en segundo plano.", color="#8B949E", size=12, text_align="center")
         ], expand=True, horizontal_alignment="center")
 
-        main_container = ft.Container(content=view_editor, expand=True)
+        # --- AÑADIDO: El contenedor principal inicia con la vista de IA en vez de CODE ---
+        main_container = ft.Container(content=view_ia, expand=True)
 
         def set_tab(idx):
             global PBR_STATE, LATEST_CODE_B64, LATEST_NEEDS_STL
-            if idx in [0, 1, 2, 6]: PBR_STATE["mode"] = "single"
-            if idx == 3: render_assembly_ui()
-            if idx == 5: refresh_nexus_db(); refresh_explorer(current_android_dir)
-            main_container.content = [view_editor, view_constructor, view_visor, view_ensamble, view_pbr, view_archivos, view_ia][idx]
+            # --- CORREGIDO: Lógica de índices actualizada a la nueva disposición ---
+            # 0=IA, 1=CODE, 2=PARAM, 3=3D, 4=ENS, 5=PBR, 6=FILES
+            if idx in [0, 1, 2, 3]: PBR_STATE["mode"] = "single"
+            if idx == 4: render_assembly_ui()
+            if idx == 6: refresh_nexus_db(); refresh_explorer(current_android_dir)
+            main_container.content = [view_ia, view_editor, view_constructor, view_visor, view_ensamble, view_pbr, view_archivos][idx]
             page.update()
 
+        # --- AÑADIDO: Nuevo orden visual en la barra de navegación ---
         nav_bar = ft.Row([
-            ft.ElevatedButton("💻 CODE", on_click=lambda _: set_tab(0), bgcolor="#21262D", color="white"), ft.ElevatedButton("🌐 PARAM", on_click=lambda _: set_tab(1), bgcolor="#FFAB00", color="black"), ft.ElevatedButton("👁️ 3D", on_click=lambda _: set_tab(2), bgcolor="#00E5FF", color="black"), ft.ElevatedButton("🧩 ENS", on_click=lambda _: set_tab(3), bgcolor="#7CB342", color="white"), ft.ElevatedButton("🎨 PBR", on_click=lambda _: set_tab(4), bgcolor="#C51162", color="white"), ft.ElevatedButton("📂 FILES", on_click=lambda _: set_tab(5), bgcolor="#21262D", color="white"), ft.ElevatedButton("🤖 IA", on_click=lambda _: set_tab(6), bgcolor="#B388FF", color="black"),
+            ft.ElevatedButton("🤖 IA", on_click=lambda _: set_tab(0), bgcolor="#B388FF", color="black"),
+            ft.ElevatedButton("💻 CODE", on_click=lambda _: set_tab(1), bgcolor="#21262D", color="white"), 
+            ft.ElevatedButton("🌐 PARAM", on_click=lambda _: set_tab(2), bgcolor="#FFAB00", color="black"), 
+            ft.ElevatedButton("👁️ 3D", on_click=lambda _: set_tab(3), bgcolor="#00E5FF", color="black"), 
+            ft.ElevatedButton("🧩 ENS", on_click=lambda _: set_tab(4), bgcolor="#7CB342", color="white"), 
+            ft.ElevatedButton("🎨 PBR", on_click=lambda _: set_tab(5), bgcolor="#C51162", color="white"), 
+            ft.ElevatedButton("📂 FILES", on_click=lambda _: set_tab(6), bgcolor="#21262D", color="white"), 
         ], scroll="auto")
 
         page.add(ft.Container(content=ft.Column([nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))

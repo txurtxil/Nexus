@@ -27,7 +27,7 @@
         .btn:hover { background: #30363D; }
         .btn:active { transform: scale(0.95); }
         
-        /* 🔥 NUEVO PANEL TELEMETRÍA RETRÁCTIL (ABAJO DERECHA) */
+        /* 🔥 PANEL TELEMETRÍA RETRÁCTIL (ABAJO DERECHA) */
         #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); transition: all 0.3s; overflow: hidden; pointer-events: none; }
         #hud-panel.collapsed { width: 45px; height: 45px; padding: 0; background: rgba(11, 14, 20, 0.5); border: none; border-radius: 50%; bottom: 10px; right: 10px; pointer-events: auto; }
         
@@ -35,11 +35,8 @@
         #hud-panel.collapsed #btn-toggle-hud { display: flex; }
         #btn-toggle-hud:active { transform: scale(0.9); }
 
-        /* Contenido del HUD que se oculta */
         #hud-content { transition: opacity 0.2s; height: 100%; display: flex; flex-direction: column; pointer-events: auto;}
         #hud-panel.collapsed #hud-content { opacity: 0; pointer-events: none; height: 0;}
-
-        /* Botón de cierre interno para cuando el HUD está desplegado */
         #btn-close-hud { background: none; border: none; color: #8B949E; cursor: pointer; font-weight: bold; font-size: 12px;}
         #btn-close-hud:hover { color: #FFF; }
 
@@ -53,13 +50,9 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
+        /* 🔥 LOADER ORIGINAL V4 RESTAURADO EXACTAMENTE COMO LO PEDISTE */
         #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
-        
-        /* 🔥 NUEVO SPINNER EN EL FONDO (ABAJO IZQUIERDA) */
-        #spinner-background { display: flex; position: absolute; bottom: 15px; left: 15px; z-index: 5; background: none; padding: 0; box-shadow: none; backdrop-filter: none; border: none;}
-        #spinner-background .gear-spinner { font-size: 24px; color: rgba(0, 229, 255, 0.4); } /* Translúcido para el fondo */
-
-        .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
+        .spinner { border: 2px solid rgba(0, 229, 255, 0.2); border-top: 2px solid var(--nexus-cyan); border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
@@ -106,10 +99,10 @@
             <div style="background: #161B22; border: 1px solid var(--nexus-cyan); padding: 8px; border-radius: 4px; margin-bottom: 4px; flex-shrink: 0;">
                 <div style="color: var(--nexus-cyan); font-size: 9px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px;">⚙️ CALIDAD (LOD)</div>
                 <select id="lod-selector" style="width: 100%; background: #0B0E14; color: #fff; border: 1px solid #30363D; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 10px; cursor: pointer;" onchange="changeLOD()">
-                    <option value="32" selected>🟢 MÍNIMA (Animación)</option>
-                    <option value="128">🟡 MEDIA (Normal)</option>
-                    <option value="256">🟠 ALTA (Detalle)</option>
-                    <option value="512">🔴 EXTREMA (Render)</option>
+                    <option value="32">🟢 MÍNIMA (Animación)</option>
+                    <option value="64" selected>🟡 MEDIA (Normal)</option>
+                    <option value="128">🟠 ALTA (Detalle)</option>
+                    <option value="256">🔴 EXTREMA (Render)</option>
                 </select>
             </div>
 
@@ -123,7 +116,7 @@
             
             <button class="btn" style="border-left: 3px solid #00E676;" onclick="toggleAutoRotate()">Rotar <span>🔄</span></button>
             <button class="btn" style="border-left: 3px solid #6200EA;" onclick="toggleCamera()">Cámara <span>🎥</span></button>
-            <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Pintura PBR <span>🎨</span></button>
+            <button class="btn" style="border-left: 3px solid #FFAB00;" onclick="changeMaterial()">Materiales PBR <span>🎨</span></button>
             <button class="btn" style="border-left: 3px solid #FF3D00;" onclick="toggleStressAnalysis()">Simulación FEA <span>🔥</span></button>
             
             <button class="btn" style="border-left: 3px solid #00B0FF;" onclick="exportBlueprint()">Plano 2D <span>📐</span></button>
@@ -175,22 +168,21 @@
 
         <div id="hud-content">
             <div class="hud-section-title">
-                🔌 Telemetría GPU & Red
+                🔌 Telemetría Cliente
                 <button id="btn-close-hud" onclick="toggleHudPanel()">✖</button>
             </div>
             <div class="hud-row"><span class="hud-label">Procesadores:</span> <span class="hud-value highlight" id="hw-cpu">-</span></div>
             <div class="hud-row"><span class="hud-label">Memoria RAM:</span> <span class="hud-value purple" id="hw-ram">N/A</span></div>
             <div class="hud-row"><span class="hud-label">GPU Render:</span> <span class="hud-value" id="hw-gpu">Buscando...</span></div>
+            <div class="hud-row"><span class="hud-label">Batería:</span> <span class="hud-value" id="hw-bat">🔌 AC</span></div>
             <div class="hud-row"><span class="hud-label">Reloj (KINE_T):</span> <span class="hud-value" style="color: #00E676;" id="hw-kinet">0</span></div>
-            <div class="hud-row"><span class="hud-label">Sincronización:</span> <span class="hud-value" id="hw-net">LOCAL</span></div>
-            <div class="hud-row"><span class="hud-label">Usuarios Sala:</span> <span class="hud-value highlight" id="hud-users">1</span></div>
             <div style="height: 10px;"></div>
             <div class="hud-section-title">📐 Análisis Sólido</div>
             <div class="hud-row"><span class="hud-label">Ancho (X):</span> <span class="hud-value" id="geo-x">0.00 mm</span></div>
             <div class="hud-row"><span class="hud-label">Largo (Y):</span> <span class="hud-value" id="geo-y">0.00 mm</span></div>
             <div class="hud-row"><span class="hud-label">Alto (Z):</span> <span class="hud-value" id="geo-z">0.00 mm</span></div>
             <div class="hud-row"><span class="hud-label">Polígonos:</span> <span class="hud-value highlight" id="geo-poly">0</span></div>
-            <div class="hud-row"><span class="hud-label">Tiempo CSG:</span> <span class="hud-value" id="geo-time">0 ms</span></div>
+            <div class="hud-row"><span class="hud-label">Tiempo Render:</span> <span class="hud-value" id="geo-time">0 ms</span></div>
         </div>
     </div>
 
@@ -199,20 +191,15 @@
         <div id="log-content"></div>
     </div>
 
-    <div id="loader">
-        <div class="gear-spinner">⚙️</div>
-        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
-    </div>
-
-    <div id="spinner-background">
-        <div class="gear-spinner">⚙️</div>
+    <div id="loader" style="display:none;">
+        <div class="spinner"></div>
+        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold;">WORKER PROCESANDO...</div>
     </div>
 
     <script type="module">
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
-        //🔥 LÓGICA DE LOS MENÚS RETRÁCTILES
-        // Pestaña lateral izquierda (Herramientas)
+        // LÓGICA MENÚS RETRÁCTILES
         window.toggleSidebarMenu = () => {
             const tb = document.getElementById('toolbar');
             const iconText = document.getElementById('toggle-icon-text');
@@ -229,7 +216,6 @@
             }
         };
 
-        // Panel HUD de telemetría (abajo derecha)
         window.toggleHudPanel = () => {
             document.getElementById('hud-panel').classList.toggle('collapsed');
         };
@@ -341,17 +327,12 @@
 
         window.restoreHistory = (index) => {
             if (!confirm(`¿Seguro que quieres viajar al Commit #${index+1}? Reemplazará el código actual.`)) return;
-            
             let oldCode = codeHistory[index].code;
-            
             if (isCompareMode) window.toggleCompare(comparingIndex);
-            
             fetch('/api/inject_code', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ code: oldCode }) }).catch(()=>{});
-            
             if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'code', code: oldCode }));
-            
             lastCode = oldCode;
-            executeCSGCode(oldCode, true);
+            executeCSGCode(oldCode);
             log(`<span class='log-ok'>> 🕰️ Máquina del Tiempo: Código restaurado a V${index+1} con éxito.</span>`);
         };
 
@@ -741,7 +722,7 @@
 
         window.changeLOD = () => {
             if (lastCode !== "") {
-                executeCSGCode(lastCode, true);
+                executeCSGCode(lastCode);
             }
         };
 
@@ -749,11 +730,25 @@
             if(!lastCode) { log("<span class='log-err'>No hay geometría para exportar.</span>"); document.getElementById('console').style.display = 'block'; return; }
             window.IS_EXPORTING_HD = true;
             window.NEXUS_HD_EXPORT = true;
-            executeCSGCode(lastCode, true); 
+            executeCSGCode(lastCode); 
         };
 
+        // HW DETECT
         document.getElementById('hw-cpu').innerText = (navigator.hardwareConcurrency || '?') + ' Cores';
+        if (navigator.deviceMemory) document.getElementById('hw-ram').innerText = navigator.deviceMemory + ' GB+';
+        if (navigator.connection && navigator.connection.effectiveType) document.getElementById('hw-net').innerText = navigator.connection.effectiveType.toUpperCase();
         
+        if (navigator.getBattery) {
+            navigator.getBattery().then(bat => {
+                const updateBat = () => {
+                    let level = Math.round(bat.level * 100);
+                    let icon = bat.charging ? "⚡" : (level < 20 ? "🪫" : "🔋");
+                    document.getElementById('hw-bat').innerText = `${level}% ${icon}`;
+                };
+                updateBat(); bat.addEventListener('levelchange', updateBat); bat.addEventListener('chargingchange', updateBat);
+            });
+        }
+
         try {
             const gl = document.createElement('canvas').getContext('webgl');
             const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
@@ -775,8 +770,6 @@
                 ws.onopen = () => {
                     log("<span class='log-ok'>> 🌐 SYNC: Conectado a Sala de Diseño.</span>");
                     document.getElementById('console').style.display = 'block';
-                    document.getElementById('hw-net').innerText = "WSS ONLINE";
-                    document.getElementById('hw-net').style.color = "#00E676";
                 };
 
                 ws.onmessage = (event) => {
@@ -786,15 +779,13 @@
                         if (data.type === 'code' && data.code !== lastCode) {
                             lastCode = data.code;
                             window.isWorkerBusy = false;
-                            executeCSGCode(lastCode, true);
+                            executeCSGCode(lastCode);
                         }
-                        if (data.type === 'users') document.getElementById('hud-users').innerText = data.count;
                     } catch(e) {}
                 };
 
                 ws.onerror = () => {
-                    document.getElementById('hw-net').innerText = "LOCAL (Fallback)";
-                    document.getElementById('hw-net').style.color = "#8B949E";
+                    log("<span class='log-warn'>> AVISO MULTIPLAYER: Fallback Local.</span>");
                 };
             } catch(e) { console.warn("NEXUS MULTIPLAYER: Fallback Local."); }
         }
@@ -983,64 +974,14 @@
             });
         }
 
+        // --- WORKER DE LA V4 RESTAURADO INTACTO PARA COMPATIBILIDAD PYTHON ---
         const workerCode = `
             importScripts('https://cdn.jsdelivr.net/gh/evanw/csg.js@master/csg.js');
-            
-            CSG.prototype.translate = function(v) {
-                var dx = v[0], dy = v[1], dz = v[2];
-                return CSG.fromPolygons(this.toPolygons().map(function(p) {
-                    return new CSG.Polygon(p.vertices.map(function(vert) {
-                        return new CSG.Vertex(new CSG.Vector(vert.pos.x + dx, vert.pos.y + dy, vert.pos.z + dz), vert.normal);
-                    }), p.shared);
-                }));
-            };
-            
-            CSG.prototype.scale = function(v) {
-                var sx = Array.isArray(v) ? v[0] : v;
-                var sy = Array.isArray(v) ? v[1] : v;
-                var sz = Array.isArray(v) ? v[2] : v;
-                return CSG.fromPolygons(this.toPolygons().map(function(p) {
-                    return new CSG.Polygon(p.vertices.map(function(vert) {
-                        return new CSG.Vertex(new CSG.Vector(vert.pos.x * sx, vert.pos.y * sy, vert.pos.z * sz), vert.normal);
-                    }), p.shared);
-                }));
-            };
-            
-            CSG.prototype.rotateX = function(deg) {
-                var rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
-                return CSG.fromPolygons(this.toPolygons().map(function(p) {
-                    return new CSG.Polygon(p.vertices.map(function(v) {
-                        return new CSG.Vertex(
-                            new CSG.Vector(v.pos.x, v.pos.y * cos - v.pos.z * sin, v.pos.y * sin + v.pos.z * cos), 
-                            new CSG.Vector(v.normal.x, v.normal.y * cos - v.normal.z * sin, v.normal.y * sin + v.normal.z * cos)
-                        );
-                    }), p.shared);
-                }));
-            };
-            
-            CSG.prototype.rotateY = function(deg) {
-                var rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
-                return CSG.fromPolygons(this.toPolygons().map(function(p) {
-                    return new CSG.Polygon(p.vertices.map(function(v) {
-                        return new CSG.Vertex(
-                            new CSG.Vector(v.pos.x * cos + v.pos.z * sin, v.pos.y, -v.pos.x * sin + v.pos.z * cos), 
-                            new CSG.Vector(v.normal.x * cos + v.normal.z * sin, v.normal.y, -v.normal.x * sin + v.normal.z * cos)
-                        );
-                    }), p.shared);
-                }));
-            };
-            
-            CSG.prototype.rotateZ = function(deg) {
-                var rad = deg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
-                return CSG.fromPolygons(this.toPolygons().map(function(p) {
-                    return new CSG.Polygon(p.vertices.map(function(v) {
-                        return new CSG.Vertex(
-                            new CSG.Vector(v.pos.x * cos - v.pos.y * sin, v.pos.x * sin + v.pos.y * cos, v.pos.z), 
-                            new CSG.Vector(v.normal.x * cos - v.normal.y * sin, v.normal.x * sin + v.normal.y * cos, v.normal.z)
-                        );
-                    }), p.shared);
-                }));
-            };
+            CSG.prototype.translate = function(v) { return this.transform(CSG.Matrix4x4.translation(v)); };
+            CSG.prototype.scale = function(v) { if(typeof v === 'number') v = [v,v,v]; return this.transform(CSG.Matrix4x4.scaling(v)); };
+            CSG.prototype.rotateX = function(deg) { return this.transform(CSG.Matrix4x4.rotationX(deg)); };
+            CSG.prototype.rotateY = function(deg) { return this.transform(CSG.Matrix4x4.rotationY(deg)); };
+            CSG.prototype.rotateZ = function(deg) { return this.transform(CSG.Matrix4x4.rotationZ(deg)); };
             
             CSG.prototype.setColor = function(c) {
                 this.toPolygons().forEach(function(p) { p.shared = p.shared || {}; p.shared.color = c; }); return this;
@@ -1074,7 +1015,8 @@
                 } 
                 else if (e.data.type === 'eval') {
                     try {
-                        let fn = new Function("IMPORTED_STL", e.data.code);
+                        // LA LÍNEA CRÍTICA DE LA V4 QUE HACE FUNCIONAR EL SCRIPT PYTHON
+                        let fn = new Function("IMPORTED_STL", e.data.code + "\\nreturn main();");
                         let csgResult = fn(IMPORTED_STL);
                         
                         if (!csgResult || typeof csgResult.toPolygons !== 'function') throw new Error("Objeto no válido o vacío");
@@ -1109,14 +1051,14 @@
         let isImportingSTL = false;
 
         csgWorker.onmessage = function(e) {
-            window.isWorkerBusy = false; 
+            window.isWorkerBusy = false; // Detener el flag de bloqueo para prevenir spinners infinitos
             const data = e.data;
             
             if (data.is_import) {
                 isImportingSTL = false;
                 if(data.success) {
                     log("<span class='log-ok'>> Módulo Híbrido: STL indexado listo.</span>");
-                    if (lastCode !== "") executeCSGCode(lastCode, true); 
+                    if (lastCode !== "") executeCSGCode(lastCode); 
                 } else {
                     log("<span class='log-err'>> ERROR (STL Import): " + data.err + "</span>"); 
                     document.getElementById('console').style.display = 'block';
@@ -1175,7 +1117,7 @@
 
                 if (window.IS_EXPORTING_HD) {
                     setTimeout(() => {
-                        window.exportFile('stl'); window.IS_EXPORTING_HD = false; window.NEXUS_HD_EXPORT = false; executeCSGCode(lastCode, true); 
+                        window.exportFile('stl'); window.IS_EXPORTING_HD = false; window.NEXUS_HD_EXPORT = false; executeCSGCode(lastCode); 
                     }, 500);
                 }
 
@@ -1187,24 +1129,26 @@
             } else {
                 log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
                 document.getElementById('console').style.display = 'block';
-                window.isWorkerBusy = true; 
             }
         };
 
-        function executeCSGCode(rawCode, forceLoader = false) {
+        function executeCSGCode(rawCode) {
             if (isImportingSTL || window.isWorkerBusy) return; 
             window.isWorkerBusy = true;
             
-            if (forceLoader || window.NEXUS_HD_EXPORT) {
-                document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "RENDERIZANDO HD (512 SLICES)..." : "CALCULANDO SÓLIDO...";
-                document.getElementById('loader').style.display = 'flex';
-            }
-
-            let comboValue = parseInt(document.getElementById('lod-selector').value);
+            // Leemos el selector de LOD moderno, o por defecto 64 (como en V4)
+            let comboValue = parseInt(document.getElementById('lod-selector').value) || 64;
             let currentSlices = window.NEXUS_HD_EXPORT ? 512 : comboValue; 
 
             let optimizedCode = rawCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
             optimizedCode = optimizedCode.replace(/resolution\s*:\s*\d+/g, 'resolution: ' + currentSlices);
+
+            if (window.NEXUS_HD_EXPORT) {
+                document.getElementById('loader-txt').innerText = "RENDERIZANDO HD (" + currentSlices + " SLICES)...";
+            } else {
+                document.getElementById('loader-txt').innerText = "WORKER PROCESANDO...";
+            }
+            document.getElementById('loader').style.display = 'flex';
 
             let filletHelper = "function roundedBox(w, d, h, r) {\n" +
                 "var res = " + currentSlices + ";\n" +
@@ -1219,9 +1163,9 @@
                 "return b1.union([b2, c1, c2, c3, c4]);\n" +
             "}\n\n";
             
-            let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
-            optimizedCode = optimizedCode.replace(/return main\(\);/g, "").replace(/return main\(\{.*\}\);/g, "");
-            optimizedCode = filletHelper + optimizedCode + executionCall;
+            // Inyectamos KINE_T globalmente para no romper param_generators.py con reemplazos Regex
+            let kineInjector = `\nvar KINE_T = ${window.KINE_T_VALUE};\n`;
+            optimizedCode = filletHelper + kineInjector + optimizedCode;
             
             t0 = performance.now(); 
             csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
@@ -1232,27 +1176,43 @@
                 window.KINE_T_VALUE += 5; 
                 if (window.KINE_T_VALUE > 36000) window.KINE_T_VALUE = 0; 
                 document.getElementById('hw-kinet').innerText = window.KINE_T_VALUE;
-                if (!window.isWorkerBusy) executeCSGCode(lastCode, false);
+                if (!window.isWorkerBusy) executeCSGCode(lastCode);
             }
         }, 50);
 
         function loadAndSendSTL(url) {
-            isImportingSTL = true; document.getElementById('loader-txt').innerText = "DESCARGANDO STL LOCAL..."; document.getElementById('loader').style.display = 'flex';
-            new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "TRIANGULIZANDO A NODO CSG..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
+            isImportingSTL = true; 
+            document.getElementById('loader-txt').innerText = "DESCARGANDO STL LOCAL..."; 
+            document.getElementById('loader').style.display = 'flex';
+            
+            new THREE.STLLoader().load(url, function (geometry) { 
+                document.getElementById('loader-txt').innerText = "TRIANGULIZANDO A NODO CSG..."; 
+                csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); 
+            }, undefined, function (error) { 
+                log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); 
+                isImportingSTL = false; 
+                document.getElementById('loader').style.display = 'none'; 
+            });
         }
 
+        // --- POLLING LOCALHOST DE LA V4 (SIN RESTRICCIONES) ---
         let lastCode = ""; let currentStlHash = "";
         
         function checkServer() {
             fetch(window.location.origin + '/api/get_code_b64.json').then(r => r.json()).then(data => {
-                if (data.stl_hash && data.stl_hash !== currentStlHash) { currentStlHash = data.stl_hash; log("<span class='log-warn'>> Nuevo STL detectado, iniciando flujo híbrido...</span>"); document.getElementById('console').style.display = 'block'; loadAndSendSTL(window.location.origin + '/exports/imported.stl?t=' + Date.now()); }
+                if (data.stl_hash && data.stl_hash !== currentStlHash) { 
+                    currentStlHash = data.stl_hash; 
+                    log("<span class='log-warn'>> Nuevo STL detectado, iniciando flujo híbrido...</span>"); 
+                    document.getElementById('console').style.display = 'block'; 
+                    loadAndSendSTL(window.location.origin + '/exports/imported.stl?t=' + Date.now()); 
+                }
                 
                 if ((!ws || ws.readyState !== WebSocket.OPEN) && data && data.code_b64 && data.code_b64 !== "") { 
                     let decoded = atob(data.code_b64); 
                     if (decoded !== lastCode) { 
                         lastCode = decoded; 
-                        window.isWorkerBusy = false; 
-                        if (!isImportingSTL && !lastCode.includes("KINE_T")) executeCSGCode(lastCode, true); 
+                        window.isWorkerBusy = false; // Desbloqueamos por seguridad 
+                        if (!isImportingSTL) executeCSGCode(lastCode); 
                     } 
                 }
             }).catch(e => {});

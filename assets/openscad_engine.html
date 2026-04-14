@@ -51,7 +51,7 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
-        /* 🔥 LOADER DEFINITIVO: CENTRADO Y GIGANTE PARA QUE NO FALLE */
+        /* 🔥 LOADER DEFINITIVO: CENTRADO Y GIGANTE */
         #loader { 
             display: none; 
             position: fixed; 
@@ -122,13 +122,13 @@
         <div id="toolbar-content">
             
             <div style="background: #161B22; border: 1px solid var(--nexus-purple); padding: 8px; border-radius: 4px; margin-bottom: 4px; flex-shrink: 0;">
-                <div style="color: var(--nexus-purple); font-size: 9px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px;">📂 EJEMPLOS (PYTHON)</div>
+                <div style="color: var(--nexus-purple); font-size: 9px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px;">📂 EJEMPLOS (LOCAL)</div>
                 <select id="ejemplos-selector" style="width: 100%; background: #0B0E14; color: #fff; border: 1px solid #30363D; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 10px; cursor: pointer;" onchange="loadExample(this.value)">
                     <option value="" selected>Cargar modelo...</option>
                     <option value="engranaje">⚙️ Engranaje Paramétrico</option>
-                    <option value="caja">📦 Caja de Ensamblaje</option>
-                    <option value="soporte">📐 Soporte Estructural</option>
-                    <option value="motor">🏎️ Bloque Motor Básico</option>
+                    <option value="multicaja">📦 Caja Ensamblaje</option>
+                    <option value="muelle">🔩 Muelle de Tensión</option>
+                    <option value="solar">🌌 Sistema Solar Animado</option>
                 </select>
             </div>
 
@@ -162,8 +162,6 @@
             <button class="btn" style="border-left: 3px solid #C51162;" onclick="exportFile('obj')">Guardar OBJ <span>📦</span></button>
             <button class="btn" style="border-left: 3px solid var(--nexus-purple);" onclick="triggerHDExport()">Guardar HD <span>💎</span></button>
             <button class="btn" style="border-left: 3px solid #8B949E;" onclick="toggleConsole()">Motor Logs <span>🖥️</span></button>
-            
-            <button class="btn" style="border-left: 3px solid #B388FF; background: #1A0D3B; margin-top: 10px;" onclick="sendToCopilot()">Copiloto IA <span>🤖</span></button>
         </div>
     </div>
 
@@ -233,42 +231,65 @@
     <script type="module">
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
-        // Petición inicial (Opcional) para listar ejemplos dinámicos desde Python si tienes la ruta
-        fetch('/api/get_examples').then(r=>r.json()).then(data => {
-            if(data.examples) {
-                const sel = document.getElementById('ejemplos-selector');
-                sel.innerHTML = '<option value="">Cargar modelo...</option>';
-                data.examples.forEach(ex => { sel.innerHTML += `<option value="${ex.id}">${ex.name}</option>`; });
-            }
-        }).catch(e => { /* Usa los quemados en HTML si la ruta no existe */ });
+        // 🔥 DICCIONARIO DE EJEMPLOS FRONTEND (Evita errores de red con el backend)
+        const EXAMPLES_DB = {
+            "engranaje": `function main({KINE_T}) {
+                var dientes = 15; var r = 20; var h = 5;
+                var d_x = r*0.15; var d_y = r*0.2;
+                var pieza = CSG.cylinder({start:[0,0,0], end:[0,0,h], radius:r, slices:64});
+                for(var i=0; i<dientes; i++) {
+                    var a = (i * Math.PI * 2) / dientes;
+                    var diente = CSG.cube({center:[Math.cos(a)*r, Math.sin(a)*r, h/2], radius:[d_x, d_y, h/2]}); 
+                    pieza = pieza.union(diente);
+                }
+                var hueco = CSG.cylinder({start:[0,0,-1], end:[0,0,h+1], radius:5, slices:32}); 
+                pieza = pieza.subtract(hueco);
+                return pieza.rotateZ(KINE_T);
+            }`,
+            "multicaja": `function main({KINE_T}) {
+                var w = 40; var l = 30; var h = 20; var tol = 0.4; var sep = 10;
+                var t = 2; var ext = CSG.cube({center:[0,0,h/2], radius:[w/2, l/2, h/2]});
+                var int_box = CSG.cube({center:[0,0,h/2+t], radius:[w/2-t, l/2-t, h/2]}); var caja = ext.subtract(int_box);
+                var offsetZ = h + sep + (KINE_T/5); var tapa_b = CSG.cube({center:[0,0, offsetZ + t/2], radius:[w/2, l/2, t/2]});
+                var tapa_i = CSG.cube({center:[0,0, offsetZ - t/2], radius:[w/2-t-tol, l/2-t-tol, t/2]}); var tapa = tapa_b.union(tapa_i);
+                return caja.union(tapa);
+            }`,
+            "muelle": `function main({KINE_T}) {
+                var r_res = 15; var r_hilo = 2; var h = 40 + (Math.sin(KINE_T * 0.1) * 10); var vueltas = 5;
+                var resorte = null; var pasos = Math.floor(vueltas * 20); var paso_z = h / pasos; var a_step = (Math.PI * 2 * vueltas) / pasos;
+                for(var i=0; i<pasos; i++) {
+                    var a1 = i * a_step; var a2 = (i+1) * a_step;
+                    var x1 = Math.cos(a1)*r_res; var y1 = Math.sin(a1)*r_res; var z1 = i*paso_z;
+                    var x2 = Math.cos(a2)*r_res; var y2 = Math.sin(a2)*r_res; var z2 = (i+1)*paso_z;
+                    var seg = CSG.cylinder({start:[x1,y1,z1], end:[x2,y2,z2], radius:r_hilo, slices:8});
+                    var esp = CSG.sphere({center:[x2,y2,z2], radius:r_hilo, resolution:8});
+                    if(!resorte) resorte = seg.union(esp); else resorte = resorte.union(seg).union(esp);
+                }
+                return resorte;
+            }`,
+            "solar": `function main({KINE_T}) {
+                var s = 0.5; var HD = 32;
+                var sol = CSG.sphere({center:[0,0,0], radius: 25*s, slices: HD});
+                var rPlaneta = 8*s; var dist = 60*s;
+                var angulo = (KINE_T * 2) * (Math.PI / 180);
+                var px = Math.cos(angulo) * dist; var py = Math.sin(angulo) * dist;
+                var planeta = CSG.sphere({center: [px, py, 0], radius: rPlaneta, slices: HD});
+                var anillo = CSG.cylinder({start: [px, py, -1], end: [px, py, 1], radius: rPlaneta + 6*s, slices: HD}).subtract(CSG.cylinder({start: [px, py, -2], end: [px, py, 2], radius: rPlaneta + 2*s, slices: HD}));
+                return sol.union(planeta).union(anillo);
+            }`
+        };
 
         window.loadExample = (exampleName) => {
-            if(!exampleName) return;
-            log(`<span class='log-warn'>> 📂 Solicitando ejemplo '${exampleName}' a param_generators.py...</span>`);
+            if(!exampleName || !EXAMPLES_DB[exampleName]) return;
+            log(`<span class='log-warn'>> 📂 Cargando ejemplo local: '${exampleName}'...</span>`);
             document.getElementById('console').style.display = 'block';
             
-            // Llama a tu backend de Python para cargar el código
-            fetch('/api/load_example', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ example: exampleName })
-            })
-            .then(r => r.json())
-            .then(res => {
-                if(res.success && res.code) {
-                    log("<span class='log-ok'>> ¡Ejemplo inyectado!</span>");
-                    // Opcionalmente puedes forzar la ejecución aquí si el servidor no lo inyecta por el socket
-                    // lastCode = res.code; executeCSGCode(res.code, true);
-                } else {
-                    log("<span class='log-err'>> Error cargando ejemplo. Asegúrate de tener la ruta /api/load_example en tu app.py</span>");
-                }
-            })
-            .catch(e => {
-                log("<span class='log-err'>> Fallo de red solicitando el ejemplo a Python.</span>");
-            });
+            // Inyectamos el código directamente desde el diccionario local
+            lastCode = EXAMPLES_DB[exampleName];
+            executeCSGCode(lastCode, true);
             
-            // Resetea el desplegable
             document.getElementById('ejemplos-selector').selectedIndex = 0;
+            log("<span class='log-ok'>> ¡Ejemplo inyectado en el Worker!</span>");
         };
 
         window.toggleSidebarMenu = () => {
@@ -421,7 +442,6 @@
             log(`<span class='log-ok'>> 🕰️ Máquina del Tiempo: Código restaurado a V${index+1} con éxito.</span>`);
         };
 
-
         let dynamicMat = null; 
         let stressMaterial = null; 
         let isStressMode = false;
@@ -468,28 +488,6 @@
             } else {
                 currentMesh.material = materialsArray[matIndex];
             }
-        };
-
-        window.sendToCopilot = () => {
-            if(!currentMesh) {
-                log("<span class='log-err'>> No hay pieza generada o importada.</span>");
-                document.getElementById('console').style.display = 'block';
-                return;
-            }
-            currentMesh.geometry.computeBoundingBox();
-            const size = new THREE.Vector3();
-            currentMesh.geometry.boundingBox.getSize(size);
-            
-            const metadata = {
-                x: size.x.toFixed(2),
-                y: size.y.toFixed(2),
-                z: size.z.toFixed(2),
-                polys: Math.round(currentMesh.geometry.attributes.position.array.length / 9)
-            };
-            
-            localStorage.setItem('nexus_copilot_data', JSON.stringify(metadata));
-            log("<span class='log-ok'>> 🧠 Datos transferidos al AI Copilot. Ve a la pestaña de IA.</span>");
-            document.getElementById('console').style.display = 'block';
         };
 
         window.togglePhysics = () => {
@@ -800,7 +798,6 @@
                     if (format === 'stl') { ext = ".stl"; fileParts.push("solid nexus_export\n"); for(let i=0; i<pos.length; i+=9) { fileParts.push("facet normal "+nor[i]+" "+nor[i+1]+" "+nor[i+2]+"\n  outer loop\n    vertex "+pos[i]+" "+pos[i+1]+" "+pos[i+2]+"\n    vertex "+pos[i+3]+" "+pos[i+4]+" "+pos[i+5]+"\n    vertex "+pos[i+6]+" "+pos[i+7]+" "+pos[i+8]+"\n  endloop\nendfacet\n"); } fileParts.push("endsolid nexus_export\n"); } else if (format === 'obj') { ext = ".obj"; fileParts.push("# NEXUS CAD Export\n"); for(let i=0; i<pos.length; i+=3) fileParts.push("v " + pos[i] + " " + pos[i+1] + " " + pos[i+2] + "\n"); for(let i=0; i<nor.length; i+=3) fileParts.push("vn " + nor[i] + " " + nor[i+1] + " " + nor[i+2] + "\n"); for(let i=1; i<=(pos.length/3); i+=3) fileParts.push("f " + i + "//" + i + " " + (i+1) + "//" + (i+1) + " " + (i+2) + "//" + (i+2) + "\n"); }
                     let filename = "nexus_model_" + Math.floor(Date.now()/1000) + ext; let blob = new Blob(fileParts, {type: 'text/plain'}); let a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); 
                     log("<span class='log-ok'>> ¡" + format.toUpperCase() + " GUARDADO EN DESCARGAS!</span>");
-                    if (numPolys < 500000) { let dataString = fileParts.join(""); fetch(window.location.origin + '/api/save_export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: filename, data: dataString }) }).then(r => r.json()).then(res => { log("<span class='log-ok'>> Sincronizado con la pestaña DB.</span>"); }).catch(err => { log("<span class='log-warn'>> Aviso DB: Ignora esto, el archivo ya está en tus Descargas.</span>"); }); } else { log("<span class='log-warn'>> 🛡️ Render Extremo (> 500k polígonos). Se omite el envío a DB para proteger el servidor local.</span>"); }
                 } catch(e) { log("<span class='log-err'>> ERROR EXPORTACIÓN: " + e.message + "</span>"); } finally { document.getElementById('loader').style.display = 'none'; }
             }, 150); 
         };
@@ -1072,7 +1069,7 @@
                 if (window.isPhysicsActive || window.isMechanismActive) {
                     world.step(1 / 60);
                 }
- 
+
                 if (window.isPhysicsActive && physicsBody && currentMesh) {
                     currentMesh.position.copy(physicsBody.position);
                     currentMesh.quaternion.copy(physicsBody.quaternion);
@@ -1301,44 +1298,43 @@
             if (isImportingSTL || window.isWorkerBusy) return; 
             window.isWorkerBusy = true;
             
+            // 🔥 MOSTRAR EL LOADER PRIMERO
             if (forceLoader || window.NEXUS_HD_EXPORT) {
                 document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "RENDERIZANDO HD..." : "TRABAJANDO WORKER...";
-                document.getElementById('loader').style.display = 'block';
+                let loaderEl = document.getElementById('loader');
+                loaderEl.style.display = 'block';
+                // Obligar al navegador a "repintar" antes de bloquearse
+                loaderEl.offsetHeight; 
             }
 
-            // 🔥 MAGIA: Doble requestAnimationFrame obliga al navegador a pintar el DOM (mostrar el loader)
-            // ANTES de que el hilo se congele ejecutando código de strings y Workers.
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        let comboValue = parseInt(document.getElementById('lod-selector').value);
-                        let currentSlices = window.NEXUS_HD_EXPORT ? 512 : comboValue; 
+            // Damos 50ms para que el renderizado de la pantalla se efectúe antes de enviar el string gigante
+            setTimeout(() => {
+                let comboValue = parseInt(document.getElementById('lod-selector').value);
+                let currentSlices = window.NEXUS_HD_EXPORT ? 512 : comboValue; 
 
-                        let optimizedCode = rawCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
-                        optimizedCode = optimizedCode.replace(/resolution\s*:\s*\d+/g, 'resolution: ' + currentSlices);
+                let optimizedCode = rawCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
+                optimizedCode = optimizedCode.replace(/resolution\s*:\s*\d+/g, 'resolution: ' + currentSlices);
 
-                        let filletHelper = "function roundedBox(w, d, h, r) {\n" +
-                            "var res = " + currentSlices + ";\n" +
-                            "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
-                            "if(r<=0) return CSG.cube({radius:[w/2, d/2, h/2]});\n" +
-                            "var b1 = CSG.cube({radius:[w/2-r, d/2, h/2]});\n" +
-                            "var b2 = CSG.cube({radius:[w/2, d/2-r, h/2]});\n" +
-                            "var c1 = CSG.cylinder({start:[w/2-r, d/2-r, -h/2], end:[w/2-r, d/2-r, h/2], radius:r, slices:res});\n" +
-                            "var c2 = CSG.cylinder({start:[-w/2+r, d/2-r, -h/2], end:[-w/2+r, d/2-r, h/2], radius:r, slices:res});\n" +
-                            "var c3 = CSG.cylinder({start:[w/2-r, -d/2+r, -h/2], end:[w/2-r, -d/2+r, h/2], radius:r, slices:res});\n" +
-                            "var c4 = CSG.cylinder({start:[-w/2+r, -d/2+r, -h/2], end:[-w/2+r, -d/2+r, h/2], radius:r, slices:res});\n" +
-                            "return b1.union([b2, c1, c2, c3, c4]);\n" +
-                        "}\n\n";
-                        
-                        let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
-                        optimizedCode = optimizedCode.replace(/return main\(\);/g, "").replace(/return main\(\{.*\}\);/g, "");
-                        optimizedCode = filletHelper + optimizedCode + executionCall;
-                        
-                        t0 = performance.now(); 
-                        csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
-                    }, 10);
-                });
-            });
+                let filletHelper = "function roundedBox(w, d, h, r) {\n" +
+                    "var res = " + currentSlices + ";\n" +
+                    "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
+                    "if(r<=0) return CSG.cube({radius:[w/2, d/2, h/2]});\n" +
+                    "var b1 = CSG.cube({radius:[w/2-r, d/2, h/2]});\n" +
+                    "var b2 = CSG.cube({radius:[w/2, d/2-r, h/2]});\n" +
+                    "var c1 = CSG.cylinder({start:[w/2-r, d/2-r, -h/2], end:[w/2-r, d/2-r, h/2], radius:r, slices:res});\n" +
+                    "var c2 = CSG.cylinder({start:[-w/2+r, d/2-r, -h/2], end:[-w/2+r, d/2-r, h/2], radius:r, slices:res});\n" +
+                    "var c3 = CSG.cylinder({start:[w/2-r, -d/2+r, -h/2], end:[w/2-r, -d/2+r, h/2], radius:r, slices:res});\n" +
+                    "var c4 = CSG.cylinder({start:[-w/2+r, -d/2+r, -h/2], end:[-w/2+r, -d/2+r, h/2], radius:r, slices:res});\n" +
+                    "return b1.union([b2, c1, c2, c3, c4]);\n" +
+                "}\n\n";
+                
+                let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
+                optimizedCode = optimizedCode.replace(/return main\(\);/g, "").replace(/return main\(\{.*\}\);/g, "");
+                optimizedCode = filletHelper + optimizedCode + executionCall;
+                
+                t0 = performance.now(); 
+                csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
+            }, 50);
         }
 
         setInterval(() => {

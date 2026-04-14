@@ -51,32 +51,33 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
-        /* 🔥 LOADER DEFINITIVO: CENTRADO Y GIGANTE */
+        /* 🔥 LOADER ORIGINAL RESTAURADO: TUERCA Y FLEX EN LA ESQUINA */
         #loader { 
             display: none; 
-            position: fixed; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
+            position: absolute; 
+            bottom: 15px; 
+            left: 15px; 
             z-index: 999999; 
-            background: rgba(11, 14, 20, 0.95); 
-            padding: 20px 40px; 
-            border-radius: 8px; 
-            border: 2px solid var(--nexus-cyan); 
-            box-shadow: 0 0 40px rgba(0, 229, 255, 0.4); 
-            text-align: center;
+            background: var(--nexus-bg); 
+            padding: 10px 20px; 
+            border-radius: 6px; 
+            border-left: 3px solid var(--nexus-cyan); 
+            align-items: center; 
+            gap: 10px; 
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2); 
         }
-        .pulse-text { 
+        .gear-spinner { 
+            font-size: 20px; 
+            animation: spin 1.5s linear infinite; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            line-height: 1; 
             color: var(--nexus-cyan); 
-            font-size: 18px; 
-            font-weight: bold; 
-            letter-spacing: 2px; 
-            font-family: 'Courier New', monospace; 
-            animation: pulse 0.5s infinite alternate; 
         }
-        @keyframes pulse { 
-            0% { opacity: 0.3; } 
-            100% { opacity: 1; text-shadow: 0 0 15px var(--nexus-cyan); } 
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
         }
 
         #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
@@ -225,7 +226,8 @@
     </div>
 
     <div id="loader">
-        <div id="loader-txt" class="pulse-text">TRABAJANDO WORKER...</div>
+        <div class="gear-spinner">⚙️</div>
+        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">TRABAJANDO WORKER...</div>
     </div>
 
     <script type="module">
@@ -234,7 +236,7 @@
         // 🔥 GANCHO GLOBAL PARA PYTHON/FLET
         window.showWorkerLoader = function(msg) {
             document.getElementById('loader-txt').innerText = msg || "TRABAJANDO WORKER...";
-            document.getElementById('loader').style.display = 'block';
+            document.getElementById('loader').style.display = 'flex';
         };
 
         // 🔥 DICCIONARIO DE EJEMPLOS FRONTEND (Con el sistema solar épico)
@@ -793,7 +795,7 @@
             document.getElementById('console').style.display = 'block';
             document.getElementById('slicer-modal').style.display = 'none';
             document.getElementById('loader-txt').innerText = "GENERANDO G-CODE...";
-            document.getElementById('loader').style.display = 'block';
+            document.getElementById('loader').style.display = 'flex';
 
             setTimeout(() => {
                 const temp = document.getElementById('cam-temp').value;
@@ -866,7 +868,7 @@
         
         window.exportFile = function(format) {
             if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
-            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + "..."; document.getElementById('loader').style.display = 'block';
+            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + "..."; document.getElementById('loader').style.display = 'flex';
             setTimeout(() => {
                 try {
                     let pos = currentMesh.geometry.attributes.position.array; let nor = currentMesh.geometry.attributes.normal.array; let fileParts = []; let ext = "";
@@ -1394,7 +1396,7 @@
             if (forceLoader || window.NEXUS_HD_EXPORT) {
                 document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "RENDERIZANDO HD..." : "TRABAJANDO WORKER...";
                 let loaderEl = document.getElementById('loader');
-                loaderEl.style.display = 'block';
+                loaderEl.style.display = 'flex';
                 // Obligar al navegador a "repintar" antes de bloquearse
                 loaderEl.offsetHeight; 
             }
@@ -1440,7 +1442,7 @@
         }, 50);
 
         function loadAndSendSTL(url) {
-            isImportingSTL = true; document.getElementById('loader-txt').innerText = "DESCARGANDO STL..."; document.getElementById('loader').style.display = 'block';
+            isImportingSTL = true; document.getElementById('loader-txt').innerText = "DESCARGANDO STL..."; document.getElementById('loader').style.display = 'flex';
             new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "INDEXANDO SÓLIDO..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
         }
 

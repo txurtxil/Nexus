@@ -1072,7 +1072,7 @@
                 if (window.isPhysicsActive || window.isMechanismActive) {
                     world.step(1 / 60);
                 }
-
+ 
                 if (window.isPhysicsActive && physicsBody && currentMesh) {
                     currentMesh.position.copy(physicsBody.position);
                     currentMesh.quaternion.copy(physicsBody.quaternion);

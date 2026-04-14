@@ -51,10 +51,10 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
-        /* 🔥 LOADER OFICIAL CON ENGRANAJE ANIMADO */
-        #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
-        .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 🔥 LOADER SIMPLIFICADO: SOLO TEXTO QUE PULSA */
+        #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        .pulse-text { color: var(--nexus-cyan); font-size: 12px; font-weight: bold; letter-spacing: 1px; font-family: 'Courier New', monospace; animation: pulse 0.8s infinite alternate; }
+        @keyframes pulse { 0% { opacity: 0.4; } 100% { opacity: 1; text-shadow: 0 0 8px var(--nexus-cyan); } }
 
         #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
 
@@ -108,9 +108,7 @@
             </div>
 
             <button class="btn" style="border-left: 3px solid #FFF; background: #21262D;" onclick="toggleTimeline()">Timeline Git <span>🕒</span></button>
-
             <button class="btn" style="border-left: 3px solid #FFF;" onclick="toggleSpaceEnv()">Espacio 🌌</button>
-
             <button class="btn" style="border-left: 3px solid #00E5FF;" onclick="toggleLights()">Luces <span>💡</span></button>
             <button class="btn" style="border-left: 3px solid #B388FF;" onclick="toggleKine()">Animación <span>🎬</span></button>
             
@@ -194,8 +192,7 @@
     </div>
 
     <div id="loader">
-        <div class="gear-spinner">⚙️</div>
-        <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
+        <div id="loader-txt" class="pulse-text">⚙ TRABAJANDO WORKER...</div>
     </div>
 
     <script type="module">
@@ -649,7 +646,7 @@
             log("<span class='log-warn'>> 🖨️ Iniciando NEXUS CAM...</span>");
             document.getElementById('console').style.display = 'block';
             document.getElementById('slicer-modal').style.display = 'none';
-            document.getElementById('loader-txt').innerText = "GENERANDO G-CODE...";
+            document.getElementById('loader-txt').innerText = "⚙ GENERANDO G-CODE...";
             document.getElementById('loader').style.display = 'flex';
 
             setTimeout(() => {
@@ -723,7 +720,7 @@
         
         window.exportFile = function(format) {
             if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
-            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + " (PUEDE TARDAR)..."; document.getElementById('loader').style.display = 'flex';
+            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "⚙ GENERANDO " + format.toUpperCase() + "..."; document.getElementById('loader').style.display = 'flex';
             setTimeout(() => {
                 try {
                     let pos = currentMesh.geometry.attributes.position.array; let nor = currentMesh.geometry.attributes.normal.array; let fileParts = []; let ext = "";
@@ -1232,7 +1229,7 @@
             window.isWorkerBusy = true;
             
             if (forceLoader || window.NEXUS_HD_EXPORT) {
-                document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "RENDERIZANDO HD (512 SLICES)..." : "CALCULANDO SÓLIDO...";
+                document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "⚙ RENDERIZANDO HD..." : "⚙ TRABAJANDO WORKER...";
                 document.getElementById('loader').style.display = 'flex';
             }
 
@@ -1273,8 +1270,8 @@
         }, 50);
 
         function loadAndSendSTL(url) {
-            isImportingSTL = true; document.getElementById('loader-txt').innerText = "DESCARGANDO STL LOCAL..."; document.getElementById('loader').style.display = 'flex';
-            new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "TRIANGULIZANDO A NODO CSG..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
+            isImportingSTL = true; document.getElementById('loader-txt').innerText = "⚙ DESCARGANDO STL..."; document.getElementById('loader').style.display = 'flex';
+            new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "⚙ INDEXANDO SÓLIDO..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
         }
 
         let lastCode = ""; let currentStlHash = "";

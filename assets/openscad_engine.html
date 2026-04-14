@@ -11,7 +11,7 @@
         
         .nexus-panel { position: absolute; background: var(--nexus-bg); border: 1px solid var(--nexus-border); border-radius: 6px; padding: 12px; z-index: 10; backdrop-filter: blur(8px); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         
-        /* 🔥 BARRA LATERAL IZQUIERDA (CONTRAÍDA POR DEFECTO) */
+        /* 🔥 BARRA LATERAL IZQUIERDA */
         #toolbar { top: 15px; left: 15px; display: flex; flex-direction: column; width: 160px; max-height: 90vh; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
         #toolbar.collapsed { width: 45px; padding: 8px; background: rgba(11, 14, 20, 0.5); border-color: transparent; box-shadow: none; }
         #toolbar.collapsed #toolbar-content { display: none; }
@@ -27,7 +27,7 @@
         .btn:hover { background: #30363D; }
         .btn:active { transform: scale(0.95); }
         
-        /* 🔥 PANEL TELEMETRÍA RETRÁCTIL (ABAJO DERECHA) */
+        /* 🔥 PANEL TELEMETRÍA RETRÁCTIL */
         #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); transition: all 0.3s; overflow: hidden; pointer-events: none; }
         #hud-panel.collapsed { width: 45px; height: 45px; padding: 0; background: rgba(11, 14, 20, 0.5); border: none; border-radius: 50%; bottom: 10px; right: 10px; pointer-events: auto; }
         
@@ -51,10 +51,33 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
-        /* 🔥 LOADER SIMPLIFICADO: SOLO TEXTO QUE PULSA */
-        #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-        .pulse-text { color: var(--nexus-cyan); font-size: 12px; font-weight: bold; letter-spacing: 1px; font-family: 'Courier New', monospace; animation: pulse 0.8s infinite alternate; }
-        @keyframes pulse { 0% { opacity: 0.4; } 100% { opacity: 1; text-shadow: 0 0 8px var(--nexus-cyan); } }
+        /* 🔥 LOADER REESCRITO Y CENTRADO PARA ASEGURAR VISIBILIDAD */
+        #loader { 
+            display: none; 
+            position: fixed; 
+            bottom: 30px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            z-index: 9999; 
+            background: var(--nexus-bg); 
+            padding: 12px 24px; 
+            border-radius: 8px; 
+            border: 1px solid var(--nexus-cyan); 
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.4); 
+        }
+        .pulse-text { 
+            color: var(--nexus-cyan); 
+            font-size: 14px; 
+            font-weight: bold; 
+            letter-spacing: 2px; 
+            font-family: 'Courier New', monospace; 
+            animation: pulse 0.5s infinite alternate; 
+            text-align: center;
+        }
+        @keyframes pulse { 
+            0% { opacity: 0.3; } 
+            100% { opacity: 1; text-shadow: 0 0 10px var(--nexus-cyan); } 
+        }
 
         #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
 
@@ -192,7 +215,7 @@
     </div>
 
     <div id="loader">
-        <div id="loader-txt" class="pulse-text">⚙ TRABAJANDO WORKER...</div>
+        <div id="loader-txt" class="pulse-text">TRABAJANDO WORKER...</div>
     </div>
 
     <script type="module">
@@ -646,8 +669,8 @@
             log("<span class='log-warn'>> 🖨️ Iniciando NEXUS CAM...</span>");
             document.getElementById('console').style.display = 'block';
             document.getElementById('slicer-modal').style.display = 'none';
-            document.getElementById('loader-txt').innerText = "⚙ GENERANDO G-CODE...";
-            document.getElementById('loader').style.display = 'flex';
+            document.getElementById('loader-txt').innerText = "GENERANDO G-CODE...";
+            document.getElementById('loader').style.display = 'block';
 
             setTimeout(() => {
                 const temp = document.getElementById('cam-temp').value;
@@ -720,7 +743,7 @@
         
         window.exportFile = function(format) {
             if(!currentMesh) { log("<span class='log-err'>No hay geometría para exportar.</span>"); return; }
-            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "⚙ GENERANDO " + format.toUpperCase() + "..."; document.getElementById('loader').style.display = 'flex';
+            let numPolys = currentMesh.geometry.attributes.position.array.length / 9; log("<span class='log-warn'>> Ensamblando " + Math.round(numPolys) + " polígonos...</span>"); document.getElementById('console').style.display = 'block'; document.getElementById('loader-txt').innerText = "GENERANDO " + format.toUpperCase() + "..."; document.getElementById('loader').style.display = 'block';
             setTimeout(() => {
                 try {
                     let pos = currentMesh.geometry.attributes.position.array; let nor = currentMesh.geometry.attributes.normal.array; let fileParts = []; let ext = "";
@@ -1229,8 +1252,8 @@
             window.isWorkerBusy = true;
             
             if (forceLoader || window.NEXUS_HD_EXPORT) {
-                document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "⚙ RENDERIZANDO HD..." : "⚙ TRABAJANDO WORKER...";
-                document.getElementById('loader').style.display = 'flex';
+                document.getElementById('loader-txt').innerText = window.NEXUS_HD_EXPORT ? "RENDERIZANDO HD..." : "TRABAJANDO WORKER...";
+                document.getElementById('loader').style.display = 'block';
             }
 
             let comboValue = parseInt(document.getElementById('lod-selector').value);
@@ -1257,7 +1280,11 @@
             optimizedCode = filletHelper + optimizedCode + executionCall;
             
             t0 = performance.now(); 
-            csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
+            
+            // 🔥 MAGIA: Micro-pausa de 15ms para que el navegador pinte el loader ANTES de bloquearse enviando código
+            setTimeout(() => {
+                csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
+            }, 15);
         }
 
         setInterval(() => {
@@ -1270,8 +1297,8 @@
         }, 50);
 
         function loadAndSendSTL(url) {
-            isImportingSTL = true; document.getElementById('loader-txt').innerText = "⚙ DESCARGANDO STL..."; document.getElementById('loader').style.display = 'flex';
-            new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "⚙ INDEXANDO SÓLIDO..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
+            isImportingSTL = true; document.getElementById('loader-txt').innerText = "DESCARGANDO STL..."; document.getElementById('loader').style.display = 'block';
+            new THREE.STLLoader().load(url, function (geometry) { document.getElementById('loader-txt').innerText = "INDEXANDO SÓLIDO..."; csgWorker.postMessage({ type: 'set_import', positions: geometry.attributes.position.array }); }, undefined, function (error) { log("<span class='log-err'>> Error cargando STL Local: " + error + "</span>"); isImportingSTL = false; document.getElementById('loader').style.display = 'none'; });
         }
 
         let lastCode = ""; let currentStlHash = "";

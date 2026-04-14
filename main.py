@@ -362,12 +362,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v21.2 TITAN PRO"
+        page.title = "NEXUS CAD v1.0 Golden Master"
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v21.2 | Entorno Integrado 3 Pilares", color="#00E676", weight="bold")
+        status = ft.Text("NEXUS v1.0 | Entorno Integrado 3 Pilares", color="#00E676", weight="bold")
 
         def custom_icon_btn(text, action, tooltip_txt): 
             return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
@@ -830,23 +830,59 @@ def main(page: ft.Page):
         ])
         pillar_lab = ft.Column([nav_lab, ft.Divider(height=2, color="#30363D"), lab_content], expand=True)
 
+        # ==========================================
+        # DIÁLOGO ACERCA DE Y DONACIONES
+        # ==========================================
+        def open_about_dialog(e):
+            def close_about(e):
+                dialog_about.open = False
+                page.update()
+                
+            dialog_about = ft.AlertDialog(
+                bgcolor="#161B22",
+                title=ft.Row([
+                    ft.Text("🌟", size=20),
+                    ft.Text("Acerca de NEXUS", color="#FFAB00", weight="bold")
+                ]),
+                content=ft.Column([
+                    ft.Text("NEXUS CAD TITAN PRO", weight="bold", size=18, color="#E6EDF3"),
+                    ft.Text("Versión 1.0 (Golden Master)", size=12, color="#00E676"),
+                    ft.Divider(color="#30363D"),
+                    ft.Text("Desarrollado de forma independiente para la comunidad. Nexus es y será siempre libre de rastreadores y publicidad.", size=13, color="#8B949E"),
+                    ft.Container(height=10),
+                    ft.Text("Si Nexus te ha sido útil en tus proyectos 3D, considera apoyar su desarrollo con la voluntad. ¡Cada euro ayuda a mantener el motor encendido!", size=13, color="#E6EDF3", italic=True),
+                    ft.Container(height=15),
+                    ft.ElevatedButton(
+                        content=ft.Row([
+                            ft.Text("☕", size=18), 
+                            ft.Text("Apoyar el proyecto (Ko-fi)", color="black", weight="bold")
+                        ], alignment="center"),
+                        bgcolor="#FFD600",
+                        width=float('inf'),
+                        url="https://ko-fi.com/TU_USUARIO_AQUI",  # <-- ¡Recuerda cambiar esto por tu enlace de Ko-fi!
+                        style=ft.ButtonStyle(padding=15)
+                    )
+                ], tight=True, width=320),
+                actions=[
+                    ft.TextButton("Cerrar", on_click=close_about, style=ft.ButtonStyle(color="#00E5FF"))
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            
+            page.overlay.append(dialog_about)
+            dialog_about.open = True
+            page.update()
 
         # ==========================================
-        # CONTENEDOR MAESTRO Y BARRA PRINCIPAL
+        # CONTENEDOR MAESTRO Y BARRAS
         # ==========================================
         main_container = ft.Container(content=pillar_studio, expand=True)
 
         def set_main_pillar(idx):
             main_container.content = [pillar_studio, pillar_vis, pillar_lab][idx]
-            
-            # 🔥 Colores más evidentes para que se note el cambio:
-            if idx == 0:
-                page.bgcolor = "#0B0E14"  # Original oscuro
-            elif idx == 1:
-                page.bgcolor = "#002B36"  # Azul profundo evidente
-            elif idx == 2:
-                page.bgcolor = "#122A16"  # Verde oscuro evidente
-                
+            if idx == 0: page.bgcolor = "#0B0E14" 
+            elif idx == 1: page.bgcolor = "#002B36" 
+            elif idx == 2: page.bgcolor = "#122A16" 
             page.update()
 
         # BARRA DE NAVEGACIÓN SUPERIOR (LOS 3 PILARES)
@@ -856,8 +892,20 @@ def main(page: ft.Page):
             ft.ElevatedButton("🏭 LAB", on_click=lambda _: set_main_pillar(2), bgcolor="#1B5E20", color="white", expand=True, height=45),
         ], spacing=5)
 
+        # BARRA DE ESTADO INFERIOR CON EL BOTÓN "ACERCA DE"
+        status_bar = ft.Row([
+            status,
+            ft.Container(expand=True),  # Espaciador para empujar el botón a la derecha
+            ft.IconButton(
+                icon=ft.icons.INFO_OUTLINE, 
+                icon_color="#FFAB00", 
+                on_click=open_about_dialog, 
+                tooltip="Acerca de Nexus y Apoyo"
+            )
+        ])
+
         # Montaje final en la página
-        page.add(ft.Container(content=ft.Column([main_nav_bar, main_container, status], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
+        page.add(ft.Container(content=ft.Column([main_nav_bar, main_container, status_bar], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
         
         # Inicialización
         select_tool("planetario")

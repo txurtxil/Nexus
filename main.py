@@ -917,3 +917,4 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     if "TERMUX_VERSION" in os.environ: ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
     else: ft.app(target=main)
+ 

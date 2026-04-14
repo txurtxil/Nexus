@@ -51,20 +51,48 @@
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
         .btn-remove-img { position: absolute; top: -5px; right: -5px; background: #D50000; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);}
 
+        /* 🔥 CSS MEJORADO PARA LA BIBLIOTECA 🔥 */
         .library-panel { 
             background: #0D1117; 
             border: 1px solid #30363D; 
             border-radius: 6px; 
-            padding: 10px; 
-            max-height: 40vh; 
+            padding: 15px; 
+            max-height: 50vh; 
             overflow-y: auto; 
             -webkit-overflow-scrolling: touch; 
             display: none; 
             margin-bottom: 25px; 
         }
-        .library-item { background: #161B22; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #2E7D32; display: flex; justify-content: space-between; align-items: center;}
-        .library-item-title { font-size: 12px; color: #E6EDF3; font-weight: bold; }
-        .library-item-btn { background: #B388FF; color: #FFF; padding: 5px 10px; font-size: 10px; border-radius: 4px; cursor: pointer; border: none; }
+        .library-item { 
+            background: #161B22; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            border-radius: 6px; 
+            border-left: 4px solid #2E7D32; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            gap: 12px;
+        }
+        .library-item-title { 
+            font-size: 14px; 
+            color: #E6EDF3; 
+            font-weight: bold; 
+            line-height: 1.4;
+            flex-grow: 1;
+        }
+        .library-item-btn { 
+            background: #B388FF; 
+            color: #FFF; 
+            padding: 10px 16px; 
+            font-size: 12px; 
+            font-weight: bold;
+            border-radius: 4px; 
+            cursor: pointer; 
+            border: none; 
+            text-transform: uppercase;
+            white-space: nowrap; /* Evita que el botón se aplaste */
+        }
     </style>
 </head>
 <body>
@@ -247,7 +275,7 @@
             data.forEach(item => {
                 const div = document.createElement('div');
                 div.className = "library-item";
-                const title = item.prompt.length > 40 ? item.prompt.substring(0, 40) + "..." : item.prompt;
+                const title = item.prompt.length > 50 ? item.prompt.substring(0, 50) + "..." : item.prompt;
                 
                 const encodedCode = btoa(unescape(encodeURIComponent(item.codigo)));
                 const encodedPlan = btoa(unescape(encodeURIComponent(item.plan_tecnico || "")));

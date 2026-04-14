@@ -51,27 +51,41 @@
         #imagePreview { max-height: 150px; border-radius: 6px; border: 2px solid #00B0FF; }
         .btn-remove-img { position: absolute; top: -5px; right: -5px; background: #D50000; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.5);}
 
-        /* 🔥 CSS MEJORADO PARA LA BIBLIOTECA 🔥 */
-        .library-panel { 
-            background: #0D1117; 
-            border: 1px solid #30363D; 
-            border-radius: 6px; 
-            padding: 15px; 
-            max-height: 50vh; 
-            overflow-y: auto; 
-            -webkit-overflow-scrolling: touch; 
-            display: none; 
-            margin-bottom: 25px; 
+        /* 🔥 CSS PARA LA VENTANA MODAL (BIBLIOTECA) 🔥 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(4px);
+            display: none; justify-content: center; align-items: center; 
+            z-index: 9999; padding: 15px; box-sizing: border-box;
         }
+        .modal-content {
+            background: #0D1117; width: 100%; max-width: 500px;
+            border: 1px solid #30363D; border-radius: 12px;
+            display: flex; flex-direction: column; max-height: 85vh;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+        }
+        .modal-header {
+            padding: 15px 20px; border-bottom: 1px solid #30363D;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h3 { margin: 0; color: #FFAB00; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .close-btn {
+            background: transparent; border: none; color: #D50000;
+            font-size: 22px; cursor: pointer; padding: 0; width: auto; font-weight: normal;
+        }
+        .close-btn:hover { background: transparent; transform: scale(1.1); }
+        
+        .modal-body {
+            padding: 15px; overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; gap: 12px;
+        }
+
         .library-item { 
             background: #161B22; 
             padding: 15px; 
-            margin-bottom: 10px; 
-            border-radius: 6px; 
+            border-radius: 8px; 
             border-left: 4px solid #2E7D32; 
             display: flex; 
-            justify-content: space-between; 
-            align-items: center;
+            flex-direction: column;
             gap: 12px;
         }
         .library-item-title { 
@@ -79,20 +93,22 @@
             color: #E6EDF3; 
             font-weight: bold; 
             line-height: 1.4;
-            flex-grow: 1;
+            word-wrap: break-word;
         }
         .library-item-btn { 
             background: #B388FF; 
             color: #FFF; 
-            padding: 10px 16px; 
-            font-size: 12px; 
+            padding: 12px; 
+            font-size: 13px; 
             font-weight: bold;
-            border-radius: 4px; 
+            border-radius: 6px; 
             cursor: pointer; 
             border: none; 
             text-transform: uppercase;
-            white-space: nowrap; /* Evita que el botón se aplaste */
+            width: 100%; /* Botón gigante para móvil */
+            text-align: center;
         }
+        .library-item-btn:hover { background: #9575CD; }
     </style>
 </head>
 <body>
@@ -203,9 +219,19 @@
     <button class="btn-inject" id="btnInject" onclick="inject()">⚙️ Inyectar al Visor 3D</button>
 
     <button class="btn-cloud" onclick="saveToCloud()" style="margin-top: 5px;">💾 Guardar Receta en Supabase</button>
-    <button onclick="toggleLibrary()" style="margin-top: 5px; background: #30363D; color: #FFF;">📚 Ver Mi Biblioteca de Piezas</button>
     
-    <div id="libraryPanel" class="library-panel"></div>
+    <button onclick="toggleLibrary()" style="margin-top: 5px; background: #30363D; color: #FFF;">📚 Ver Mi Biblioteca de Piezas</button>
+</div>
+
+<div id="libraryModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>📚 Mi Biblioteca de Supabase</h3>
+            <button class="close-btn" onclick="toggleLibrary()">✖</button>
+        </div>
+        <div id="modalBody" class="modal-body">
+            </div>
+    </div>
 </div>
 
 <script>
@@ -255,7 +281,9 @@
             btn.style.backgroundColor = "#00E676";
             btn.style.color = "#000";
             setTimeout(() => { btn.innerHTML = "💾 Guardar Receta en Supabase"; btn.style.backgroundColor = "#2E7D32"; btn.style.color = "#FFF"; }, 2500);
-            if(document.getElementById('libraryPanel').style.display === "block") loadLibrary(); 
+            
+            // Si el modal está abierto, actualizamos la lista
+            if(document.getElementById('libraryModal').style.display === "flex") loadLibrary(); 
         } catch (err) {
             alert("Error guardando en Supabase: " + err.message);
             btn.innerHTML = "💾 Guardar Receta en Supabase";
@@ -264,41 +292,51 @@
 
     async function loadLibrary() {
         if (!initSupabase()) return;
-        const panel = document.getElementById('libraryPanel');
-        panel.innerHTML = "<div style='color:#8B949E; font-size: 11px; text-align:center;'>Conectando con Supabase...</div>";
+        const panel = document.getElementById('modalBody');
+        panel.innerHTML = "<div style='color:#8B949E; font-size: 13px; text-align:center; padding: 20px;'>⏳ Conectando con Supabase...</div>";
         try {
             const { data, error } = await supaClient.from('nexus_library').select('*').order('created_at', { ascending: false });
             if (error) throw error;
             panel.innerHTML = "";
-            if(data.length === 0) { panel.innerHTML = "<div style='color:#8B949E; font-size: 11px; text-align:center;'>Tu biblioteca está vacía.</div>"; return; }
+            if(data.length === 0) { panel.innerHTML = "<div style='color:#8B949E; font-size: 13px; text-align:center; padding: 20px;'>Tu biblioteca está vacía.</div>"; return; }
 
             data.forEach(item => {
                 const div = document.createElement('div');
                 div.className = "library-item";
-                const title = item.prompt.length > 50 ? item.prompt.substring(0, 50) + "..." : item.prompt;
+                
+                // Mostrar el texto completo, ya que en el modal tenemos espacio de sobra
+                const title = item.prompt;
                 
                 const encodedCode = btoa(unescape(encodeURIComponent(item.codigo)));
                 const encodedPlan = btoa(unescape(encodeURIComponent(item.plan_tecnico || "")));
                 
                 div.innerHTML = `
-                    <div class="library-item-title">${title}</div>
-                    <button class="library-item-btn" onclick="loadPiece('${encodedCode}', '${encodedPlan}')">Cargar</button>
+                    <div class="library-item-title">📝 ${title}</div>
+                    <button class="library-item-btn" onclick="loadPiece('${encodedCode}', '${encodedPlan}')">⬇️ Cargar Código JS</button>
                 `;
                 panel.appendChild(div);
             });
-        } catch (err) { panel.innerHTML = "<div style='color:#D50000; font-size: 11px; text-align:center;'>Error: " + err.message + "</div>"; }
+        } catch (err) { panel.innerHTML = "<div style='color:#D50000; font-size: 13px; text-align:center; padding: 20px;'>Error: " + err.message + "</div>"; }
     }
 
     function toggleLibrary() {
-        const panel = document.getElementById('libraryPanel');
-        panel.style.display = panel.style.display === "block" ? "none" : "block";
-        if(panel.style.display === "block") loadLibrary();
+        const modal = document.getElementById('libraryModal');
+        if (modal.style.display === "flex") {
+            modal.style.display = "none";
+        } else {
+            modal.style.display = "flex";
+            loadLibrary();
+        }
     }
 
     function loadPiece(b64Code, b64Plan) {
         document.getElementById('codeOutput').value = decodeURIComponent(escape(atob(b64Code)));
         lastTechPlan = decodeURIComponent(escape(atob(b64Plan))); 
-        alert("✅ Pieza y plano cargados desde la Nube. Pulsa 'Inyectar' para verla.");
+        
+        // Cierra la ventana automáticamente
+        document.getElementById('libraryModal').style.display = "none";
+        
+        alert("✅ Pieza cargada correctamente. Pulsa 'Inyectar al Visor 3D' para verla.");
     }
     
     async function checkDataBridge() {

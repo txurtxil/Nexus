@@ -50,3 +50,4 @@ jobs:
         with:
           name: Nexus-CAD-WASM-APK
           path: build/apk/**/*.apk
+          retention-days: 1

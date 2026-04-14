@@ -51,32 +51,32 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
-        /* 🔥 LOADER REESCRITO Y CENTRADO PARA ASEGURAR VISIBILIDAD */
+        /* 🔥 LOADER DEFINITIVO: CENTRADO Y GIGANTE PARA QUE NO FALLE */
         #loader { 
             display: none; 
             position: fixed; 
-            bottom: 30px; 
+            top: 50%; 
             left: 50%; 
-            transform: translateX(-50%); 
-            z-index: 9999; 
-            background: var(--nexus-bg); 
-            padding: 12px 24px; 
+            transform: translate(-50%, -50%); 
+            z-index: 999999; 
+            background: rgba(11, 14, 20, 0.95); 
+            padding: 20px 40px; 
             border-radius: 8px; 
-            border: 1px solid var(--nexus-cyan); 
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.4); 
+            border: 2px solid var(--nexus-cyan); 
+            box-shadow: 0 0 40px rgba(0, 229, 255, 0.4); 
+            text-align: center;
         }
         .pulse-text { 
             color: var(--nexus-cyan); 
-            font-size: 14px; 
+            font-size: 18px; 
             font-weight: bold; 
             letter-spacing: 2px; 
             font-family: 'Courier New', monospace; 
             animation: pulse 0.5s infinite alternate; 
-            text-align: center;
         }
         @keyframes pulse { 
             0% { opacity: 0.3; } 
-            100% { opacity: 1; text-shadow: 0 0 10px var(--nexus-cyan); } 
+            100% { opacity: 1; text-shadow: 0 0 15px var(--nexus-cyan); } 
         }
 
         #ARButton { border: 1px solid var(--nexus-purple) !important; background: rgba(22, 27, 34, 0.9) !important; color: var(--nexus-purple) !important; border-radius: 6px !important; font-weight: bold !important; font-family: 'Segoe UI', sans-serif !important; letter-spacing: 1px; bottom: 15px !important; }
@@ -120,6 +120,18 @@
         </button>
 
         <div id="toolbar-content">
+            
+            <div style="background: #161B22; border: 1px solid var(--nexus-purple); padding: 8px; border-radius: 4px; margin-bottom: 4px; flex-shrink: 0;">
+                <div style="color: var(--nexus-purple); font-size: 9px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px;">📂 EJEMPLOS (PYTHON)</div>
+                <select id="ejemplos-selector" style="width: 100%; background: #0B0E14; color: #fff; border: 1px solid #30363D; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 10px; cursor: pointer;" onchange="loadExample(this.value)">
+                    <option value="" selected>Cargar modelo...</option>
+                    <option value="engranaje">⚙️ Engranaje Paramétrico</option>
+                    <option value="caja">📦 Caja de Ensamblaje</option>
+                    <option value="soporte">📐 Soporte Estructural</option>
+                    <option value="motor">🏎️ Bloque Motor Básico</option>
+                </select>
+            </div>
+
             <div style="background: #161B22; border: 1px solid var(--nexus-cyan); padding: 8px; border-radius: 4px; margin-bottom: 4px; flex-shrink: 0;">
                 <div style="color: var(--nexus-cyan); font-size: 9px; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px;">⚙️ CALIDAD (LOD)</div>
                 <select id="lod-selector" style="width: 100%; background: #0B0E14; color: #fff; border: 1px solid #30363D; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 10px; cursor: pointer;" onchange="changeLOD()">
@@ -220,6 +232,44 @@
 
     <script type="module">
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
+
+        // Petición inicial (Opcional) para listar ejemplos dinámicos desde Python si tienes la ruta
+        fetch('/api/get_examples').then(r=>r.json()).then(data => {
+            if(data.examples) {
+                const sel = document.getElementById('ejemplos-selector');
+                sel.innerHTML = '<option value="">Cargar modelo...</option>';
+                data.examples.forEach(ex => { sel.innerHTML += `<option value="${ex.id}">${ex.name}</option>`; });
+            }
+        }).catch(e => { /* Usa los quemados en HTML si la ruta no existe */ });
+
+        window.loadExample = (exampleName) => {
+            if(!exampleName) return;
+            log(`<span class='log-warn'>> 📂 Solicitando ejemplo '${exampleName}' a param_generators.py...</span>`);
+            document.getElementById('console').style.display = 'block';
+            
+            // Llama a tu backend de Python para cargar el código
+            fetch('/api/load_example', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ example: exampleName })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success && res.code) {
+                    log("<span class='log-ok'>> ¡Ejemplo inyectado!</span>");
+                    // Opcionalmente puedes forzar la ejecución aquí si el servidor no lo inyecta por el socket
+                    // lastCode = res.code; executeCSGCode(res.code, true);
+                } else {
+                    log("<span class='log-err'>> Error cargando ejemplo. Asegúrate de tener la ruta /api/load_example en tu app.py</span>");
+                }
+            })
+            .catch(e => {
+                log("<span class='log-err'>> Fallo de red solicitando el ejemplo a Python.</span>");
+            });
+            
+            // Resetea el desplegable
+            document.getElementById('ejemplos-selector').selectedIndex = 0;
+        };
 
         window.toggleSidebarMenu = () => {
             const tb = document.getElementById('toolbar');
@@ -1256,35 +1306,39 @@
                 document.getElementById('loader').style.display = 'block';
             }
 
-            let comboValue = parseInt(document.getElementById('lod-selector').value);
-            let currentSlices = window.NEXUS_HD_EXPORT ? 512 : comboValue; 
+            // 🔥 MAGIA: Doble requestAnimationFrame obliga al navegador a pintar el DOM (mostrar el loader)
+            // ANTES de que el hilo se congele ejecutando código de strings y Workers.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        let comboValue = parseInt(document.getElementById('lod-selector').value);
+                        let currentSlices = window.NEXUS_HD_EXPORT ? 512 : comboValue; 
 
-            let optimizedCode = rawCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
-            optimizedCode = optimizedCode.replace(/resolution\s*:\s*\d+/g, 'resolution: ' + currentSlices);
+                        let optimizedCode = rawCode.replace(/slices\s*:\s*\d+/g, 'slices: ' + currentSlices);
+                        optimizedCode = optimizedCode.replace(/resolution\s*:\s*\d+/g, 'resolution: ' + currentSlices);
 
-            let filletHelper = "function roundedBox(w, d, h, r) {\n" +
-                "var res = " + currentSlices + ";\n" +
-                "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
-                "if(r<=0) return CSG.cube({radius:[w/2, d/2, h/2]});\n" +
-                "var b1 = CSG.cube({radius:[w/2-r, d/2, h/2]});\n" +
-                "var b2 = CSG.cube({radius:[w/2, d/2-r, h/2]});\n" +
-                "var c1 = CSG.cylinder({start:[w/2-r, d/2-r, -h/2], end:[w/2-r, d/2-r, h/2], radius:r, slices:res});\n" +
-                "var c2 = CSG.cylinder({start:[-w/2+r, d/2-r, -h/2], end:[-w/2+r, d/2-r, h/2], radius:r, slices:res});\n" +
-                "var c3 = CSG.cylinder({start:[w/2-r, -d/2+r, -h/2], end:[w/2-r, -d/2+r, h/2], radius:r, slices:res});\n" +
-                "var c4 = CSG.cylinder({start:[-w/2+r, -d/2+r, -h/2], end:[-w/2+r, -d/2+r, h/2], radius:r, slices:res});\n" +
-                "return b1.union([b2, c1, c2, c3, c4]);\n" +
-            "}\n\n";
-            
-            let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
-            optimizedCode = optimizedCode.replace(/return main\(\);/g, "").replace(/return main\(\{.*\}\);/g, "");
-            optimizedCode = filletHelper + optimizedCode + executionCall;
-            
-            t0 = performance.now(); 
-            
-            // 🔥 MAGIA: Micro-pausa de 15ms para que el navegador pinte el loader ANTES de bloquearse enviando código
-            setTimeout(() => {
-                csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
-            }, 15);
+                        let filletHelper = "function roundedBox(w, d, h, r) {\n" +
+                            "var res = " + currentSlices + ";\n" +
+                            "w=Math.max(0.1,w); d=Math.max(0.1,d); h=Math.max(0.1,h); r=Math.min(r, w/2, d/2);\n" +
+                            "if(r<=0) return CSG.cube({radius:[w/2, d/2, h/2]});\n" +
+                            "var b1 = CSG.cube({radius:[w/2-r, d/2, h/2]});\n" +
+                            "var b2 = CSG.cube({radius:[w/2, d/2-r, h/2]});\n" +
+                            "var c1 = CSG.cylinder({start:[w/2-r, d/2-r, -h/2], end:[w/2-r, d/2-r, h/2], radius:r, slices:res});\n" +
+                            "var c2 = CSG.cylinder({start:[-w/2+r, d/2-r, -h/2], end:[-w/2+r, d/2-r, h/2], radius:r, slices:res});\n" +
+                            "var c3 = CSG.cylinder({start:[w/2-r, -d/2+r, -h/2], end:[w/2-r, -d/2+r, h/2], radius:r, slices:res});\n" +
+                            "var c4 = CSG.cylinder({start:[-w/2+r, -d/2+r, -h/2], end:[-w/2+r, -d/2+r, h/2], radius:r, slices:res});\n" +
+                            "return b1.union([b2, c1, c2, c3, c4]);\n" +
+                        "}\n\n";
+                        
+                        let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
+                        optimizedCode = optimizedCode.replace(/return main\(\);/g, "").replace(/return main\(\{.*\}\);/g, "");
+                        optimizedCode = filletHelper + optimizedCode + executionCall;
+                        
+                        t0 = performance.now(); 
+                        csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
+                    }, 10);
+                });
+            });
         }
 
         setInterval(() => {

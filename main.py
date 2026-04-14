@@ -839,13 +839,13 @@ def main(page: ft.Page):
         def set_main_pillar(idx):
             main_container.content = [pillar_studio, pillar_vis, pillar_lab][idx]
             
-            # 🔥 Cambiamos el color de fondo según el Pilar activo
+            # 🔥 Colores más evidentes para que se note el cambio:
             if idx == 0:
-                page.bgcolor = "#0B0E14"  # Fondo oscuro original para STUDIO
+                page.bgcolor = "#0B0E14"  # Original oscuro
             elif idx == 1:
-                page.bgcolor = "#05151A"  # Tono azul/cyan muy oscuro para VER 3D
+                page.bgcolor = "#002B36"  # Azul profundo evidente
             elif idx == 2:
-                page.bgcolor = "#0A140C"  # Tono verdoso muy oscuro para LAB
+                page.bgcolor = "#122A16"  # Verde oscuro evidente
                 
             page.update()
 

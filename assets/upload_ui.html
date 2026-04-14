@@ -135,7 +135,11 @@
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
         });
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) handleFile(e.target.files[0]);
+            if (e.target.files && e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+                // 🔥 FIX: Reseteamos el input para que detecte si subes el mismo archivo sin recargar la web
+                e.target.value = ''; 
+            }
         });
 
         function formatBytes(bytes, decimals = 2) {
@@ -206,18 +210,25 @@
             injectBtn.disabled = true;
 
             try {
-                // CORRECCIÓN: Usamos activeFile (Blob) en lugar de pasarlo a ArrayBuffer. 
-                // Esto permite al navegador hacer streaming y evita que la RAM se sature.
+                // 🔥 FIX PARA EL CUELGUE EN ANDROID/FLET:
+                // Leemos el archivo a memoria primero. Esto evita el bug de WebKit/WebView 
+                // que se queda bloqueado esperando hacer streaming de un Blob local.
+                const arrayBuffer = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(activeFile);
+                });
+
                 const response = await fetch('/api/upload_raw', {
                     method: 'POST',
                     headers: { 
                         'File-Name': encodeURIComponent(activeFile.name), 
                         'Content-Type': 'application/octet-stream' 
                     },
-                    body: activeFile 
+                    body: arrayBuffer 
                 });
 
-                // Consumimos el texto de respuesta para liberar la conexión del socket limpiamente
                 const responseText = await response.text();
 
                 if (!response.ok) throw new Error(responseText || 'Error en el servidor');

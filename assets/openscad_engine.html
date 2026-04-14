@@ -27,7 +27,7 @@
         .btn:hover { background: #30363D; }
         .btn:active { transform: scale(0.95); }
         
-        /* 🔥 NUEVO PANEL TELEMETRÍA RETRÁCTIL (ABAJO DERECHA) */
+        /* 🔥 PANEL TELEMETRÍA RETRÁCTIL (ABAJO DERECHA) */
         #hud-panel { bottom: 15px; right: 15px; width: 230px; font-size: 10px; border-top: 3px solid var(--nexus-cyan); transition: all 0.3s; overflow: hidden; pointer-events: none; }
         #hud-panel.collapsed { width: 45px; height: 45px; padding: 0; background: rgba(11, 14, 20, 0.5); border: none; border-radius: 50%; bottom: 10px; right: 10px; pointer-events: auto; }
         
@@ -35,11 +35,9 @@
         #hud-panel.collapsed #btn-toggle-hud { display: flex; }
         #btn-toggle-hud:active { transform: scale(0.9); }
 
-        /* Contenido del HUD que se oculta */
         #hud-content { transition: opacity 0.2s; height: 100%; display: flex; flex-direction: column; pointer-events: auto;}
         #hud-panel.collapsed #hud-content { opacity: 0; pointer-events: none; height: 0;}
 
-        /* Botón de cierre interno para cuando el HUD está desplegado */
         #btn-close-hud { background: none; border: none; color: #8B949E; cursor: pointer; font-weight: bold; font-size: 12px;}
         #btn-close-hud:hover { color: #FFF; }
 
@@ -53,12 +51,8 @@
         #console { top: 15px; right: 15px; width: 250px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 10px; display: none; border-top: 3px solid #FFAB00; z-index: 10; pointer-events: auto;}
         .log-sys { color: var(--nexus-cyan); } .log-ok { color: var(--nexus-green); } .log-err { color: #FF5252; } .log-warn { color: #FFAB00; }
         
+        /* 🔥 LOADER OFICIAL CON ENGRANAJE ANIMADO */
         #loader { display: none; position: absolute; bottom: 15px; left: 15px; z-index: 20; background: var(--nexus-bg); padding: 10px 20px; border-radius: 6px; border-left: 3px solid var(--nexus-cyan); align-items: center; gap: 10px; }
-        
-        /* 🔥 NUEVO SPINNER EN EL FONDO (ABAJO IZQUIERDA) */
-        #spinner-background { display: flex; position: absolute; bottom: 15px; left: 15px; z-index: 5; background: none; padding: 0; box-shadow: none; backdrop-filter: none; border: none;}
-        #spinner-background .gear-spinner { font-size: 24px; color: rgba(0, 229, 255, 0.4); } /* Translúcido para el fondo */
-
         .gear-spinner { font-size: 20px; animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; line-height: 1; color: var(--nexus-cyan); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -172,9 +166,7 @@
     </div>
 
     <div id="hud-panel" class="nexus-panel collapsed">
-        
         <button id="btn-toggle-hud" onclick="toggleHudPanel()">📊</button>
-
         <div id="hud-content">
             <div class="hud-section-title">
                 🔌 Telemetría GPU & Red
@@ -206,15 +198,9 @@
         <div id="loader-txt" style="color: #00E5FF; font-size: 11px; font-weight: bold; letter-spacing: 1px;">WORKER PROCESANDO...</div>
     </div>
 
-    <div id="spinner-background">
-        <div class="gear-spinner">⚙️</div>
-    </div>
-
     <script type="module">
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
-        //🔥 LÓGICA DE LOS MENÚS RETRÁCTILES
-        // Pestaña lateral izquierda (Herramientas)
         window.toggleSidebarMenu = () => {
             const tb = document.getElementById('toolbar');
             const iconText = document.getElementById('toggle-icon-text');
@@ -231,7 +217,6 @@
             }
         };
 
-        // Panel HUD de telemetría (abajo derecha)
         window.toggleHudPanel = () => {
             document.getElementById('hud-panel').classList.toggle('collapsed');
         };
@@ -262,7 +247,6 @@
 
         window.toggleAutoRotate = () => { controls.autoRotate = !controls.autoRotate; };
         
-        // --- FUNCIÓN DEL ESPACIO AÑADIDA AQUÍ ---
         let spaceEnvGroup = null;
         window.toggleSpaceEnv = () => {
             if(spaceEnvGroup) {
@@ -835,7 +819,6 @@
             grid.position.y = -50; 
             scene.add(grid);
             
-            // --- INYECCIÓN DEL ESPACIO (AQUÍ Y SOLO AQUÍ) ---
             spaceEnvGroup = new THREE.Group();
             spaceEnvGroup.visible = false; 
 
@@ -874,7 +857,6 @@
             spaceEnvGroup.add(starField);
 
             scene.add(spaceEnvGroup);
-            // ------------------------------------------------
 
             lightGroup = new THREE.Group();
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -960,7 +942,7 @@
             renderer.xr.addEventListener('sessionstart', () => {
                 scene.background = null; 
                 if(grid) grid.visible = false;
-                if(spaceEnvGroup) spaceEnvGroup.visible = false; // <-- APAGADO SEGURO EN AR
+                if(spaceEnvGroup) spaceEnvGroup.visible = false; 
                 if (currentMesh) {
                     currentMesh.scale.set(0.001, 0.001, 0.001); 
                     currentMesh.position.set(0, -0.2, -0.5); 

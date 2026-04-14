@@ -838,6 +838,15 @@ def main(page: ft.Page):
 
         def set_main_pillar(idx):
             main_container.content = [pillar_studio, pillar_vis, pillar_lab][idx]
+            
+            # 🔥 Cambiamos el color de fondo según el Pilar activo
+            if idx == 0:
+                page.bgcolor = "#0B0E14"  # Fondo oscuro original para STUDIO
+            elif idx == 1:
+                page.bgcolor = "#05151A"  # Tono azul/cyan muy oscuro para VER 3D
+            elif idx == 2:
+                page.bgcolor = "#0A140C"  # Tono verdoso muy oscuro para LAB
+                
             page.update()
 
         # BARRA DE NAVEGACIÓN SUPERIOR (LOS 3 PILARES)

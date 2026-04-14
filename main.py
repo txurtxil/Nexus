@@ -897,7 +897,7 @@ def main(page: ft.Page):
             status,
             ft.Container(expand=True),  # Espaciador para empujar el botón a la derecha
             ft.IconButton(
-                icon=ft.icons.INFO_OUTLINE, 
+                icon=ft.icons.INFO_OUTLINED, # <-- Cambiado INFO_OUTLINE por INFO_OUTLINED
                 icon_color="#FFAB00", 
                 on_click=open_about_dialog, 
                 tooltip="Acerca de Nexus y Apoyo"

@@ -128,7 +128,7 @@
                     <option value="engranaje">⚙️ Engranaje Paramétrico</option>
                     <option value="multicaja">📦 Caja Ensamblaje</option>
                     <option value="muelle">🔩 Muelle de Tensión</option>
-                    <option value="solar">🌌 Sistema Solar Animado</option>
+                    <option value="solar">🌌 Sistema Solar Animado HD</option>
                 </select>
             </div>
 
@@ -231,7 +231,13 @@
     <script type="module">
         import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
-        // 🔥 DICCIONARIO DE EJEMPLOS FRONTEND (Evita errores de red con el backend)
+        // 🔥 GANCHO GLOBAL PARA PYTHON/FLET
+        window.showWorkerLoader = function(msg) {
+            document.getElementById('loader-txt').innerText = msg || "TRABAJANDO WORKER...";
+            document.getElementById('loader').style.display = 'block';
+        };
+
+        // 🔥 DICCIONARIO DE EJEMPLOS FRONTEND (Con el sistema solar épico)
         const EXAMPLES_DB = {
             "engranaje": `function main({KINE_T}) {
                 var dientes = 15; var r = 20; var h = 5;
@@ -244,7 +250,7 @@
                 }
                 var hueco = CSG.cylinder({start:[0,0,-1], end:[0,0,h+1], radius:5, slices:32}); 
                 pieza = pieza.subtract(hueco);
-                return pieza.rotateZ(KINE_T);
+                return UTILS.rotZ(pieza, KINE_T);
             }`,
             "multicaja": `function main({KINE_T}) {
                 var w = 40; var l = 30; var h = 20; var tol = 0.4; var sep = 10;
@@ -267,15 +273,84 @@
                 }
                 return resorte;
             }`,
-            "solar": `function main({KINE_T}) {
-                var s = 0.5; var HD = 32;
-                var sol = CSG.sphere({center:[0,0,0], radius: 25*s, slices: HD});
-                var rPlaneta = 8*s; var dist = 60*s;
-                var angulo = (KINE_T * 2) * (Math.PI / 180);
-                var px = Math.cos(angulo) * dist; var py = Math.sin(angulo) * dist;
-                var planeta = CSG.sphere({center: [px, py, 0], radius: rPlaneta, slices: HD});
-                var anillo = CSG.cylinder({start: [px, py, -1], end: [px, py, 1], radius: rPlaneta + 6*s, slices: HD}).subtract(CSG.cylinder({start: [px, py, -2], end: [px, py, 2], radius: rPlaneta + 2*s, slices: HD}));
-                return sol.union(planeta).union(anillo);
+            "solar": `function main(params) {
+                var t = (typeof KINE_T !== 'undefined') ? KINE_T : (params && params.KINE_T) ? params.KINE_T : 0;
+                var s = 3.5; 
+                var U_HD = 512; var HD = 256; var MD = 128; var SD = 64;
+
+                var sol = CSG.sphere({center: [0,0,0], radius: 25, slices: U_HD}).setColor([1.0, 0.95, 0.8]);
+                var elementosSistema = [sol];
+
+                function crearOrbita(dist) {
+                    return CSG.cylinder({start: [0,0,-0.1], end: [0,0,0.1], radius: dist + 0.15, slices: HD})
+                        .subtract(CSG.cylinder({start: [0,0,-0.2], end: [0,0,0.2], radius: dist - 0.15, slices: HD}))
+                        .setColor([0.2, 0.2, 0.25]);
+                }
+
+                function crearPlaneta(dist, radio, vel, color, numLunas, lunasSize) {
+                    var angulo = (t * vel) * (Math.PI / 180);
+                    var px = Math.cos(angulo) * dist;
+                    var py = Math.sin(angulo) * dist;
+                    var planeta = CSG.sphere({center: [px, py, 0], radius: radio * s, slices: HD}).setColor(color);
+                    elementosSistema.push(crearOrbita(dist));
+                    elementosSistema.push(planeta);
+                    
+                    if (numLunas > 0) {
+                        for(var i=1; i<=numLunas; i++) {
+                            var angLuna = (t * vel * (5 + i*3)) * (Math.PI / 180);
+                            var distLuna = (radio * s) + (i * 4) + 1;
+                            var lx = px + Math.cos(angLuna) * distLuna;
+                            var ly = py + Math.sin(angLuna) * distLuna;
+                            var luna = CSG.sphere({center: [lx, ly, 0], radius: (lunasSize || 0.7) * s, slices: MD}).setColor([0.7, 0.7, 0.75]);
+                            elementosSistema.push(luna);
+                        }
+                    }
+                }
+
+                crearPlaneta(45, 1.2, 4.1, [0.6, 0.5, 0.5], 0); 
+                crearPlaneta(65, 2.8, 1.6, [0.9, 0.7, 0.3], 0); 
+                crearPlaneta(95, 3.2, 1.0, [0.1, 0.6, 1.0], 1); 
+                crearPlaneta(130, 1.7, 0.5, [0.9, 0.3, 0.1], 2); 
+
+                for(var a=1; a<=1500; a++) {
+                    var rand1 = (a * 13.54) % (Math.PI * 2);
+                    var rand2 = (a * 7.21) % 25;
+                    var rand3 = ((a * 3.14) % 8) - 4;
+                    var rDist = 155 + rand2;
+                    var ax = Math.cos(rand1) * rDist;
+                    var ay = Math.sin(rand1) * rDist;
+                    var az = rand3;
+                    var asteroide = CSG.sphere({center: [ax, ay, az], radius: (0.2 + (a%3)*0.1) * s, slices: SD}).setColor([0.4, 0.4, 0.45]);
+                    elementosSistema.push(asteroide);
+                }
+
+                crearPlaneta(220, 8.5, 0.2, [0.8, 0.6, 0.4], 8, 0.5); 
+
+                var angSat = (t * 0.1) * (Math.PI / 180);
+                var satX = Math.cos(angSat) * 310;
+                var satY = Math.sin(angSat) * 310;
+                elementosSistema.push(CSG.sphere({center: [satX, satY, 0], radius: 7.0 * s, slices: HD}).setColor([0.9, 0.8, 0.5]));
+                
+                var tilt = 25 * (Math.PI / 180);
+                var hExt = 0.1; var dzExt = hExt * Math.cos(tilt); var dyExt = hExt * Math.sin(tilt);
+                var hInt = 0.3; var dzInt = hInt * Math.cos(tilt); var dyInt = hInt * Math.sin(tilt);
+
+                var anilloA = CSG.cylinder({start: [satX, satY + dyExt, -dzExt], end: [satX, satY - dyExt, dzExt], radius: 16 * s, slices: U_HD})
+                                .subtract(CSG.cylinder({start: [satX, satY + dyInt, -dzInt], end: [satX, satY - dyInt, dzInt], radius: 13.5 * s, slices: U_HD}))
+                                .setColor([0.85, 0.75, 0.65]);
+                                
+                var anilloB = CSG.cylinder({start: [satX, satY + dyExt, -dzExt], end: [satX, satY - dyExt, dzExt], radius: 13 * s, slices: U_HD})
+                                .subtract(CSG.cylinder({start: [satX, satY + dyInt, -dzInt], end: [satX, satY - dyInt, dzInt], radius: 9 * s, slices: U_HD}))
+                                .setColor([0.7, 0.6, 0.5]);
+                                
+                elementosSistema.push(anilloA);
+                elementosSistema.push(anilloB);
+                elementosSistema.push(crearOrbita(310));
+
+                crearPlaneta(400, 4.0, 0.05, [0.4, 0.8, 0.9], 5, 0.4); 
+                crearPlaneta(480, 3.8, 0.03, [0.1, 0.3, 0.8], 3, 0.5); 
+
+                return UTILS.fastCombine(elementosSistema);
             }`
         };
 
@@ -1157,6 +1232,21 @@
             CSG.prototype.subtract = function(obj) { if(Array.isArray(obj)) { let r = this; for(let i=0; i<obj.length; i++) r = origSubtract.call(r, obj[i]); return r; } return origSubtract.call(this, obj); };
             CSG.prototype.intersect = function(obj) { if(Array.isArray(obj)) { let r = this; for(let i=0; i<obj.length; i++) r = origIntersect.call(r, obj[i]); return r; } return origIntersect.call(this, obj); };
 
+            // 🔥 LIBRERÍA UTILS INYECTADA EN EL WORKER PARA EVITAR CRASHEOS DE PYTHON
+            var UTILS = {
+                fastCombine: function(arr) {
+                    var polys = [];
+                    for(var i=0; i<arr.length; i++) { if(arr[i]) polys = polys.concat(arr[i].toPolygons()); }
+                    return CSG.fromPolygons(polys);
+                },
+                mat: function(obj) { return obj; },
+                rotX: function(obj, a) { return obj.rotateX(a); },
+                rotY: function(obj, a) { return obj.rotateY(a); },
+                rotZ: function(obj, a) { return obj.rotateZ(a); },
+                trans: function(obj, arr) { return obj.translate(arr); },
+                scale: function(obj, arr) { return obj.scale(arr); }
+            };
+
             let IMPORTED_STL = CSG.cube({radius:[0.01, 0.01, 0.01]});
 
             self.onmessage = function(e) {
@@ -1177,8 +1267,9 @@
                 } 
                 else if (e.data.type === 'eval') {
                     try {
-                        let fn = new Function("IMPORTED_STL", e.data.code);
-                        let csgResult = fn(IMPORTED_STL);
+                        // Pasamos KINE_T explícitamente para que la compilación sea estable
+                        let fn = new Function("IMPORTED_STL", "KINE_T", "UTILS", e.data.code);
+                        let csgResult = fn(IMPORTED_STL, e.data.kine_t, UTILS);
                         
                         if (!csgResult || typeof csgResult.toPolygons !== 'function') throw new Error("Objeto no válido o vacío");
                         
@@ -1212,7 +1303,7 @@
         let isImportingSTL = false;
 
         csgWorker.onmessage = function(e) {
-            window.isWorkerBusy = false; 
+            window.isWorkerBusy = false; // 🔥 NUNCA PONER EN TRUE AL TERMINAR, O SE ROMPERÁ EN BUCLE INFINITO
             const data = e.data;
             
             if (data.is_import) {
@@ -1288,9 +1379,10 @@
                 }
 
             } else {
+                // 🔥 BUG CORREGIDO: Nunca debes poner isWorkerBusy = true aquí
                 log("<span class='log-err'>> WORKER ERROR: " + data.err + "</span>"); 
                 document.getElementById('console').style.display = 'block';
-                window.isWorkerBusy = true; 
+                window.isWorkerBusy = false; 
             }
         };
 
@@ -1328,12 +1420,13 @@
                     "return b1.union([b2, c1, c2, c3, c4]);\n" +
                 "}\n\n";
                 
-                let executionCall = `\nreturn main({KINE_T: ${window.KINE_T_VALUE}});`;
+                // Ejecución dinámica inyectando explícitamente KINE_T
+                let executionCall = `\nreturn typeof main === 'function' ? main({KINE_T: KINE_T}) : CSG.cube({radius:[1,1,1]});`;
                 optimizedCode = optimizedCode.replace(/return main\(\);/g, "").replace(/return main\(\{.*\}\);/g, "");
                 optimizedCode = filletHelper + optimizedCode + executionCall;
                 
                 t0 = performance.now(); 
-                csgWorker.postMessage({ type: 'eval', code: optimizedCode }); 
+                csgWorker.postMessage({ type: 'eval', code: optimizedCode, kine_t: window.KINE_T_VALUE }); 
             }, 50);
         }
 

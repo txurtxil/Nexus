@@ -3,11 +3,6 @@ import os, base64, json, threading, http.server, socketserver, socket, time, war
 import importlib  # <-- Motor para recarga en caliente
 import param_generators
 import nexus_ui_tools
-try:
-    import psutil
-    HAS_PSUTIL = True
-except ImportError:
-    HAS_PSUTIL = False
 
 from urllib.parse import urlparse, unquote
 
@@ -55,14 +50,6 @@ def update_pbr_state():
     global PBR_STATE
     PBR_STATE["mode"] = "assembly"
     PBR_STATE["parts"] = [p for p in ASSEMBLY_PARTS_STATE if p["active"]]
-
-def get_sys_info():
-    cores = os.cpu_count() or 1
-    cpu_p, ram_p = 0.0, 0.0
-    if HAS_PSUTIL:
-        cpu_p = psutil.cpu_percent()
-        ram_p = psutil.virtual_memory().percent
-    return cpu_p, ram_p, cores
 
 def get_lan_ip():
     try:
@@ -502,6 +489,13 @@ def main(page: ft.Page):
 
         def run_render():
             global LATEST_CODE_B64, LATEST_NEEDS_STL
+            
+            # 🔥 Inyectamos el Javascript al WebView para que muestre el Loader al instante
+            try:
+                page.evaluate_javascript("window.showWorkerLoader('ENSAMBLANDO PIEZAS...');")
+            except Exception as e:
+                print(f"Aviso de inyección JS: {e}")
+
             js_payload = prepare_js_payload()
             LATEST_CODE_B64 = base64.b64encode(js_payload.encode('utf-8')).decode()
             LATEST_NEEDS_STL = ("IMPORTED_STL" in js_payload) or herramienta_actual.startswith("stl")
@@ -608,23 +602,8 @@ def main(page: ft.Page):
             txt_code
         ], expand=True)
 
-        pb_cpu = ft.ProgressBar(width=100, color="#FFAB00", bgcolor="#30363D", value=0, expand=True); txt_cpu_val = ft.Text("0.0%", size=11, color="#FFAB00", width=40, text_align="right")
-        pb_ram = ft.ProgressBar(width=100, color="#00E5FF", bgcolor="#30363D", value=0, expand=True); txt_ram_val = ft.Text("0.0%", size=11, color="#00E5FF", width=40, text_align="right"); txt_cores = ft.Text("CORES: ?", size=11, color="#8B949E", weight="bold")
-        hw_panel = ft.Container(content=ft.Column([ft.Row([ft.Text("📊 HARDWARE", size=11, color="#E6EDF3", weight="bold"), txt_cores], alignment="spaceBetween"), ft.Row([ft.Text("CPU", size=11, color="#FFAB00", weight="bold", width=30), pb_cpu, txt_cpu_val]), ft.Row([ft.Text("RAM", size=11, color="#00E5FF", weight="bold", width=30), pb_ram, txt_ram_val])], spacing=5), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
-
-        def hw_monitor_loop():
-            while True:
-                time.sleep(1.5)
-                try:
-                    cpu, ram, cores = get_sys_info()
-                    pb_cpu.value = cpu / 100.0; txt_cpu_val.value = f"{cpu:.1f}%"
-                    pb_ram.value = ram / 100.0; txt_ram_val.value = f"{ram:.1f}%"
-                    txt_cores.value = f"CORES: {cores}"; hw_panel.update()
-                except: pass
-        threading.Thread(target=hw_monitor_loop, daemon=True).start()
-
         view_visor = ft.Column([
-            ft.Container(height=5), hw_panel, ft.Container(height=5),
+            ft.Container(height=5),
             ft.Container(content=ft.Column([
                 ft.Text("🥽 VISOR EXTERNO", color="#B388FF", weight="bold", size=11),
                 ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=13, text_align="center", bgcolor="#161B22", color="#00E676"),

@@ -824,9 +824,9 @@
             grid.position.y = -50; 
             scene.add(grid);
             
-            // --- GRUPO DEL ENTORNO ESPACIAL (NUEVO) ---
+            // --- GRUPO DEL ENTORNO ESPACIAL ---
             spaceEnvGroup = new THREE.Group();
-            spaceEnvGroup.visible = false; // Inicia apagado
+            spaceEnvGroup.visible = false; 
 
             const sunLight = new THREE.PointLight(0xffffff, 4.5, 5000); 
             sunLight.position.set(0, 0, 0);
@@ -855,8 +855,10 @@
                 else if(colorType > 0.8) starColors.push(1, 0.7, 0.5); 
                 else starColors.push(1, 1, 1); 
             }
+            // AQUI ESTABA EL FALLO (Faltaba añadir 'new' antes de THREE.Float32BufferAttribute)
             starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
             starGeo.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+            
             const starMat = new THREE.PointsMaterial({size: 1.2, vertexColors: true, transparent: true, opacity: 0.9});
             const starField = new THREE.Points(starGeo, starMat);
             spaceEnvGroup.add(starField);
@@ -948,6 +950,7 @@
             renderer.xr.addEventListener('sessionstart', () => {
                 scene.background = null; 
                 if(grid) grid.visible = false;
+                if(spaceEnvGroup) spaceEnvGroup.visible = false; // <-- APAGA EL ESPACIO EN AR
                 if (currentMesh) {
                     currentMesh.scale.set(0.001, 0.001, 0.001); 
                     currentMesh.position.set(0, -0.2, -0.5); 
@@ -1269,6 +1272,6 @@
             setInterval(checkServer, 1000); 
         };
     </script>
-    
 </body>
 </html>
+

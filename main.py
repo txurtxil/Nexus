@@ -896,9 +896,8 @@ def main(page: ft.Page):
         status_bar = ft.Row([
             status,
             ft.Container(expand=True),  # Espaciador para empujar el botón a la derecha
-            ft.ElevatedButton(  # <-- BALE, USAMOS UN ELEVATEDBUTTON NORMAL CON EMOJI
-                text="ℹ️ INFO", 
-                color="#FFAB00",
+            ft.ElevatedButton(  # <-- AQUÍ ESTÁ EL CAMBIO. TODO EN EL CONTENT
+                content=ft.Text("ℹ️ INFO", color="#FFAB00", weight="bold"), 
                 bgcolor="#21262D",
                 on_click=open_about_dialog, 
                 tooltip="Acerca de Nexus y Apoyo"

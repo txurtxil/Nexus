@@ -427,6 +427,9 @@ def main(page: ft.Page):
         lbl_native_exp = ft.Text(lang.t("lbl_native_exp"), color="#00E5FF", weight="bold")
         lbl_btn_save_code = ft.Text(lang.t("btn_save_code"), color="white")
         
+        lbl_btn_go = ft.Text(lang.t("btn_go"), color="black")
+        lbl_btn_dl = ft.Text(lang.t("btn_dl"), color="white")
+        
         lbl_assembly = ft.Text(lang.t("lbl_assembly"), size=20, color="#FFAB00", weight="bold")
         lbl_btn_add_part = ft.Text(lang.t("btn_add_part"), color="white")
         lbl_btn_view_pbr = ft.Text(lang.t("btn_view_pbr"), color="white")
@@ -1045,5 +1048,3 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     if "TERMUX_VERSION" in os.environ: ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
     else: ft.app(target=main)
- 
- 

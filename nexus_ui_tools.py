@@ -1,4 +1,5 @@
 import flet as ft
+import lang  # <-- Importamos el cerebro de idiomas
 
 class NexusTools:
     def __init__(self, create_slider, update_code_wrapper, set_tab_func, select_tool_func):
@@ -148,23 +149,23 @@ class NexusTools:
         # ---------------------------------------------------------
         # CATEGORÍAS UI (FILAS DE BOTONES)
         # ---------------------------------------------------------
-        self.cat_especial = ft.Row([self.thumbnail("🧠", "Código Libre", "custom", "#000000"), self.thumbnail("🔠", "Placas Texto", "texto", "#880E4F"), self.thumbnail("🥽", "Pedestal VR", "vr_pedestal", "#B388FF")], scroll="auto")
-        self.cat_bocetos = ft.Row([self.thumbnail("✍️", "Sketch 2D", "sketcher", "#2962FF")], scroll="auto")
-        self.cat_stl_forge = ft.Row([self.thumbnail("🧊", "Híbrido Base", "stl", "#00C853"), self.thumbnail("📏", "Flatten", "stl_flatten", "#00C853"), self.thumbnail("✂️", "Split XYZ", "stl_split", "#00C853"), self.thumbnail("📦", "Crop Box", "stl_crop", "#00C853"), self.thumbnail("🕳️", "Taladro 3D", "stl_drill", "#00C853"), self.thumbnail("🔩", "Orejetas", "stl_mount", "#00C853"), self.thumbnail("🖱️", "Mouse Ears", "stl_ears", "#00C853"), self.thumbnail("🧱", "Bloque Ref", "stl_patch", "#00C853"), self.thumbnail("🐝", "Honeycomb", "stl_honeycomb", "#00C853"), self.thumbnail("🛡️", "Prop Guard", "stl_propguard", "#00C853")], scroll="auto")
-        self.cat_accesorios = ft.Row([self.thumbnail("📱", "Stand Móvil", "stand_movil", "#00C853"), self.thumbnail("🔌", "Clip Cables", "clip_cable", "#00C853")], scroll="auto")
-        self.cat_produccion = ft.Row([self.thumbnail("🔪", "Perfil Láser", "laser", "#D50000"), self.thumbnail("🔲", "Matriz Grid", "array_lin", "#0091EA"), self.thumbnail("🎡", "Matriz Polar", "array_pol", "#00B0FF")], scroll="auto")
-        self.cat_lofting = ft.Row([self.thumbnail("🌪️", "Adap. Loft", "loft", "#D50000")], scroll="auto")
-        self.cat_topologia = ft.Row([self.thumbnail("🐝", "Panal Hex", "panal", "#F57F17"), self.thumbnail("🕸️", "Voronoi", "voronoi", "#6A1B9A")], scroll="auto")
-        self.cat_engranajes = ft.Row([self.thumbnail("⚙️", "Evolvente", "evolvente", "#E65100"), self.thumbnail("🛤️", "Cremallera", "cremallera", "#5D4037"), self.thumbnail("🍦", "Cónico", "conico", "#D84315")], scroll="auto")
-        self.cat_multicuerpo = ft.Row([self.thumbnail("📦", "Caja+Tapa", "multicaja", "#33691E")], scroll="auto")
-        self.cat_perfiles = ft.Row([self.thumbnail("⭐", "Estrella 2D", "perfil", "#F57F17"), self.thumbnail("🏺", "Revolución", "revolucion", "#6A1B9A")], scroll="auto")
+        self.cat_especial = ft.Row([self.thumbnail("🧠", lang.t("t_custom"), "custom", "#000000"), self.thumbnail("🔠", lang.t("t_texto"), "texto", "#880E4F"), self.thumbnail("🥽", lang.t("t_vr"), "vr_pedestal", "#B388FF")], scroll="auto")
+        self.cat_bocetos = ft.Row([self.thumbnail("✍️", lang.t("t_sketch"), "sketcher", "#2962FF")], scroll="auto")
+        self.cat_stl_forge = ft.Row([self.thumbnail("🧊", lang.t("t_stl"), "stl", "#00C853"), self.thumbnail("📏", lang.t("t_flat"), "stl_flatten", "#00C853"), self.thumbnail("✂️", lang.t("t_split"), "stl_split", "#00C853"), self.thumbnail("📦", lang.t("t_crop"), "stl_crop", "#00C853"), self.thumbnail("🕳️", lang.t("t_drill"), "stl_drill", "#00C853"), self.thumbnail("🔩", lang.t("t_mount"), "stl_mount", "#00C853"), self.thumbnail("🖱️", lang.t("t_ears"), "stl_ears", "#00C853"), self.thumbnail("🧱", lang.t("t_patch"), "stl_patch", "#00C853"), self.thumbnail("🐝", lang.t("t_honey"), "stl_honeycomb", "#00C853"), self.thumbnail("🛡️", lang.t("t_prop"), "stl_propguard", "#00C853")], scroll="auto")
+        self.cat_accesorios = ft.Row([self.thumbnail("📱", lang.t("t_stand"), "stand_movil", "#00C853"), self.thumbnail("🔌", lang.t("t_clip"), "clip_cable", "#00C853")], scroll="auto")
+        self.cat_produccion = ft.Row([self.thumbnail("🔪", lang.t("t_laser"), "laser", "#D50000"), self.thumbnail("🔲", lang.t("t_grid"), "array_lin", "#0091EA"), self.thumbnail("🎡", lang.t("t_polar"), "array_pol", "#00B0FF")], scroll="auto")
+        self.cat_lofting = ft.Row([self.thumbnail("🌪️", lang.t("t_loft"), "loft", "#D50000")], scroll="auto")
+        self.cat_topologia = ft.Row([self.thumbnail("🐝", lang.t("t_panal"), "panal", "#F57F17"), self.thumbnail("🕸️", lang.t("t_voronoi"), "voronoi", "#6A1B9A")], scroll="auto")
+        self.cat_engranajes = ft.Row([self.thumbnail("⚙️", lang.t("t_evol"), "evolvente", "#E65100"), self.thumbnail("🛤️", lang.t("t_rack"), "cremallera", "#5D4037"), self.thumbnail("🍦", lang.t("t_bevel"), "conico", "#D84315")], scroll="auto")
+        self.cat_multicuerpo = ft.Row([self.thumbnail("📦", lang.t("t_box"), "multicaja", "#33691E")], scroll="auto")
+        self.cat_perfiles = ft.Row([self.thumbnail("⭐", lang.t("t_star"), "perfil", "#F57F17"), self.thumbnail("🏺", lang.t("t_rev"), "revolucion", "#6A1B9A")], scroll="auto")
         
         # Se añaden el dron al array aeroespacial y las DEMOS ESPACIALES
-        self.cat_aero = ft.Row([self.thumbnail("✈️", "Perfil NACA", "naca", "#01579B"), self.thumbnail("🚁", "Hélice", "helice", "#006064"), self.thumbnail("🚰", "Tubo Curvo", "codo", "#004D40"), self.thumbnail("🛸", "Dron Frame", "dron_frame", "#00B0FF"), self.thumbnail("🪂", "Dron Prop", "dron_propeller", "#00B0FF"), self.thumbnail("☀️", "S. Solar", "solar", "#FF8F00"), self.thumbnail("🌍", "Tierra", "tierra", "#0277BD"), self.thumbnail("🛰️", "Estación", "station", "#424242")], scroll="auto")
+        self.cat_aero = ft.Row([self.thumbnail("✈️", lang.t("t_naca"), "naca", "#01579B"), self.thumbnail("🚁", lang.t("t_helice"), "helice", "#006064"), self.thumbnail("🚰", lang.t("t_pipe"), "codo", "#004D40"), self.thumbnail("🛸", lang.t("t_dronf"), "dron_frame", "#00B0FF"), self.thumbnail("🪂", lang.t("t_dronp"), "dron_propeller", "#00B0FF"), self.thumbnail("☀️", lang.t("t_solar"), "solar", "#FF8F00"), self.thumbnail("🌍", lang.t("t_earth"), "tierra", "#0277BD"), self.thumbnail("🛰️", lang.t("t_station"), "station", "#424242")], scroll="auto")
         
-        self.cat_mecanismos = ft.Row([self.thumbnail("🌀", "Muelle", "muelle", "#3E2723"), self.thumbnail("🦾", "Rótula", "rotula", "#BF360C"), self.thumbnail("⚙️", "Planetario", "planetario", "#E65100"), self.thumbnail("🛼", "Polea", "polea", "#0277BD"), self.thumbnail("🛞", "Rodamiento", "rodamiento", "#4E342E")], scroll="auto")
-        self.cat_ingenieria = ft.Row([self.thumbnail("🚧", "Eje ACME", "acme", "#212121"), self.thumbnail("🗃️", "Carcasa", "carcasa", "#1B5E20"), self.thumbnail("🔩", "Tornillos", "fijacion", "#B71C1C"), self.thumbnail("🗜️", "Abrazadera", "abrazadera", "#0D47A1"), self.thumbnail("🔌", "Caja PCB", "pcb", "#004D40"), self.thumbnail("🚪", "Bisagra", "bisagra", "#311B92"), self.thumbnail("🏗️", "V-Slot", "vslot", "#1A237E")], scroll="auto")
-        self.cat_basico = ft.Row([self.thumbnail("📦", "Cubo G", "cubo", "#263238"), self.thumbnail("🛢️", "Cilindro G", "cilindro", "#263238"), self.thumbnail("📐", "Escuadra", "escuadra", "#D84315"), self.thumbnail("⚙️", "Piñón SQ", "engranaje", "#FF6F00")], scroll="auto")
+        self.cat_mecanismos = ft.Row([self.thumbnail("🌀", lang.t("t_spring"), "muelle", "#3E2723"), self.thumbnail("🦾", lang.t("t_joint"), "rotula", "#BF360C"), self.thumbnail("⚙️", lang.t("t_planet"), "planetario", "#E65100"), self.thumbnail("🛼", lang.t("t_pulley"), "polea", "#0277BD"), self.thumbnail("🛞", lang.t("t_bearing"), "rodamiento", "#4E342E")], scroll="auto")
+        self.cat_ingenieria = ft.Row([self.thumbnail("🚧", lang.t("t_acme"), "acme", "#212121"), self.thumbnail("🗃️", lang.t("t_case"), "carcasa", "#1B5E20"), self.thumbnail("🔩", lang.t("t_screw"), "fijacion", "#B71C1C"), self.thumbnail("🗜️", lang.t("t_clamp"), "abrazadera", "#0D47A1"), self.thumbnail("🔌", lang.t("t_pcb"), "pcb", "#004D40"), self.thumbnail("🚪", lang.t("t_hinge"), "bisagra", "#311B92"), self.thumbnail("🏗️", lang.t("t_vslot"), "vslot", "#1A237E")], scroll="auto")
+        self.cat_basico = ft.Row([self.thumbnail("📦", lang.t("t_cube"), "cubo", "#263238"), self.thumbnail("🛢️", lang.t("t_cyl"), "cilindro", "#263238"), self.thumbnail("📐", lang.t("t_angle"), "escuadra", "#D84315"), self.thumbnail("⚙️", lang.t("t_gear"), "engranaje", "#FF6F00")], scroll="auto")
 
     def thumbnail(self, icon, title, tool_id, color):
         return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: self.select_tool(tool_id), ink=True, border=ft.border.all(1, "#30363D"))

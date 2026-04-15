@@ -1,0 +1,11 @@
+Nexus CAD es un motor de diseño 3D paramétrico y ensamblaje diseñado específicamente para dispositivos móviles. Construido sobre la filosofía de tres pilares (Studio, Visor 3D y Laboratorio), permite a los creadores generar piezas, ensamblarlas y previsualizarlas con renderizado físico realista (PBR) sin depender de la nube.
+
+Características principales:
+- Entorno de modelado paramétrico mediante código JS-CSG.
+- Generación de formas complejas (engranajes, mecanismos, lofting) con controles intuitivos.
+- Asistencia de IA (Copilot) para crear modificaciones iterativas o generar piezas.
+- Visor 3D integrado y exportación directa a formato STL y OBJ para impresión 3D.
+- Mesa de ensamblaje para componer múltiples piezas con tolerancia y precisión.
+- Ejecución local, garantizando la privacidad absoluta de tus diseños sin rastreadores.
+
+Todo el poder del CAD paramétrico, ahora en tu bolsillo.

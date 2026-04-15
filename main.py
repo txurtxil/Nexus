@@ -897,7 +897,7 @@ def main(page: ft.Page):
             status,
             ft.Container(expand=True),  # Espaciador para empujar el botón a la derecha
             ft.IconButton(
-                icon=ft.icons.INFO_OUTLINED, # <-- Cambiado INFO_OUTLINE por INFO_OUTLINED
+                icon=ft.icons.INFO,  # <-- Usamos INFO estándar para máxima compatibilidad
                 icon_color="#FFAB00", 
                 on_click=open_about_dialog, 
                 tooltip="Acerca de Nexus y Apoyo"
@@ -917,3 +917,5 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     if "TERMUX_VERSION" in os.environ: ft.app(target=main, port=0, view=ft.AppView.WEB_BROWSER)
     else: ft.app(target=main)
+ 
+ 

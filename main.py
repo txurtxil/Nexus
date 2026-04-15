@@ -3,6 +3,7 @@ import os, base64, json, threading, http.server, socketserver, socket, time, war
 import importlib  # <-- Motor para recarga en caliente
 import param_generators
 import nexus_ui_tools
+import lang       # <-- ¡NUESTRO CEREBRO BILINGÜE!
 
 from urllib.parse import urlparse, unquote
 
@@ -362,12 +363,12 @@ threading.Thread(target=lambda: ThreadedHTTPServer(("0.0.0.0", LOCAL_PORT), Nexu
 # =========================================================
 def main(page: ft.Page):
     try:
-        page.title = "NEXUS CAD v1.0 Golden Master"
+        page.title = lang.t("app_title")
         page.theme_mode = "dark"
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text("NEXUS v1.0 | Entorno Integrado 3 Pilares", color="#00E676", weight="bold")
+        status = ft.Text(lang.t("app_title"), color="#00E676", weight="bold")
 
         def custom_icon_btn(text, action, tooltip_txt): 
             return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
@@ -793,6 +794,25 @@ def main(page: ft.Page):
         # CONSTRUCCIÓN DE LOS 3 PILARES PRINCIPALES
         # ==========================================
 
+        # --- ETIQUETAS DINÁMICAS DE IDIOMA ---
+        lbl_nav_studio = ft.Text(lang.t("nav_studio"), weight="bold")
+        lbl_nav_view = ft.Text(lang.t("nav_view"), weight="bold", color="black")
+        lbl_nav_lab = ft.Text(lang.t("nav_lab"), weight="bold")
+
+        lbl_sub_ia = ft.Text(lang.t("btn_ia"), weight="bold")
+        lbl_sub_sliders = ft.Text(lang.t("btn_sliders"), weight="bold", color="black")
+        lbl_sub_code = ft.Text(lang.t("btn_code"), weight="bold")
+
+        lbl_sub_3d = ft.Text(lang.t("btn_3d"), weight="bold", color="black")
+        lbl_sub_pbr = ft.Text(lang.t("btn_pbr"), weight="bold")
+
+        lbl_sub_db = ft.Text(lang.t("btn_db"), weight="bold")
+        lbl_sub_assemble = ft.Text(lang.t("btn_assemble"), weight="bold")
+
+        lbl_info = ft.Text(lang.t("btn_info"), color="#FFAB00", weight="bold")
+        lbl_lang = ft.Text(lang.t("btn_lang"), color="white", weight="bold")
+
+
         # --- PILAR 1: STUDIO ---
         studio_content = ft.Container(content=view_ia, expand=True)
         def set_studio_tab(idx):
@@ -800,9 +820,9 @@ def main(page: ft.Page):
             if studio_content.page: page.update()
             
         nav_studio = ft.Row([
-            ft.ElevatedButton("🤖 IA", on_click=lambda _: set_studio_tab(0), bgcolor="#8E24AA", color="white", expand=True),
-            ft.ElevatedButton("🎛️ SLIDERS", on_click=lambda _: set_studio_tab(1), bgcolor="#FFAB00", color="black", expand=True),
-            ft.ElevatedButton("💻 CODE", on_click=lambda _: set_studio_tab(2), bgcolor="#21262D", color="white", expand=True),
+            ft.ElevatedButton(content=lbl_sub_ia, on_click=lambda _: set_studio_tab(0), bgcolor="#8E24AA", color="white", expand=True),
+            ft.ElevatedButton(content=lbl_sub_sliders, on_click=lambda _: set_studio_tab(1), bgcolor="#FFAB00", expand=True),
+            ft.ElevatedButton(content=lbl_sub_code, on_click=lambda _: set_studio_tab(2), bgcolor="#21262D", color="white", expand=True),
         ])
         pillar_studio = ft.Column([nav_studio, ft.Divider(height=2, color="#30363D"), studio_content], expand=True)
 
@@ -813,8 +833,8 @@ def main(page: ft.Page):
             if vis_content.page: page.update()
 
         nav_vis = ft.Row([
-            ft.ElevatedButton("📐 3D RÁPIDO", on_click=lambda _: set_vis_tab(0), bgcolor="#00E5FF", color="black", expand=True),
-            ft.ElevatedButton("🎨 PBR STUDIO", on_click=lambda _: set_vis_tab(1), bgcolor="#C51162", color="white", expand=True),
+            ft.ElevatedButton(content=lbl_sub_3d, on_click=lambda _: set_vis_tab(0), bgcolor="#00E5FF", expand=True),
+            ft.ElevatedButton(content=lbl_sub_pbr, on_click=lambda _: set_vis_tab(1), bgcolor="#C51162", color="white", expand=True),
         ])
         pillar_vis = ft.Column([nav_vis, ft.Divider(height=2, color="#30363D"), vis_content], expand=True)
 
@@ -825,8 +845,8 @@ def main(page: ft.Page):
             if lab_content.page: page.update()
 
         nav_lab = ft.Row([
-            ft.ElevatedButton("📂 GESTOR DB", on_click=lambda _: set_lab_tab(0), bgcolor="#21262D", color="white", expand=True),
-            ft.ElevatedButton("🧩 ENSAMBLAR", on_click=lambda _: set_lab_tab(1), bgcolor="#7CB342", color="white", expand=True),
+            ft.ElevatedButton(content=lbl_sub_db, on_click=lambda _: set_lab_tab(0), bgcolor="#21262D", color="white", expand=True),
+            ft.ElevatedButton(content=lbl_sub_assemble, on_click=lambda _: set_lab_tab(1), bgcolor="#7CB342", color="white", expand=True),
         ])
         pillar_lab = ft.Column([nav_lab, ft.Divider(height=2, color="#30363D"), lab_content], expand=True)
 
@@ -859,7 +879,7 @@ def main(page: ft.Page):
                         ], alignment="center"),
                         bgcolor="#FFD600",
                         width=float('inf'),
-                        url="https://ko-fi.com/txurtxil",  # <-- ¡Recuerda cambiar esto por tu enlace de Ko-fi!
+                        url="https://ko-fi.com/txurtxil",
                         style=ft.ButtonStyle(padding=15)
                     )
                 ], tight=True, width=320),
@@ -887,20 +907,51 @@ def main(page: ft.Page):
 
         # BARRA DE NAVEGACIÓN SUPERIOR (LOS 3 PILARES)
         main_nav_bar = ft.Row([
-            ft.ElevatedButton("🧠 STUDIO", on_click=lambda _: set_main_pillar(0), bgcolor="#8E24AA", color="white", expand=True, height=45),
-            ft.ElevatedButton("👁️ VER 3D", on_click=lambda _: set_main_pillar(1), bgcolor="#00E5FF", color="black", expand=True, height=45),
-            ft.ElevatedButton("🏭 LAB", on_click=lambda _: set_main_pillar(2), bgcolor="#1B5E20", color="white", expand=True, height=45),
+            ft.ElevatedButton(content=lbl_nav_studio, on_click=lambda _: set_main_pillar(0), bgcolor="#8E24AA", color="white", expand=True, height=45),
+            ft.ElevatedButton(content=lbl_nav_view, on_click=lambda _: set_main_pillar(1), bgcolor="#00E5FF", expand=True, height=45),
+            ft.ElevatedButton(content=lbl_nav_lab, on_click=lambda _: set_main_pillar(2), bgcolor="#1B5E20", color="white", expand=True, height=45),
         ], spacing=5)
 
-        # BARRA DE ESTADO INFERIOR CON EL BOTÓN "ACERCA DE"
+        # FUNCIÓN MAESTRA DE CAMBIO DE IDIOMA
+        def toggle_lang(e):
+            lang.switch_lang()
+            page.title = lang.t("app_title")
+            status.value = lang.t("app_title")
+            
+            lbl_nav_studio.value = lang.t("nav_studio")
+            lbl_nav_view.value = lang.t("nav_view")
+            lbl_nav_lab.value = lang.t("nav_lab")
+            
+            lbl_sub_ia.value = lang.t("btn_ia")
+            lbl_sub_sliders.value = lang.t("btn_sliders")
+            lbl_sub_code.value = lang.t("btn_code")
+            
+            lbl_sub_3d.value = lang.t("btn_3d")
+            lbl_sub_pbr.value = lang.t("btn_pbr")
+            
+            lbl_sub_db.value = lang.t("btn_db")
+            lbl_sub_assemble.value = lang.t("btn_assemble")
+            
+            lbl_info.value = lang.t("btn_info")
+            lbl_lang.value = lang.t("btn_lang")
+            
+            page.update()
+
+        # BARRA DE ESTADO INFERIOR CON EL BOTÓN "ACERCA DE" Y "CERRAR SESIÓN"
         status_bar = ft.Row([
             status,
             ft.Container(expand=True),  # Espaciador para empujar el botón a la derecha
-            ft.ElevatedButton(  # <-- AQUÍ ESTÁ EL CAMBIO. TODO EN EL CONTENT
-                content=ft.Text("ℹ️ INFO", color="#FFAB00", weight="bold"), 
+            ft.ElevatedButton(
+                content=lbl_lang, 
+                bgcolor="#0D47A1",
+                on_click=toggle_lang, 
+                tooltip="Change Language"
+            ),
+            ft.ElevatedButton(  
+                content=lbl_info, 
                 bgcolor="#21262D",
                 on_click=open_about_dialog, 
-                tooltip="Acerca de Nexus y Apoyo"
+                tooltip="About / Acerca de"
             )
         ])
 

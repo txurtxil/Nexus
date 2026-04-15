@@ -16,6 +16,33 @@ translations = {
         "btn_info": "ℹ️ INFO",
         "btn_lang": "🇬🇧 EN",
         
+        # UI Text
+        "ia_title": "AI AGENT ACTIVE",
+        "ia_desc": "Copilot Assistant & Agentic Builder.",
+        "ia_btn": "🚀 OPEN AI ENVIRONMENT",
+        "ia_hint": "💡 Analysis runs in background. Use tabs above to view code.",
+        "cat_opts": "💡 Options:",
+        "cat_sketch": "📐 Sketches:",
+        "cat_forge": "⚔️ STL FORGE:",
+        "cat_prod": "🏭 Production:",
+        "cat_loft": "🌪️ Shapes:",
+        "cat_mech": "⚙️ Mechanics:",
+        "cat_basic": "📦 Basics:",
+        "param_title": "🌐 PARAMETERS",
+        "param_asm": "Assembly Code Mode",
+        "param_tex": "🎨 TEXTURE:",
+        "param_kine": "🎬 KINEMATICS",
+        "sl_w": "Width (GW)",
+        "sl_l": "Length (GL)",
+        "sl_h": "Height (GH)",
+        "sl_t": "Thickness (GT)",
+        "sl_tol": "Global Tol. (G_TOL)",
+        "sl_anim": "Animation (º)",
+        "btn_render": "▶ 3D RENDER",
+        "btn_save": "💾 SAVE",
+        "btn_reset": "🗑️ RESET",
+        "lbl_code": "Source Code (JS-CSG)",
+
         # Tools
         "t_custom": "Free Code", "t_texto": "Text Plates", "t_vr": "VR Pedestal", 
         "t_sketch": "2D Sketch", "t_stl": "Base Hybrid", "t_flat": "Flatten", 
@@ -50,6 +77,33 @@ translations = {
         "btn_info": "ℹ️ INFO",
         "btn_lang": "🇪🇸 ES",
         
+        # UI Text
+        "ia_title": "AGENTE IA ACTIVO",
+        "ia_desc": "Asistente Copilot y Generador Agentic.",
+        "ia_btn": "🚀 ABRIR ENTORNO IA",
+        "ia_hint": "💡 El análisis ocurre en segundo plano. Usa las pestañas de arriba para ver el código.",
+        "cat_opts": "💡 Opciones:",
+        "cat_sketch": "📐 Bocetos:",
+        "cat_forge": "⚔️ STL FORGE:",
+        "cat_prod": "🏭 Producción:",
+        "cat_loft": "🌪️ Formas:",
+        "cat_mech": "⚙️ Mecánica:",
+        "cat_basic": "📦 Básico:",
+        "param_title": "🌐 PARÁMETROS",
+        "param_asm": "Manejo Código Ensamblador",
+        "param_tex": "🎨 TEXTURA:",
+        "param_kine": "🎬 CINEMÁTICA",
+        "sl_w": "Ancho (GW)",
+        "sl_l": "Largo (GL)",
+        "sl_h": "Alto (GH)",
+        "sl_t": "Grosor (GT)",
+        "sl_tol": "Tol. Global (G_TOL)",
+        "sl_anim": "Animación (º)",
+        "btn_render": "▶ RENDER 3D",
+        "btn_save": "💾 GUARDAR",
+        "btn_reset": "🗑️ RESET",
+        "lbl_code": "Código Fuente (JS-CSG)",
+
         # Tools
         "t_custom": "Código Libre", "t_texto": "Placas Texto", "t_vr": "Pedestal VR", 
         "t_sketch": "Sketch 2D", "t_stl": "Híbrido Base", "t_flat": "Flatten", 
@@ -71,7 +125,7 @@ translations = {
     }
 }
 
-current_lang = "en"
+current_lang = "en"  # Si pones "en" aquí, arranca directo en inglés por defecto.
 
 def t(key):
     global current_lang

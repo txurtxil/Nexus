@@ -368,28 +368,45 @@ def main(page: ft.Page):
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        # EL TEXTO AHORA ES FLEXIBLE: Si la pantalla es estrecha, se cortará con "..." para que quepan los botones
-        status = ft.Text(
-            value=lang.t("app_title"), 
-            color="#00E676", 
-            weight="bold", 
-            expand=True,         # Ocupa el espacio disponible a la izquierda
-            no_wrap=True,        # No salta de línea
-            overflow=ft.TextOverflow.ELLIPSIS # Pone puntos suspensivos si no cabe
-        )
+        status = ft.Text(value=lang.t("app_title"), color="#00E676", weight="bold", expand=True, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS)
 
         def custom_icon_btn(text, action, tooltip_txt): 
             return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
 
         T_INICIAL = "function main() {\n  var pieza = CSG.cube({center:[0,0,GH/2], radius:[GW/2, GL/2, GH/2]});\n  return pieza;\n}"
-        txt_code = ft.TextField(label="Código Fuente (JS-CSG)", multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
+        txt_code = ft.TextField(label=lang.t("lbl_code"), multiline=True, expand=True, value=T_INICIAL, bgcolor="#161B22", color="#58A6FF", border_color="#30363D", text_size=12)
 
         ensamble_stack = []; herramienta_actual = "custom"; modo_ensamble = False
 
         # ==========================================
+        # VARIABLES DE TEXTO PARA I18N EN TIEMPO REAL
+        # ==========================================
+        lbl_ia_title = ft.Text(lang.t("ia_title"), size=22, color="#B388FF", weight="bold", text_align="center")
+        lbl_ia_desc = ft.Text(lang.t("ia_desc"), color="#E6EDF3", text_align="center")
+        lbl_ia_btn = ft.Text(lang.t("ia_btn"), color="white")
+        btn_ia_open = ft.ElevatedButton(content=lbl_ia_btn, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", height=70, width=float('inf'))
+        lbl_ia_hint = ft.Text(lang.t("ia_hint"), color="#8B949E", size=12, text_align="center")
+
+        lbl_cat_opts = ft.Text(lang.t("cat_opts"), size=12, color="#8B949E")
+        lbl_cat_sketch = ft.Text(lang.t("cat_sketch"), size=12, color="#2962FF", weight="bold")
+        lbl_cat_forge = ft.Text(lang.t("cat_forge"), size=12, color="#00E676", weight="bold")
+        lbl_cat_prod = ft.Text(lang.t("cat_prod"), size=12, color="#00B0FF")
+        lbl_cat_loft = ft.Text(lang.t("cat_loft"), size=12, color="#D50000")
+        lbl_cat_mech = ft.Text(lang.t("cat_mech"), size=12, color="#FF9100")
+        lbl_cat_basic = ft.Text(lang.t("cat_basic"), size=12, color="#8B949E")
+
+        lbl_param_title = ft.Text(lang.t("param_title"), color="#00E5FF", weight="bold", size=11)
+        sw_ensamble = ft.Switch(label=lang.t("param_asm"), value=False, active_color="#FFAB00")
+        lbl_param_tex = ft.Text(lang.t("param_tex"), color="#E6EDF3", size=11, width=130)
+        lbl_param_kine = ft.Text(lang.t("param_kine"), color="#B388FF", weight="bold", size=11)
+
+        lbl_btn_render = ft.Text(lang.t("btn_render"), color="black")
+        lbl_btn_save = ft.Text(lang.t("btn_save"), color="white")
+        lbl_btn_reset = ft.Text(lang.t("btn_reset"), color="white")
+
+        # ==========================================
         # CONTROL DE NAVEGACIÓN Y PILARES
         # ==========================================
-        # 0=IA, 1=CODE, 2=PARAM, 3=3D, 4=ENS, 5=PBR, 6=FILES
         def navigate_to(target_idx):
             global PBR_STATE
             if target_idx in [0, 1, 2, 3]: PBR_STATE["mode"] = "single"
@@ -405,7 +422,6 @@ def main(page: ft.Page):
             elif target_idx == 6: set_main_pillar(2); set_lab_tab(0)       # FILES
 
         def set_tab_wrapper(idx): 
-            # Traductor de Nexus UI Tools hacia los nuevos pilares
             traduccion_indices = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 0}
             navigate_to(traduccion_indices.get(idx, idx))
 
@@ -467,9 +483,19 @@ def main(page: ft.Page):
                 txt_val.value = f"{int(sl.value) if is_int else sl.value:.1f}"; txt_val.update(); 
                 if not modo_ensamble: update_code_wrapper()
             sl.on_change = internal_change
-            return sl, ft.Row([ft.Text(label, width=110, size=12, color="#E6EDF3"), sl, txt_val])
+            
+            # Anclamos la etiqueta para poder modificarla después al cambiar de idioma
+            lbl_control = ft.Text(label, width=110, size=12, color="#E6EDF3")
+            row = ft.Row([lbl_control, sl, txt_val])
+            row.lbl = lbl_control # <-- Guardamos la referencia
+            return sl, row
 
-        sl_g_w, r_g_w = create_slider("Ancho (GW)", 1, 300, 50, False); sl_g_l, r_g_l = create_slider("Largo (GL)", 1, 300, 50, False); sl_g_h, r_g_h = create_slider("Alto (GH)", 1, 300, 20, False); sl_g_t, r_g_t = create_slider("Grosor (GT)", 0.5, 20, 2, False); sl_g_tol, r_g_tol = create_slider("Tol. Global (G_TOL)", 0.0, 2.0, 0.2, False); sl_kine, r_kine = create_slider("Animación (º)", 0, 360, 0, True)
+        sl_g_w, r_g_w = create_slider(lang.t("sl_w"), 1, 300, 50, False)
+        sl_g_l, r_g_l = create_slider(lang.t("sl_l"), 1, 300, 50, False)
+        sl_g_h, r_g_h = create_slider(lang.t("sl_h"), 1, 300, 20, False)
+        sl_g_t, r_g_t = create_slider(lang.t("sl_t"), 0.5, 20, 2, False)
+        sl_g_tol, r_g_tol = create_slider(lang.t("sl_tol"), 0.0, 2.0, 0.2, False)
+        sl_kine, r_kine = create_slider(lang.t("sl_anim"), 0, 360, 0, True)
 
         dd_mat = ft.Dropdown(options=[ft.dropdown.Option("PLA Gris Mate"), ft.dropdown.Option("PETG Transparente"), ft.dropdown.Option("Fibra de Carbono"), ft.dropdown.Option("Aluminio Mecanizado"), ft.dropdown.Option("Madera Bambú"), ft.dropdown.Option("Oro Puro"), ft.dropdown.Option("Neón Cyan")], value="PLA Gris Mate", bgcolor="#161B22", color="#00E5FF", expand=True, text_size=12); dd_mat.on_change = update_code_wrapper
 
@@ -499,7 +525,6 @@ def main(page: ft.Page):
         def run_render():
             global LATEST_CODE_B64, LATEST_NEEDS_STL
             
-            # 🔥 Inyectamos el Javascript al WebView para que muestre el Loader al instante
             try:
                 page.evaluate_javascript("window.showWorkerLoader('ENSAMBLANDO PIEZAS...');")
             except Exception as e:
@@ -510,8 +535,6 @@ def main(page: ft.Page):
             LATEST_NEEDS_STL = ("IMPORTED_STL" in js_payload) or herramienta_actual.startswith("stl")
             navigate_to(3) # Va al visor 3D
 
-        sw_ensamble = ft.Switch(label="Manejo Código Ensamblador", value=False, active_color="#FFAB00")
-        
         def parse_current_tool_to_stack_var():
             code_lines = txt_code.value.split('\n')
             var_name = f"obj_{len(ensamble_stack)}"; body = []
@@ -558,10 +581,10 @@ def main(page: ft.Page):
         sw_ensamble.on_change = toggle_ensamble
 
         panel_globales = ft.Container(content=ft.Column([
-            ft.Row([ft.Text("🌐 PARÁMETROS", color="#00E5FF", weight="bold", size=11), sw_ensamble], alignment="spaceBetween"), 
+            ft.Row([lbl_param_title, sw_ensamble], alignment="spaceBetween"), 
             r_g_w, r_g_l, r_g_h, r_g_t, r_g_tol, ft.Divider(color="#333333"), 
-            ft.Row([ft.Text("🎨 TEXTURA:", color="#E6EDF3", size=11, width=130), dd_mat]), ft.Divider(color="#333333"), 
-            ft.Text("🎬 CINEMÁTICA", color="#B388FF", weight="bold", size=11), r_kine,
+            ft.Row([lbl_param_tex, dd_mat]), ft.Divider(color="#333333"), 
+            lbl_param_kine, r_kine,
             panel_ensamble_ops
         ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
 
@@ -589,25 +612,36 @@ def main(page: ft.Page):
         # VISTAS SECUNDARIAS
         # ==========================================
         view_ia = ft.Column([
-            ft.Container(height=20), ft.Text("🤖 AGENTE IA ACTIVO", size=22, color="#B388FF", weight="bold", text_align="center"), ft.Text("Asistente Copilot y Generador Agentic.", color="#E6EDF3", text_align="center"), ft.Container(height=20), ft.ElevatedButton("🚀 ABRIR ENTORNO IA", url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", color="white", height=70, width=float('inf')), ft.Container(height=10), ft.Text("💡 El análisis ocurre en segundo plano. Usa las pestañas de arriba para ver el código o los parámetros.", color="#8B949E", size=12, text_align="center")
+            ft.Container(height=20), 
+            lbl_ia_title, 
+            lbl_ia_desc, 
+            ft.Container(height=20), 
+            btn_ia_open, 
+            ft.Container(height=10), 
+            lbl_ia_hint
         ], expand=True, horizontal_alignment="center")
+
+        btn_render_3d = ft.ElevatedButton(content=lbl_btn_render, on_click=lambda _: run_render(), bgcolor="#00E676", height=50, width=float('inf'))
 
         view_constructor = ft.Column([
             panel_globales, 
-            ft.Text("💡 Opciones:", size=12, color="#8B949E"), tools_lib.cat_especial,
-            ft.Text("📐 Bocetos:", size=12, color="#2962FF", weight="bold"), tools_lib.cat_bocetos,
-            ft.Text("⚔️ STL FORGE:", size=12, color="#00E676", weight="bold"), tools_lib.cat_stl_forge,
-            ft.Text("🏭 Producción:", size=12, color="#00B0FF"), tools_lib.cat_produccion,
-            ft.Text("🌪️ Formas:", size=12, color="#D50000"), tools_lib.cat_lofting,
-            ft.Text("⚙️ Mecánica:", size=12, color="#FF9100"), tools_lib.cat_engranajes, tools_lib.cat_mecanismos,
-            ft.Text("📦 Básico:", size=12, color="#8B949E"), tools_lib.cat_basico,
+            lbl_cat_opts, tools_lib.cat_especial,
+            lbl_cat_sketch, tools_lib.cat_bocetos,
+            lbl_cat_forge, tools_lib.cat_stl_forge,
+            lbl_cat_prod, tools_lib.cat_produccion,
+            lbl_cat_loft, tools_lib.cat_lofting,
+            lbl_cat_mech, tools_lib.cat_engranajes, tools_lib.cat_mecanismos,
+            lbl_cat_basic, tools_lib.cat_basico,
             ft.Divider(color="#30363D"), tools_lib.panel_stl_transform,
             *tools_lib.tool_panels.values(),
-            ft.ElevatedButton("▶ RENDER 3D", on_click=lambda _: run_render(), bgcolor="#00E676", color="black", height=50, width=float('inf'))
+            btn_render_3d
         ], expand=True, scroll="auto")
 
         view_editor = ft.Column([
-            ft.Row([ft.ElevatedButton("💾 GUARDAR", on_click=lambda _: save_project_to_nexus(), bgcolor="#0D47A1", color="white"), ft.ElevatedButton("🗑️ RESET", on_click=lambda _: clear_editor(), bgcolor="#B71C1C", color="white")], scroll="auto"),
+            ft.Row([
+                ft.ElevatedButton(content=lbl_btn_save, on_click=lambda _: save_project_to_nexus(), bgcolor="#0D47A1"), 
+                ft.ElevatedButton(content=lbl_btn_reset, on_click=lambda _: clear_editor(), bgcolor="#B71C1C")
+            ], scroll="auto"),
             txt_code
         ], expand=True)
 
@@ -802,7 +836,6 @@ def main(page: ft.Page):
         # CONSTRUCCIÓN DE LOS 3 PILARES PRINCIPALES
         # ==========================================
 
-        # --- ETIQUETAS DINÁMICAS DE IDIOMA ---
         lbl_nav_studio = ft.Text(lang.t("nav_studio"), weight="bold")
         lbl_nav_view = ft.Text(lang.t("nav_view"), weight="bold", color="black")
         lbl_nav_lab = ft.Text(lang.t("nav_lab"), weight="bold")
@@ -819,7 +852,6 @@ def main(page: ft.Page):
 
         lbl_info = ft.Text(lang.t("btn_info"), color="#FFAB00", weight="bold")
         lbl_lang = ft.Text(lang.t("btn_lang"), color="white", weight="bold")
-
 
         # --- PILAR 1: STUDIO ---
         studio_content = ft.Container(content=view_ia, expand=True)
@@ -868,10 +900,7 @@ def main(page: ft.Page):
                 
             dialog_about = ft.AlertDialog(
                 bgcolor="#161B22",
-                title=ft.Row([
-                    ft.Text("🌟", size=20),
-                    ft.Text("Acerca de NEXUS", color="#FFAB00", weight="bold")
-                ]),
+                title=ft.Row([ft.Text("🌟", size=20), ft.Text("Acerca de NEXUS", color="#FFAB00", weight="bold")]),
                 content=ft.Column([
                     ft.Text("NEXUS CAD TITAN PRO", weight="bold", size=18, color="#E6EDF3"),
                     ft.Text("Versión 1.0 (Golden Master)", size=12, color="#00E676"),
@@ -881,29 +910,17 @@ def main(page: ft.Page):
                     ft.Text("Si Nexus te ha sido útil en tus proyectos 3D, considera apoyar su desarrollo con la voluntad. ¡Cada euro ayuda a mantener el motor encendido!", size=13, color="#E6EDF3", italic=True),
                     ft.Container(height=15),
                     ft.ElevatedButton(
-                        content=ft.Row([
-                            ft.Text("☕", size=18), 
-                            ft.Text("Apoyar el proyecto (Ko-fi)", color="black", weight="bold")
-                        ], alignment="center"),
-                        bgcolor="#FFD600",
-                        width=float('inf'),
-                        url="https://ko-fi.com/txurtxil",
-                        style=ft.ButtonStyle(padding=15)
+                        content=ft.Row([ft.Text("☕", size=18), ft.Text("Apoyar el proyecto (Ko-fi)", color="black", weight="bold")], alignment="center"),
+                        bgcolor="#FFD600", width=float('inf'), url="https://ko-fi.com/txurtxil", style=ft.ButtonStyle(padding=15)
                     )
                 ], tight=True, width=320),
-                actions=[
-                    ft.TextButton("Cerrar", on_click=close_about, style=ft.ButtonStyle(color="#00E5FF"))
-                ],
+                actions=[ft.TextButton("Cerrar", on_click=close_about, style=ft.ButtonStyle(color="#00E5FF"))],
                 actions_alignment=ft.MainAxisAlignment.END,
             )
-            
             page.overlay.append(dialog_about)
             dialog_about.open = True
             page.update()
 
-        # ==========================================
-        # CONTENEDOR MAESTRO Y BARRAS
-        # ==========================================
         main_container = ft.Container(content=pillar_studio, expand=True)
 
         def set_main_pillar(idx):
@@ -913,19 +930,21 @@ def main(page: ft.Page):
             elif idx == 2: page.bgcolor = "#122A16" 
             page.update()
 
-        # BARRA DE NAVEGACIÓN SUPERIOR (LOS 3 PILARES)
         main_nav_bar = ft.Row([
             ft.ElevatedButton(content=lbl_nav_studio, on_click=lambda _: set_main_pillar(0), bgcolor="#8E24AA", color="white", expand=True, height=45),
             ft.ElevatedButton(content=lbl_nav_view, on_click=lambda _: set_main_pillar(1), bgcolor="#00E5FF", expand=True, height=45),
             ft.ElevatedButton(content=lbl_nav_lab, on_click=lambda _: set_main_pillar(2), bgcolor="#1B5E20", color="white", expand=True, height=45),
         ], spacing=5)
 
-        # FUNCIÓN MAESTRA DE CAMBIO DE IDIOMA
+        # ==========================================
+        # FUNCIÓN MAESTRA DE CAMBIO DE IDIOMA EN TIEMPO REAL
+        # ==========================================
         def toggle_lang(e):
             lang.switch_lang()
             page.title = lang.t("app_title")
             status.value = lang.t("app_title")
             
+            # Navegación principal
             lbl_nav_studio.value = lang.t("nav_studio")
             lbl_nav_view.value = lang.t("nav_view")
             lbl_nav_lab.value = lang.t("nav_lab")
@@ -943,29 +962,50 @@ def main(page: ft.Page):
             lbl_info.value = lang.t("btn_info")
             lbl_lang.value = lang.t("btn_lang")
             
+            # Textos de la pestaña IA
+            lbl_ia_title.value = lang.t("ia_title")
+            lbl_ia_desc.value = lang.t("ia_desc")
+            lbl_ia_btn.value = lang.t("ia_btn")
+            lbl_ia_hint.value = lang.t("ia_hint")
+
+            # Categorías de Herramientas
+            lbl_cat_opts.value = lang.t("cat_opts")
+            lbl_cat_sketch.value = lang.t("cat_sketch")
+            lbl_cat_forge.value = lang.t("cat_forge")
+            lbl_cat_prod.value = lang.t("cat_prod")
+            lbl_cat_loft.value = lang.t("cat_loft")
+            lbl_cat_mech.value = lang.t("cat_mech")
+            lbl_cat_basic.value = lang.t("cat_basic")
+
+            # Panel Global de Sliders
+            lbl_param_title.value = lang.t("param_title")
+            sw_ensamble.label = lang.t("param_asm")
+            lbl_param_tex.value = lang.t("param_tex")
+            lbl_param_kine.value = lang.t("param_kine")
+
+            r_g_w.lbl.value = lang.t("sl_w")
+            r_g_l.lbl.value = lang.t("sl_l")
+            r_g_h.lbl.value = lang.t("sl_h")
+            r_g_t.lbl.value = lang.t("sl_t")
+            r_g_tol.lbl.value = lang.t("sl_tol")
+            r_kine.lbl.value = lang.t("sl_anim")
+
+            # Pestaña Código
+            lbl_btn_render.value = lang.t("btn_render")
+            lbl_btn_save.value = lang.t("btn_save")
+            lbl_btn_reset.value = lang.t("btn_reset")
+            txt_code.label = lang.t("lbl_code")
+
             page.update()
 
-        # BARRA DE ESTADO INFERIOR
         status_bar = ft.Row([
-            status,  # <-- Al tener expand=True, empujará los botones a la derecha sin romper la línea
-            ft.ElevatedButton(
-                content=lbl_lang, 
-                bgcolor="#0D47A1",
-                on_click=toggle_lang, 
-                tooltip="Change Language"
-            ),
-            ft.ElevatedButton(  
-                content=lbl_info, 
-                bgcolor="#21262D",
-                on_click=open_about_dialog, 
-                tooltip="About / Acerca de"
-            )
+            status, 
+            ft.ElevatedButton(content=lbl_lang, bgcolor="#0D47A1", on_click=toggle_lang, tooltip="Change Language"),
+            ft.ElevatedButton(content=lbl_info, bgcolor="#21262D", on_click=open_about_dialog, tooltip="About / Acerca de")
         ])
 
-        # Montaje final en la página
         page.add(ft.Container(content=ft.Column([main_nav_bar, main_container, status_bar], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
         
-        # Inicialización
         select_tool("planetario")
         refresh_explorer(current_android_dir)
 

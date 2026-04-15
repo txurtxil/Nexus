@@ -65,4 +65,113 @@ El sistema tiene una arquitectura híbrida cliente/servidor corriendo localmente
 3. **Comunicación (El Puente):** Python expone endpoints (`/api/get_code_b64.json`, `/api/upload_raw`) que los WebViews consultan periódicamente (Polling) o envían vía Fetch API.
 4. **Cálculo Matemático:** Las operaciones booleanas intensivas se delegan al navegador interno (V8 Engine) utilizando `CSG.js` y se renderizan usando `Three.js`, manteniendo la app en Python siempre fluida.
 
---
+---
+
+## 📱 Replicar el Entorno en Termux (Otro Smartphone)
+
+Sigue estos pasos en el nuevo dispositivo para tener el entorno de desarrollo y compilación exactamente igual.
+
+### 1. Preparación Básica
+Instala la app Termux desde F-Droid (no desde la Play Store). Ábrela y ejecuta:
+```bash
+# Actualizar repositorios
+pkg update && pkg upgrade -y
+
+# Instalar dependencias clave
+pkg install python git nano openssh -y
+
+# Dar permisos de almacenamiento a Termux
+termux-setup-storage
+
+
+2. Clonar Proyecto y Entorno Virtual
+
+# Clonar el repositorio
+git clone [https://github.com/txurtxil/Nexus](https://github.com/txurtxil/Nexus) ~/nexus_app
+
+# Crear y activar entorno virtual
+pkg update
+pkg install rust clang binutils make python-psutil -y
+
+# 1. Enter your app folder
+cd ~/nexus_app
+python -m venv venv --system-site-packages
+source venv/bin/activate
+
+# 3. Tell the compiler which Android version we are on (just in case)
+export ANDROID_API_LEVEL=24
+
+# 4. Install the pre-built pydantic-core (Saves 20 minutes and avoids the Rust error!)
+pip install pydantic-core --extra-index-url [https://eutalix.github.io/android-pydantic-core/](https://eutalix.github.io/android-pydantic-core/)
+
+# 5. Install everything else
+pip install flet flet-web pydantic
+
+# Probamos que ha ido bien la instalación 
+python -c "import flet; import psutil; print('🚀 Success! Components loaded.')"
+
+3. Configurar Alias y Atajos de Desarrollo Senior
+​Vamos a inyectar tus comandos personalizados para que programar desde el móvil sea ultrarrápido.
+Abre el archivo de configuración de Bash:
+  
+nano ~/.bashrc
+
+Pega el siguiente bloque completo al final del archivo:
+  
+# ==========================================
+# NEXUS CAD: ATAJOS DE DESARROLLO SENIOR
+# ==========================================
+
+# --- ATAJOS DE NAVEGACIÓN Y LISTADO ---
+alias c='clear'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias l='ls -CF'
+alias ll='ls -lh'
+alias la='ls -A'
+alias lla='ls -la'
+
+# --- HERRAMIENTAS DE EDICIÓN ---
+alias n='nano'
+alias v='vim'
+alias editar="nano ~/nexus_app/main.py"
+
+# --- ATAJOS ESPECÍFICOS DE NEXUS CAD ---
+alias nx='cd ~/nexus_app && source venv/bin/activate'
+alias nexus='nx'
+alias p='python main.py'
+alias probar="p"
+alias nxrun='nx && p'
+
+# --- HERRAMIENTAS DE COMPILACIÓN (FLET) ---
+alias apk='flet build apk'
+
+# --- GESTIÓN DE MEMORIA Y LIMPIEZA ---
+alias mfree='sync && history -c && pkill -9 python && clear && echo "[✓] Memoria RAM liberada y procesos antiguos cerrados."'
+alias nxclean='rm -f ~/storage/downloads/Nexus-CAD-WASM-APK.zip && am start -a android.intent.action.DELETE -d package:com.flet.nexus_cad > /dev/null 2>&1 && echo "[✓] ZIP antiguo eliminado. Confirma la desinstalación en la pantalla emergente."'
+
+# --- FUNCIÓN MÁGICA DE DESPLIEGUE ---
+alias nxs='subir'
+subir() {
+    cd ~/nexus_app
+    git add .
+    # Si no le pasas mensaje, genera uno automático con la fecha
+    if [ -z "$1" ]; then
+        msg="⚡ Actualización rápida: $(date +'%Y-%m-%d %H:%M:%S')"
+    else
+        msg="$1"
+    fi
+    git commit -m "$msg"
+    git push
+    echo -e "\e[1;32m\n==============================================\e[0m"
+    echo -e "\e[1;32m🚀 ¡CÓDIGO EN PRODUCCIÓN! \e[0m"
+    echo -e "\e[1;32mGitHub Actions ya está compilando tu nuevo APK.\e[0m"
+    echo -e "\e[1;32m==============================================\n\e[0m"
+}
+
+Guarda pulsando Ctrl + 0, Enter, y cierra con
+Ctrl+ X.
+Aplica los cambios inmediatamente con:
+bash
+source ~/.bashrc
+

@@ -859,7 +859,7 @@ def main(page: ft.Page):
                         ], alignment="center"),
                         bgcolor="#FFD600",
                         width=float('inf'),
-                        url="https://ko-fi.com/TU_USUARIO_AQUI",  # <-- ¡Recuerda cambiar esto por tu enlace de Ko-fi!
+                        url="https://ko-fi.com/txurtxil",  # <-- ¡Recuerda cambiar esto por tu enlace de Ko-fi!
                         style=ft.ButtonStyle(padding=15)
                     )
                 ], tight=True, width=320),

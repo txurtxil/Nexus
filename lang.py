@@ -14,7 +14,7 @@ translations = {
         "btn_db": "📂 DB MANAGER",
         "btn_assemble": "🧩 ASSEMBLE",
         "btn_info": "ℹ️ INFO",
-        "btn_lang": "🇪🇸 ES" # El botón mostrará a qué idioma cambiar
+        "btn_lang": "🇬🇧 EN"
     },
     "es": {
         "app_title": "NEXUS v1.0 | Entorno Integrado 3 Pilares",
@@ -29,20 +29,16 @@ translations = {
         "btn_db": "📂 GESTOR DB",
         "btn_assemble": "🧩 ENSAMBLAR",
         "btn_info": "ℹ️ INFO",
-        "btn_lang": "🇬🇧 EN" # El botón mostrará a qué idioma cambiar
+        "btn_lang": "🇪🇸 ES" 
     }
 }
 
-# Idioma por defecto (vamos a poner inglés como principal para el mundo)
 current_lang = "en"
 
 def t(key):
-    """Devuelve el texto traducido según la clave y el idioma actual."""
     global current_lang
     return translations.get(current_lang, {}).get(key, f"[{key}]")
 
 def switch_lang():
-    """Alterna entre inglés y español."""
     global current_lang
     current_lang = "es" if current_lang == "en" else "en"
-

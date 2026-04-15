@@ -368,7 +368,15 @@ def main(page: ft.Page):
         page.bgcolor = "#0B0E14" 
         page.padding = 0 
         
-        status = ft.Text(lang.t("app_title"), color="#00E676", weight="bold")
+        # EL TEXTO AHORA ES FLEXIBLE: Si la pantalla es estrecha, se cortará con "..." para que quepan los botones
+        status = ft.Text(
+            value=lang.t("app_title"), 
+            color="#00E676", 
+            weight="bold", 
+            expand=True,         # Ocupa el espacio disponible a la izquierda
+            no_wrap=True,        # No salta de línea
+            overflow=ft.TextOverflow.ELLIPSIS # Pone puntos suspensivos si no cabe
+        )
 
         def custom_icon_btn(text, action, tooltip_txt): 
             return ft.Container(content=ft.Text(text, size=16), padding=5, bgcolor="#30363D", border_radius=5, on_click=action, tooltip=tooltip_txt, ink=True)
@@ -937,10 +945,9 @@ def main(page: ft.Page):
             
             page.update()
 
-        # BARRA DE ESTADO INFERIOR CON EL BOTÓN "ACERCA DE" Y "CERRAR SESIÓN"
+        # BARRA DE ESTADO INFERIOR
         status_bar = ft.Row([
-            status,
-            ft.Container(expand=True),  # Espaciador para empujar el botón a la derecha
+            status,  # <-- Al tener expand=True, empujará los botones a la derecha sin romper la línea
             ft.ElevatedButton(
                 content=lbl_lang, 
                 bgcolor="#0D47A1",

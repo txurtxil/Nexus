@@ -2,46 +2,38 @@
 
 translations = {
     "en": {
+        # App 
         "app_title": "NEXUS v1.0 | 3-Pillar Integrated Environment",
-        "nav_studio": "🧠 STUDIO",
-        "nav_view": "👁️ VIEW 3D",
-        "nav_lab": "🏭 LAB",
-        "btn_ia": "🤖 AI",
-        "btn_sliders": "🎛️ SLIDERS",
-        "btn_code": "💻 CODE",
-        "btn_3d": "📐 FAST 3D",
-        "btn_pbr": "🎨 PBR STUDIO",
-        "btn_db": "📂 DB MANAGER",
-        "btn_assemble": "🧩 ASSEMBLE",
-        "btn_info": "ℹ️ INFO",
-        "btn_lang": "🇬🇧 EN",
+        "nav_studio": "🧠 STUDIO", "nav_view": "👁️ VIEW 3D", "nav_lab": "🏭 LAB",
+        "btn_ia": "🤖 AI", "btn_sliders": "🎛️ SLIDERS", "btn_code": "💻 CODE",
+        "btn_3d": "📐 FAST 3D", "btn_pbr": "🎨 PBR STUDIO",
+        "btn_db": "📂 DB MANAGER", "btn_assemble": "🧩 ASSEMBLE",
+        "btn_info": "ℹ️ INFO", "btn_lang": "🇪🇸 ES", 
         
-        # UI Text
-        "ia_title": "AI AGENT ACTIVE",
-        "ia_desc": "Copilot Assistant & Agentic Builder.",
-        "ia_btn": "🚀 OPEN AI ENVIRONMENT",
-        "ia_hint": "💡 Analysis runs in background. Use tabs above to view code.",
-        "cat_opts": "💡 Options:",
-        "cat_sketch": "📐 Sketches:",
-        "cat_forge": "⚔️ STL FORGE:",
-        "cat_prod": "🏭 Production:",
-        "cat_loft": "🌪️ Shapes:",
-        "cat_mech": "⚙️ Mechanics:",
-        "cat_basic": "📦 Basics:",
-        "param_title": "🌐 PARAMETERS",
-        "param_asm": "Assembly Code Mode",
-        "param_tex": "🎨 TEXTURE:",
-        "param_kine": "🎬 KINEMATICS",
-        "sl_w": "Width (GW)",
-        "sl_l": "Length (GL)",
-        "sl_h": "Height (GH)",
-        "sl_t": "Thickness (GT)",
-        "sl_tol": "Global Tol. (G_TOL)",
-        "sl_anim": "Animation (º)",
-        "btn_render": "▶ 3D RENDER",
-        "btn_save": "💾 SAVE",
-        "btn_reset": "🗑️ RESET",
+        # UI Studio
+        "ia_title": "AI AGENT ACTIVE", "ia_desc": "Copilot Assistant & Agentic Builder.",
+        "ia_btn": "🚀 OPEN AI ENVIRONMENT", "ia_hint": "💡 Analysis runs in background. Use tabs above to view code.",
+        "cat_opts": "💡 Options:", "cat_sketch": "📐 Sketches:", "cat_forge": "⚔️ STL FORGE:",
+        "cat_prod": "🏭 Production:", "cat_loft": "🌪️ Shapes:", "cat_mech": "⚙️ Mechanics:", "cat_basic": "📦 Basics:",
+        "param_title": "🌐 PARAMETERS", "param_asm": "Assembly Code Mode", "param_tex": "🎨 TEXTURE:", "param_kine": "🎬 KINEMATICS",
+        "sl_w": "Width (GW)", "sl_l": "Length (GL)", "sl_h": "Height (GH)", "sl_t": "Thickness (GT)", "sl_tol": "Global Tol. (G_TOL)", "sl_anim": "Animation (º)",
+        "btn_union": "➕ UNION", "btn_subtract": "➖ SUBTRACT",
+        "btn_render": "▶ 3D RENDER", "btn_save": "💾 SAVE", "btn_reset": "🗑️ RESET",
         "lbl_code": "Source Code (JS-CSG)",
+
+        # UI View
+        "lbl_visor_ext": "🥽 EXTERNAL VIEWER", "lbl_nexus_pc": "☁️ NEXUS PC",
+        "btn_open_native": "🔄 OPEN NATIVE 3D VIEWER",
+        "lbl_pbr_studio": "🎨 PBR STUDIO PRO", "lbl_pbr_desc": "Realistic Physically Based Rendering.",
+        "btn_open_pbr": "🚀 OPEN PBR STUDIO",
+
+        # UI Lab
+        "lbl_caliper": "📐 3D CALIPER", "lbl_internal_db": "🌐 INTERNAL DB", "btn_web_injector": "🌐 OPEN WEB INJECTOR",
+        "lbl_native_exp": "📱 NATIVE EXPLORER", "btn_go": "Go", "btn_save_code": "💾 SAVE CODE HERE",
+        "btn_dl": "📥 Downloads", "lbl_assembly": "🧩 ASSEMBLY BENCH", "btn_add_part": "➕ ADD PART", "btn_view_pbr": "👁️ VIEW PBR",
+        
+        # Dialogs
+        "dialog_rename": "Rename", "tf_new_name": "New name", "btn_cancel": "Cancel", "btn_save_diag": "Save",
 
         # Tools
         "t_custom": "Free Code", "t_texto": "Text Plates", "t_vr": "VR Pedestal", 
@@ -63,46 +55,38 @@ translations = {
         "t_cube": "Cube G", "t_cyl": "Cylinder G", "t_angle": "Angle L", "t_gear": "SQ Pinion"
     },
     "es": {
+        # App 
         "app_title": "NEXUS v1.0 | Entorno Integrado 3 Pilares",
-        "nav_studio": "🧠 STUDIO",
-        "nav_view": "👁️ VER 3D",
-        "nav_lab": "🏭 LAB",
-        "btn_ia": "🤖 IA",
-        "btn_sliders": "🎛️ SLIDERS",
-        "btn_code": "💻 CODE",
-        "btn_3d": "📐 3D RÁPIDO",
-        "btn_pbr": "🎨 PBR STUDIO",
-        "btn_db": "📂 GESTOR DB",
-        "btn_assemble": "🧩 ENSAMBLAR",
-        "btn_info": "ℹ️ INFO",
-        "btn_lang": "🇪🇸 ES",
+        "nav_studio": "🧠 STUDIO", "nav_view": "👁️ VER 3D", "nav_lab": "🏭 LAB",
+        "btn_ia": "🤖 IA", "btn_sliders": "🎛️ SLIDERS", "btn_code": "💻 CODE",
+        "btn_3d": "📐 3D RÁPIDO", "btn_pbr": "🎨 PBR STUDIO",
+        "btn_db": "📂 GESTOR DB", "btn_assemble": "🧩 ENSAMBLAR",
+        "btn_info": "ℹ️ INFO", "btn_lang": "🇬🇧 EN", 
         
-        # UI Text
-        "ia_title": "AGENTE IA ACTIVO",
-        "ia_desc": "Asistente Copilot y Generador Agentic.",
-        "ia_btn": "🚀 ABRIR ENTORNO IA",
-        "ia_hint": "💡 El análisis ocurre en segundo plano. Usa las pestañas de arriba para ver el código.",
-        "cat_opts": "💡 Opciones:",
-        "cat_sketch": "📐 Bocetos:",
-        "cat_forge": "⚔️ STL FORGE:",
-        "cat_prod": "🏭 Producción:",
-        "cat_loft": "🌪️ Formas:",
-        "cat_mech": "⚙️ Mecánica:",
-        "cat_basic": "📦 Básico:",
-        "param_title": "🌐 PARÁMETROS",
-        "param_asm": "Manejo Código Ensamblador",
-        "param_tex": "🎨 TEXTURA:",
-        "param_kine": "🎬 CINEMÁTICA",
-        "sl_w": "Ancho (GW)",
-        "sl_l": "Largo (GL)",
-        "sl_h": "Alto (GH)",
-        "sl_t": "Grosor (GT)",
-        "sl_tol": "Tol. Global (G_TOL)",
-        "sl_anim": "Animación (º)",
-        "btn_render": "▶ RENDER 3D",
-        "btn_save": "💾 GUARDAR",
-        "btn_reset": "🗑️ RESET",
+        # UI Studio
+        "ia_title": "AGENTE IA ACTIVO", "ia_desc": "Asistente Copilot y Generador Agentic.",
+        "ia_btn": "🚀 ABRIR ENTORNO IA", "ia_hint": "💡 El análisis ocurre en segundo plano. Usa las pestañas de arriba.",
+        "cat_opts": "💡 Opciones:", "cat_sketch": "📐 Bocetos:", "cat_forge": "⚔️ STL FORGE:",
+        "cat_prod": "🏭 Producción:", "cat_loft": "🌪️ Formas:", "cat_mech": "⚙️ Mecánica:", "cat_basic": "📦 Básico:",
+        "param_title": "🌐 PARÁMETROS", "param_asm": "Manejo Código Ensamblador", "param_tex": "🎨 TEXTURA:", "param_kine": "🎬 CINEMÁTICA",
+        "sl_w": "Ancho (GW)", "sl_l": "Largo (GL)", "sl_h": "Alto (GH)", "sl_t": "Grosor (GT)", "sl_tol": "Tol. Global (G_TOL)", "sl_anim": "Animación (º)",
+        "btn_union": "➕ UNIR", "btn_subtract": "➖ RESTAR",
+        "btn_render": "▶ RENDER 3D", "btn_save": "💾 GUARDAR", "btn_reset": "🗑️ RESET",
         "lbl_code": "Código Fuente (JS-CSG)",
+
+        # UI View
+        "lbl_visor_ext": "🥽 VISOR EXTERNO", "lbl_nexus_pc": "☁️ NEXUS PC",
+        "btn_open_native": "🔄 ABRIR VISOR 3D NATIVO",
+        "lbl_pbr_studio": "🎨 PBR STUDIO PRO", "lbl_pbr_desc": "Render Físico Realista.",
+        "btn_open_pbr": "🚀 ABRIR PBR STUDIO",
+
+        # UI Lab
+        "lbl_caliper": "📐 CALIBRE 3D", "lbl_internal_db": "🌐 DB INTERNA", "btn_web_injector": "🌐 ABRIR INYECTOR WEB",
+        "lbl_native_exp": "📱 EXPLORADOR NATIVO", "btn_go": "Ir", "btn_save_code": "💾 GUARDAR CÓDIGO AQUÍ",
+        "btn_dl": "📥 Descargas", "lbl_assembly": "🧩 MESA DE ENSAMBLAJE", "btn_add_part": "➕ AÑADIR PIEZA", "btn_view_pbr": "👁️ VER PBR",
+        
+        # Dialogs
+        "dialog_rename": "Renombrar", "tf_new_name": "Nuevo nombre", "btn_cancel": "Cancelar", "btn_save_diag": "Guardar",
 
         # Tools
         "t_custom": "Código Libre", "t_texto": "Placas Texto", "t_vr": "Pedestal VR", 
@@ -125,7 +109,7 @@ translations = {
     }
 }
 
-current_lang = "en"  # Si pones "en" aquí, arranca directo en inglés por defecto.
+current_lang = "es" # Arranca en Español, y el botón te sugerirá cambiar a INGLÉS
 
 def t(key):
     global current_lang

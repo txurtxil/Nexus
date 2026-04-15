@@ -5,6 +5,10 @@
 ![Tecnologías](https://img.shields.io/badge/Stack-Python_%7C_Flet_%7C_Three.js_%7C_CSG-B388FF?style=for-the-badge)
 ![IA](https://img.shields.io/badge/AI_Engine-Gemini_Flash_%7C_Groq_GPT--OSS-FFAB00?style=for-the-badge)
 
+<p align="center">
+  <img src="docs/screenshots/menu_principal.jpg" alt="Menú Principal Nexus CAD" width="400"/>
+</p>
+
 NEXUS CAD TITAN PRO es un ecosistema completo de diseño 3D paramétrico, edición avanzada de archivos STL, renderizado físico (PBR) y asistencia por Inteligencia Artificial (Doble Agente), diseñado para ejecutarse de forma nativa en dispositivos móviles (vía Termux/Android) y PC.
 
 La interfaz está diseñada bajo una **Arquitectura de 3 Pilares** (`🧠 STUDIO`, `👁️ VER 3D` y `🏭 LAB`), permitiendo un flujo de trabajo sin fricciones desde la idea inicial hasta la configuración para impresión 3D.
@@ -14,6 +18,13 @@ La interfaz está diseñada bajo una **Arquitectura de 3 Pilares** (`🧠 STUDIO
 ## ✨ ¿Qué hace la aplicación? (Arquitectura 3 Pilares)
 
 ### 🧠 PILAR 1: STUDIO (Creación y AI Core)
+
+<p align="center">
+  <img src="docs/screenshots/agente_ia_01.jpg" alt="Nexus AI Core" width="250"/>
+  <img src="docs/screenshots/agente_ia_02.jpg" alt="Asistencia Iterativa" width="250"/>
+  <img src="docs/screenshots/agente_ia_03.jpg" alt="Vision to Print" width="250"/>
+</p>
+
 * **🤖 Nexus AI Core v23.26 (Doble Agente):** Integración con LLMs (Gemini 3.1 Flash Lite y Groq GPT-OSS 120B). Un agente "Arquitecto" estructura JSON técnicos, y un "Compilador" los traduce a código `CSG.js` con un puente de auto-reparación de errores (Anti-Z-Fighting y Anti-Flip).
 * **👁️ Vision-to-Print (Ingeniería Inversa):** Sube una foto de una pieza rota o un plano, y la IA deducirá las instrucciones paramétricas para clonarla limitándola a un Bounding Box exacto.
 * **🧬 Macros Generativas:** Aplica funciones complejas con un clic como *Generative Lattice* (Optimización topológica) o Vaciados (*Shell*).
@@ -22,12 +33,22 @@ La interfaz está diseñada bajo una **Arquitectura de 3 Pilares** (`🧠 STUDIO
 * **🔥 Sistema Hot Reload:** Recarga en caliente del código base (`importlib`) que permite diseñar nuevas herramientas paramétricas sin reiniciar la app.
 
 ### 👁️ PILAR 2: VER 3D (Titan Space Engine)
+
+<p align="center">
+  <img src="docs/screenshots/visor_pbr.jpg" alt="Renderizado PBR 3D" width="400"/>
+</p>
+
 * **🚀 WebWorkers Asíncronos:** Las operaciones booleanas complejas se calculan en hilos secundarios para no congelar la UI jamás, permitiendo un renderizado asíncrono ultra-rápido.
 * **🌐 Visor Externo y LAN:** Enrutamiento HTTP automático para visualizar tu diseño 3D en tiempo real desde cualquier monitor o PC conectado a la misma red WiFi.
 * **🎨 PBR Studio PRO:** Motor fotorealista basado en materiales reales (PLA, Fibra de Carbono, Aluminio) con físicas de colisión para organizar piezas.
 * **⚔️ ULTIMATE STL FORGE:** Edición y modificación de archivos STL masivos (Aplanar, Cortar, Taladrar, Añadir Orejetas, Mouse Ears, Honeycomb, Prop-Guards, etc.).
 
 ### 🏭 PILAR 3: LABORATORIO (Gestión y Ensamblaje)
+
+<p align="center">
+  <img src="docs/screenshots/solar.jpg" alt="Mesa de Ensamblaje" width="400"/>
+</p>
+
 * **☁️ Nexus DB (Supabase Cloud):** Guarda tus mejores "recetas" (prompts + código) en la base de datos en la nube. Explora tu biblioteca personal mediante un modal flotante e inyecta piezas con un clic.
 * **🧩 Mesa de Ensamblaje:** Combina hasta 10 archivos STL distintos en un único entorno espacial, asignando materiales independientes a cada pieza para prototipos mecánicos complejos.
 * **📐 Calibre 3D Inteligente:** Calcula en tiempo real las dimensiones (X, Y, Z), el volumen (cm³) y estima el peso en gramos antes de imprimir.
@@ -66,7 +87,7 @@ termux-setup-storage
 2. Clonar Proyecto y Entorno Virtual
 
 # Clonar el repositorio
-git clone [https://github.com/txurtxil/Nexus-CAD-App](https://github.com/txurtxil/Nexus) ~/nexus_app
+git clone [https://github.com/txurtxil/Nexus](https://github.com/txurtxil/Nexus) ~/nexus_app
 
 # Crear y activar entorno virtual
 pkg update
@@ -89,7 +110,6 @@ pip install flet flet-web pydantic
 # Probamos que ha ido bien la instalación 
 python -c "import flet; import psutil; print('🚀 Success! Components loaded.')"
 
-
 3. Configurar Alias y Atajos de Desarrollo Senior
 ​Vamos a inyectar tus comandos personalizados para que programar desde el móvil sea ultrarrápido.
 Abre el archivo de configuración de Bash:
@@ -97,7 +117,6 @@ Abre el archivo de configuración de Bash:
 nano ~/.bashrc
 
 Pega el siguiente bloque completo al final del archivo:
-  
   
 # ==========================================
 # NEXUS CAD: ATAJOS DE DESARROLLO SENIOR
@@ -149,11 +168,14 @@ subir() {
     echo -e "\e[1;32mGitHub Actions ya está compilando tu nuevo APK.\e[0m"
     echo -e "\e[1;32m==============================================\n\e[0m"
 }
-  
-  
-  Guarda pulsando Ctrl + O, Enter, y cierra con Ctrl + X.
+
+Guarda pulsando Ctrl + 0, Enter, y cierra con
+Ctrl+ X.
 Aplica los cambios inmediatamente con:
-  
+bash
+source ~/.bashrc
+
+
 Rutinas de Mantenimiento
 
 # 1. Limpiar caché
@@ -170,11 +192,9 @@ subir "Nexus version xxx..."
 # 4. Cambio en README.md, para sincronizar:
 git pull
 
-
 🚀 Prompt de Continuidad: Nexus CAD App
-
-Instrucciones para la IA:
-​Actúa como un desarrollador senior experto en Python, Flet y desarrollo en entornos restringidos (Termux/Android). Vamos a continuar con el desarrollo de Nexus CAD App, una aplicación de diseño asistido por computadora construida con el framework Flet.
+​Instrucciones para la IA:
+Actúa como un desarrollador senior experto en Python, Flet y desarrollo en entornos restringidos (Termux/Android). Vamos a continuar con el desarrollo de Nexus CAD App, una aplicación de diseño asistido por computadora construida con el framework Flet.
 ​1. Contexto del Entorno (CRÍTICO):
 ​Host: Android (vía Termux).
 ​Editor: Acode (acceso vía SAF).

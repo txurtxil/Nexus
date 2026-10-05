@@ -26,7 +26,7 @@ class NexusTools:
         self.sl_stl_x, self.r_stl_x = self.create_slider("Mover X", -150, 150, 0, False)
         self.sl_stl_y, self.r_stl_y = self.create_slider("Mover Y", -150, 150, 0, False)
         self.sl_stl_z, self.r_stl_z = self.create_slider("Mover Z", -150, 150, 0, False)
-        self.panel_stl_transform = ft.Container(content=ft.Column([ft.Row([ft.Text("🔄 TRANSF. BASE STL", color="#00E676", weight="bold"), self.lbl_stl_status]), ft.ElevatedButton(content=ft.Text("📂 IR A FILES", color="black"), on_click=lambda _: self.set_tab(5), bgcolor="#00E5FF", width=float('inf')), self.r_stl_sc, self.r_stl_x, self.r_stl_y, self.r_stl_z]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676"), visible=False)
+        self.panel_stl_transform = ft.Container(content=ft.Column([ft.Row([ft.Text("🔄 TRANSF. BASE STL", color="#00E676", weight="bold"), self.lbl_stl_status]), ft.ElevatedButton(content=ft.Text("📂 IR A FILES", color="black"), on_click=lambda _: self.set_tab(5), bgcolor="#00E5FF", width=float('inf')), self.r_stl_sc, self.r_stl_x, self.r_stl_y, self.r_stl_z]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.Border.all(1, "#00E676"), visible=False)
 
         self.col_stl = ft.Column([ft.Text("Visor STL Original", color="#00E676", weight="bold")], visible=False)
         self.sl_stlf_z, self.r_stlf_z = self.create_slider("Corte Z (mm)", 0, 50, 1, False)
@@ -168,7 +168,7 @@ class NexusTools:
         self.cat_basico = ft.Row([self.thumbnail("📦", lang.t("t_cube"), "cubo", "#263238"), self.thumbnail("🛢️", lang.t("t_cyl"), "cilindro", "#263238"), self.thumbnail("📐", lang.t("t_angle"), "escuadra", "#D84315"), self.thumbnail("⚙️", lang.t("t_gear"), "engranaje", "#FF6F00")], scroll="auto")
 
     def thumbnail(self, icon, title, tool_id, color):
-        return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: self.select_tool(tool_id), ink=True, border=ft.border.all(1, "#30363D"))
+        return ft.Container(content=ft.Column([ft.Text(icon, size=24), ft.Text(title, size=10, color="white", weight="bold")], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), width=75, height=70, bgcolor=color, border_radius=8, on_click=lambda _: self.select_tool(tool_id), ink=True, border=ft.Border.all(1, "#30363D"))
 
     def get_p_dict(self):
         # Genera el diccionario recogiendo el valor actual de todos los sliders y dropdowns (Incluye Dron y Demos Espaciales)

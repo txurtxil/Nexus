@@ -11,8 +11,8 @@ translations = {
         "btn_info": "ℹ️ INFO", "btn_lang": "🇪🇸 ES", 
         
         # UI Studio
-        "ia_title": "AI AGENT ACTIVE", "ia_desc": "Copilot Assistant & Agentic Builder.",
-        "missions_btn": "🦀 3D CLUSTER MISSIONS", "missions_hint": "Design by prompt with the local LLM cluster (Blender + Metrics).",
+        "ia_title": "🦀 CREATE PART", "ia_desc": "Type or photograph. The cluster (Qwen3 + Blender) builds it with metrics.",
+        "missions_btn": "🦀 CREATE PART — PROMPT → STL", "missions_hint": "One screen: template, photo or text. Download the STL with verified sha256.",
         "ia_btn": "🚀 OPEN AI ENVIRONMENT", "ia_hint": "💡 Analysis runs in background. Use tabs above to view code.",
         "cat_opts": "💡 Options:", "cat_sketch": "📐 Sketches:", "cat_forge": "⚔️ STL FORGE:",
         "cat_prod": "🏭 Production:", "cat_loft": "🌪️ Shapes:", "cat_mech": "⚙️ Mechanics:", "cat_basic": "📦 Basics:",
@@ -65,8 +65,8 @@ translations = {
         "btn_info": "ℹ️ INFO", "btn_lang": "🇬🇧 EN", 
         
         # UI Studio
-        "ia_title": "AGENTE IA ACTIVO", "ia_desc": "Asistente Copilot y Generador Agentic.",
-        "missions_btn": "🦀 MISIONES 3D CLUSTER", "missions_hint": "Diseña por texto con el cluster local de LLMs (Blender + Métricas).",
+        "ia_title": "🦀 CREAR PIEZA", "ia_desc": "Escribe o fotografía. El cluster (Qwen3 + Blender) la construye con métricas.",
+        "missions_btn": "🦀 CREAR PIEZA — PROMPT → STL", "missions_hint": "Una sola pantalla: plantilla, foto o texto. Descarga el STL con sha256 verificado.",
         "ia_btn": "🚀 ABRIR ENTORNO IA", "ia_hint": "💡 El análisis ocurre en segundo plano. Usa las pestañas de arriba.",
         "cat_opts": "💡 Opciones:", "cat_sketch": "📐 Bocetos:", "cat_forge": "⚔️ STL FORGE:",
         "cat_prod": "🏭 Producción:", "cat_loft": "🌪️ Formas:", "cat_mech": "⚙️ Mecánica:", "cat_basic": "📦 Básico:",

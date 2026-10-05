@@ -386,7 +386,6 @@ def main(page: ft.Page):
         lbl_ia_title = ft.Text(lang.t("ia_title"), size=22, color="#B388FF", weight="bold", text_align="center")
         lbl_ia_desc = ft.Text(lang.t("ia_desc"), color="#E6EDF3", text_align="center")
         lbl_ia_btn = ft.Text(lang.t("ia_btn"), color="white")
-        btn_ia_open = ft.ElevatedButton(content=lbl_ia_btn, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", height=70, width=float('inf'))
         lbl_ia_hint = ft.Text(lang.t("ia_hint"), color="#8B949E", size=12, text_align="center")
         lbl_missions_btn = ft.Text(lang.t("missions_btn"), color="white")
         btn_missions = ft.ElevatedButton(content=lbl_missions_btn, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/cluster_missions.html", bgcolor="#8B0000", height=70, width=float('inf'))
@@ -654,8 +653,6 @@ def main(page: ft.Page):
             lbl_ia_title, 
             lbl_ia_desc, 
             ft.Container(height=20), 
-            btn_ia_open, 
-            ft.Container(height=10), 
             btn_missions,
             ft.Container(height=4),
             lbl_missions_hint
@@ -903,7 +900,7 @@ def main(page: ft.Page):
             ft.ElevatedButton(content=lbl_sub_ia, on_click=lambda _: set_studio_tab(0), bgcolor="#8E24AA", color="white", expand=True),
             ft.ElevatedButton(content=lbl_sub_sliders, on_click=lambda _: set_studio_tab(1), bgcolor="#FFAB00", expand=True),
             ft.ElevatedButton(content=lbl_sub_code, on_click=lambda _: set_studio_tab(2), bgcolor="#21262D", color="white", expand=True),
-        ])
+        ], visible=False)
         pillar_studio = ft.Column([nav_studio, ft.Divider(height=2, color="#30363D"), studio_content], expand=True)
 
         # --- PILAR 2: VISUALIZAR ---

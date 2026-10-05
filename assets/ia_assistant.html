@@ -140,6 +140,17 @@
         </div>
     </div>
 
+    <div class="api-grid">
+        <div>
+            <label>🦀 Cluster TXURTXIL URL (LAN):</label>
+            <input type="text" id="clusterUrl" placeholder="http://192.168.10.140:8200" value="">
+        </div>
+        <div>
+            <label>Cluster API Key:</label>
+            <input type="password" id="clusterKey" placeholder="sk-cluster-..." value="">
+        </div>
+    </div>
+
     <div>
         <label>Motor IA (Compilador / Creador de Código):</label>
         <select id="modelSelector" onchange="toggleManualModel()">
@@ -148,6 +159,9 @@
             </optgroup>
             <optgroup label="Alternativa (Groq Fallback)">
                 <option value="groq-openai/gpt-oss-120b">Groq: GPT-OSS 120B (Mejor en Código)</option>
+            </optgroup>
+            <optgroup label="🦀 Cluster TXURTXIL (LAN)">
+                <option value="cluster-qwen3-coder">🦀 Qwen3-Coder-30B (bc250) + Qwen3-VL-8B (vision)</option>
             </optgroup>
             <option value="manual">⚙️ Otro (Introducir manualmente)...</option>
         </select>
@@ -373,6 +387,8 @@
         if(localStorage.getItem('nexus_groq_key')) document.getElementById('groqKey').value = localStorage.getItem('nexus_groq_key');
         if(localStorage.getItem('nexus_supa_url')) document.getElementById('supaUrl').value = localStorage.getItem('nexus_supa_url');
         if(localStorage.getItem('nexus_supa_key')) document.getElementById('supaKey').value = localStorage.getItem('nexus_supa_key');
+        if(localStorage.getItem('nexus_cluster_url')) document.getElementById('clusterUrl').value = localStorage.getItem('nexus_cluster_url');
+        if(localStorage.getItem('nexus_cluster_key')) document.getElementById('clusterKey').value = localStorage.getItem('nexus_cluster_key');
         
         document.getElementById('aiMode').addEventListener('change', (e) => {
             document.getElementById('slicerPanel').style.display = e.target.value === 'agentic' ? 'block' : 'none';
@@ -443,8 +459,9 @@
     async function autoDescribeImage() {
         if (!currentB64) { alert("📷 ¡Por favor, adjunta una foto primero!"); return; }
         
+        const cluster = isClusterSelected();
         const geminiKey = document.getElementById('apiKey').value.trim();
-        if (!geminiKey) { alert("⚠️ Se requiere la Gemini API Key para analizar la imagen."); return; }
+        if (!cluster && !geminiKey) { alert("⚠️ Se requiere la Gemini API Key para analizar la imagen (o selecciona el motor 🦀 Cluster)."); return; }
         
         const btn = document.getElementById('btnAutoDescribe');
         const originalText = btn.innerHTML;
@@ -455,7 +472,9 @@
             const sys = "Eres un Ingeniero Experto en Diseño 3D y CAD. Tu tarea es mirar la foto adjunta y redactar el 'Prompt Maestro' perfecto para que otro modelo de IA programe esta pieza en código JavaScript (CSG.js). Describe la pieza de forma técnica y estructurada: desglosa las primitivas necesarias (cajas, cilindros, esferas), operaciones booleanas (uniones, restas para agujeros), proporciones visuales relativas, chaflanes y su orientación en los ejes X,Y,Z. NO generes código, SOLAMENTE devuelve el texto hiperdetallado y claro en español para ser usado como prompt directo.";
             const prompt = "Por favor, analiza la geometría de esta pieza y redacta las instrucciones de diseño 3D.";
             
-            let text = await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, sys, prompt, currentB64, currentMimeType);
+            let text = cluster
+                ? await fetchClusterVLM(sys, prompt, currentB64, currentMimeType)
+                : await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, sys, prompt, currentB64, currentMimeType);
             
             const promptBox = document.getElementById('promptInput');
             promptBox.value = text;
@@ -502,6 +521,35 @@
         return data.candidates[0].content.parts[0].text.trim();
     }
 
+    // === CLUSTER TXURTXIL (FASE 2): un solo punto de config; texto y vision
+    // via cluster-api en rpi5:8200. El VLM se despierta solo bajo demanda.
+    function isClusterSelected() {
+        return document.getElementById('modelSelector').value === 'cluster-qwen3-coder';
+    }
+    function getClusterCfg() {
+        const url = (document.getElementById('clusterUrl').value.trim() || 'http://192.168.10.140:8200').replace(/\/$/, '');
+        const key = document.getElementById('clusterKey').value.trim();
+        if (!key) throw new Error("Falta la Cluster API Key (configuracion).");
+        return { url, key };
+    }
+    async function fetchClusterApi(path, body) {
+        const c = getClusterCfg();
+        const res = await fetch(c.url + path, { method: 'POST',
+            headers: { 'X-Api-Key': c.key, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+        return data;
+    }
+    async function fetchClusterCoder(systemInstruction, promptText, jsonMode) {
+        const d = await fetchClusterApi('/coder/ask', { system: systemInstruction, prompt: promptText, json_mode: !!jsonMode });
+        return d.answer.trim();
+    }
+    async function fetchClusterVLM(systemInstruction, promptText, imageB64, mimeType) {
+        const d = await fetchClusterApi('/vlm/ask', { prompt: systemInstruction + "\n\n" + promptText, image_b64: imageB64, mime: mimeType || 'image/jpeg' });
+        return d.answer.trim();
+    }
+
     async function generateCode() {
         const geminiKey = document.getElementById('apiKey').value.trim();
         const groqKey = document.getElementById('groqKey').value.trim();
@@ -510,21 +558,24 @@
         const useMemory = document.getElementById('useMemory').checked;
         
         let selectedModel = document.getElementById('modelSelector').value;
+        const cluster = isClusterSelected();
         if(selectedModel === 'manual') selectedModel = document.getElementById('manualModelInput').value.trim();
         
         if(!prompt && !currentB64) { alert("⚠️ El Prompt está vacío."); return; }
         
         if(geminiKey) localStorage.setItem('nexus_gemini_key', geminiKey);
         if(groqKey) localStorage.setItem('nexus_groq_key', groqKey);
+        localStorage.setItem('nexus_cluster_url', document.getElementById('clusterUrl').value.trim());
+        localStorage.setItem('nexus_cluster_key', document.getElementById('clusterKey').value.trim());
 
         document.getElementById('loader').style.display = 'block';
         document.getElementById('codeOutput').value = "";
 
         try {
             if (aiMode === "architect") {
-                if(!groqKey) { alert("⚠️ El modo Doble Agente requiere la API Key de Groq."); throw new Error("Falta Groq Key"); }
+                if(!cluster && !groqKey) { alert("⚠️ El modo Doble Agente requiere la API Key de Groq (o selecciona el motor 🦀 Cluster)."); throw new Error("Falta Groq Key"); }
                 
-                document.getElementById('loader').innerText = "🧠 Arquitecto (GPT-OSS 120B): Pensando la geometría...";
+                document.getElementById('loader').innerText = cluster ? "🧠 Arquitecto (Qwen3-Coder-30B): Pensando la geometría..." : "🧠 Arquitecto (GPT-OSS 120B): Pensando la geometría...";
                 const archSystem = `Eres el Arquitecto Mecánico de NEXUS. Deduce las medidas estándar en milímetros del objeto que pida el usuario. Debes devolver ÚNICAMENTE un JSON válido con esta estructura estricta: {"analisis": "tu deduccion logica", "primitivas": [{"tipo": "caja|cilindro", "medidas_mm": [x,y,z]}], "booleanas": ["explicacion_cortes_o_uniones"]}`;
                 
                 let groqPrompt = `Petición: "${prompt}"`;
@@ -532,10 +583,12 @@
                     groqPrompt = `Plan Técnico Anterior: ${lastTechPlan}\n\nNueva Instrucción del usuario: ${prompt}\nModifica el JSON actualizando medidas o primitivas para cumplir la nueva instrucción.`;
                 }
 
-                let techPlanStr = await fetchGroq("openai/gpt-oss-120b", groqKey, archSystem, groqPrompt, true);
+                let techPlanStr = cluster
+                    ? await fetchClusterCoder(archSystem, groqPrompt, true)
+                    : await fetchGroq("openai/gpt-oss-120b", groqKey, archSystem, groqPrompt, true);
                 lastTechPlan = techPlanStr; 
                 
-                let modelLabel = selectedModel.startsWith('groq-') ? 'GPT-OSS' : selectedModel;
+                let modelLabel = cluster ? 'Qwen3-Coder' : (selectedModel.startsWith('groq-') ? 'GPT-OSS' : selectedModel);
                 document.getElementById('loader').innerText = `⚙️ Compilador (${modelLabel}): Generando CSG.js...`;
                 
                 const coderSystem = `Eres NEXUS TITAN AI, compilador estricto de 'csg.js'. 
@@ -556,7 +609,9 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                 }
 
                 let rawCode = "";
-                if (selectedModel.startsWith("groq-")) {
+                if (cluster) {
+                    rawCode = await fetchClusterCoder(coderSystem, geminiPrompt, false);
+                } else if (selectedModel.startsWith("groq-")) {
                     const groqModelName = selectedModel.replace("groq-", "");
                     rawCode = await fetchGroq(groqModelName, groqKey, coderSystem, geminiPrompt, false);
                 } else {
@@ -600,7 +655,9 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                     }
                 }
 
-                let rawCode = await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, coderSystem, geminiCoderPrompt, null, null);
+                let rawCode = cluster
+                    ? await fetchClusterCoder(coderSystem, geminiCoderPrompt, false)
+                    : await fetchGemini("gemini-3.1-flash-lite-preview", geminiKey, coderSystem, geminiCoderPrompt, null, null);
                 rawCode = rawCode.replace(/```javascript/gi, "").replace(/```js/gi, "").replace(/```/g, "").trim();
                 
                 document.getElementById('codeOutput').value = `/* ========================================\n   🧠 PLAN TÉCNICO (GEMINI PURO):\n----------------------------------------\n${techPlanStr}\n======================================== */\n\n${rawCode}`;
@@ -635,7 +692,9 @@ Traduce el siguiente JSON técnico a código JavaScript puro (retornando main(pa
                 }
                 
                 let text = "";
-                if (selectedModel.startsWith("groq-")) {
+                if (cluster) {
+                    text = await fetchClusterCoder(sys, finalPrompt, false);
+                } else if (selectedModel.startsWith("groq-")) {
                     const groqModelName = selectedModel.replace("groq-", "");
                     text = await fetchGroq(groqModelName, groqKey, sys, finalPrompt, false);
                 } else {

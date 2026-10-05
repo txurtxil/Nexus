@@ -624,7 +624,7 @@ def main(page: ft.Page):
             ft.Row([lbl_param_tex, dd_mat]), ft.Divider(color="#333333"), 
             lbl_param_kine, r_kine,
             panel_ensamble_ops
-        ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#333333"))
+        ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.Border.all(1, "#333333"))
 
         def select_tool(nombre_herramienta):
             nonlocal herramienta_actual
@@ -692,7 +692,7 @@ def main(page: ft.Page):
                 ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/openscad_engine.html", read_only=True, text_size=13, text_align="center", bgcolor="#161B22", color="#00E676"),
                 lbl_nexus_pc,
                 ft.TextField(value=f"http://{LAN_IP}:{LOCAL_PORT}/nexus_pc.html", read_only=True, text_size=13, text_align="center", bgcolor="#161B22", color="#00E5FF")
-            ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.border.all(1, "#00E5FF")),
+            ]), bgcolor="#1E1E1E", padding=10, border_radius=8, border=ft.Border.all(1, "#00E5FF")),
             ft.Container(height=5),
             ft.ElevatedButton(content=lbl_btn_open_native, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/openscad_engine.html", bgcolor="#00E676", height=60, width=float('inf')),
         ], expand=True, scroll="auto")
@@ -702,7 +702,7 @@ def main(page: ft.Page):
             for i in range(MAX_ASSEMBLY_PARTS):
                 df = ft.Dropdown(options=[], width=160, text_size=12, bgcolor="#0B0E14", color="#00E5FF"); dm = ft.Dropdown(options=[ft.dropdown.Option("pla"), ft.dropdown.Option("petg"), ft.dropdown.Option("carbon"), ft.dropdown.Option("glass"), ft.dropdown.Option("aluminum"), ft.dropdown.Option("copper"), ft.dropdown.Option("wood"), ft.dropdown.Option("gold")], value="pla", width=100, text_size=12, bgcolor="#0B0E14")
                 sl_x = ft.Slider(min=-200, max=200, value=0, expand=True); sl_y = ft.Slider(min=-200, max=200, value=0, expand=True); sl_z = ft.Slider(min=-200, max=200, value=0, expand=True)
-                card = ft.Container(bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#C51162"), visible=False)
+                card = ft.Container(bgcolor="#161B22", padding=10, border_radius=8, border=ft.Border.all(1, "#C51162"), visible=False)
                 def make_change_handler(idx, d_f, d_m, s_x, s_y, s_z):
                     def handler(e):
                         if not ASSEMBLY_PARTS_STATE[idx]["active"]: return
@@ -756,7 +756,7 @@ def main(page: ft.Page):
         view_pbr = ft.Column([ft.Container(height=20), lbl_pbr_studio, lbl_pbr_desc, ft.Container(height=20), ft.ElevatedButton(content=lbl_btn_open_pbr, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/pbr_studio.html", bgcolor="#C51162", height=70, width=float('inf'))], expand=True, horizontal_alignment="center")
 
         txt_dim_x = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_dim_y = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_dim_z = ft.Text("0.0 mm", color="#00E5FF", weight="bold"); txt_vol = ft.Text("0.0 cm³", color="#FFAB00", weight="bold"); txt_peso = ft.Text("0.0 g", color="#00E676", weight="bold")
-        panel_calibre = ft.Container(content=ft.Column([lbl_caliper, ft.Row([ft.Text("X:", color="#8B949E", width=20), txt_dim_x, ft.Text("Y:", color="#8B949E", width=20), txt_dim_y]), ft.Row([ft.Text("Z:", color="#8B949E", width=20), txt_dim_z, ft.Text("Vol:", color="#8B949E", width=25), txt_vol])]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#2962FF"))
+        panel_calibre = ft.Container(content=ft.Column([lbl_caliper, ft.Row([ft.Text("X:", color="#8B949E", width=20), txt_dim_x, ft.Text("Y:", color="#8B949E", width=20), txt_dim_y]), ft.Row([ft.Text("Z:", color="#8B949E", width=20), txt_dim_z, ft.Text("Vol:", color="#8B949E", width=25), txt_vol])]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.Border.all(1, "#2962FF"))
 
         rename_target = ""
         tf_rename = ft.TextField(label=lang.t("tf_new_name"), bgcolor="#161B22", color="#00E5FF")
@@ -867,7 +867,7 @@ def main(page: ft.Page):
         
         view_archivos = ft.Column([
             panel_calibre,
-            ft.Container(content=ft.Column([ft.Row([lbl_internal_db, ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"), ft.ElevatedButton(content=lbl_btn_web_injector, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00B0FF"), ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.border.all(1, "#00E676")),
+            ft.Container(content=ft.Column([ft.Row([lbl_internal_db, ft.ElevatedButton("🔄", on_click=lambda _: refresh_nexus_db(), bgcolor="#1E1E1E", width=50)], alignment="spaceBetween"), ft.ElevatedButton(content=lbl_btn_web_injector, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/upload_ui.html", bgcolor="#00B0FF"), ft.Container(content=list_nexus_db, bgcolor="#0B0E14", border_radius=5, padding=5)]), bgcolor="#161B22", padding=10, border_radius=8, border=ft.Border.all(1, "#00E676")),
             ft.Container(content=ft.Column([lbl_native_exp, row_quick_paths, ft.Row([tf_path, ft.ElevatedButton(content=lbl_btn_go, on_click=lambda _: nav_to(tf_path.value), bgcolor="#FFAB00")]), ft.ElevatedButton(content=lbl_btn_save_code, on_click=save_to_android, bgcolor="#0D47A1", width=float('inf')), ft.Container(content=list_android, bgcolor="#0B0E14", border_radius=5, padding=5)]), bgcolor="#161B22", padding=10, border_radius=8)
         ], expand=True, scroll="auto")
 
@@ -1042,7 +1042,7 @@ def main(page: ft.Page):
             ft.ElevatedButton(content=lbl_info, bgcolor="#21262D", on_click=open_about_dialog, tooltip="About / Acerca de")
         ])
 
-        page.add(ft.Container(content=ft.Column([main_nav_bar, main_container, status_bar], expand=True), padding=ft.padding.only(top=45, left=5, right=5, bottom=5), expand=True))
+        page.add(ft.Container(content=ft.Column([main_nav_bar, main_container, status_bar], expand=True), padding=ft.Padding.only(top=45, left=5, right=5, bottom=5), expand=True))
         
         select_tool("planetario")
         refresh_explorer(current_android_dir)

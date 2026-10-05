@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "NEXUS CAD - Diseño 3D offline"
 requires-python = ">=3.9"
 dependencies = [
-    "flet"
+    "flet==0.86.5"
 ]
 
 [tool.flet]

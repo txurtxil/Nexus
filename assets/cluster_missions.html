@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🦀 Misiones 3D — Cluster TXURTXIL</title>
+<style>
+  :root { --bg:#12100e; --panel:#1e1a17; --accent:#e8722a; --ok:#3ddc84; --warn:#ffcc00; --bad:#ff5252; --txt:#e8e2da; }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--txt); font-family: system-ui, sans-serif; margin: 0; padding: 12px; }
+  h1 { font-size: 1.2rem; color: var(--accent); margin: 4px 0 12px; }
+  h2 { font-size: 1rem; margin: 18px 0 6px; color: var(--accent); }
+  .panel { background: var(--panel); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  label { font-size: .8rem; opacity: .8; display: block; margin: 6px 0 2px; }
+  input, textarea, select { width: 100%; background: #2a2521; color: var(--txt); border: 1px solid #444; border-radius: 6px; padding: 8px; font-size: .9rem; }
+  textarea { font-family: monospace; font-size: .75rem; min-height: 140px; resize: vertical; }
+  button { background: var(--accent); color: #1a120b; font-weight: bold; border: none; border-radius: 8px; padding: 10px 14px; margin: 8px 4px 0 0; font-size: .9rem; }
+  button.sec { background: #4a423c; color: var(--txt); }
+  button:disabled { opacity: .4; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 130px; }
+  pre { background: #0a0908; border-radius: 6px; padding: 8px; font-size: .72rem; overflow-x: auto; white-space: pre-wrap; max-height: 220px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: .75rem; margin-top: 8px; }
+  td, th { border-bottom: 1px solid #3a332e; padding: 4px 6px; text-align: left; word-break: break-all; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .75rem; font-weight: bold; }
+  .pill.RUNNING { background: #4a423c; } .pill.DONE { background: #1b5e20; } .pill.FAILED { background: #7a1010; }
+</style>
+</head>
+<body>
+<h1>🦀 Misiones 3D — Cluster TXURTXIL</h1>
+
+<div class="panel">
+  <label>Cluster URL (compartida con IA):</label>
+  <input type="text" id="clusterUrl" placeholder="http://192.168.10.140:8200">
+  <label>Cluster API Key:</label>
+  <input type="password" id="clusterKey" placeholder="sk-cluster-...">
+  <div class="row">
+    <button class="sec" onclick="saveCfg()">💾 Guardar config</button>
+    <button class="sec" onclick="loadGens()">📋 Generadores</button>
+    <button class="sec" onclick="refreshRuns()">🔄 Runs</button>
+  </div>
+  <select id="gensSel" style="margin-top:8px" onchange="if(this.value)document.getElementById('genName').value=this.value"><option value="">— generadores existentes —</option></select>
+</div>
+
+<div class="panel">
+  <h2>1 · Descripción → generador (Qwen3-Coder-30B)</h2>
+  <label>Describe la pieza (medidas en mm, qué va a soportar, agujeros...):</label>
+  <textarea id="prompt" style="min-height:80px" placeholder="soporte angular de 40x20x3mm con agujero de 8mm para tornillo M8"></textarea>
+  <label>Nombre de la pieza/run (letras, números, _ -):</label>
+  <input type="text" id="runName" placeholder="soporte_m8_v1">
+  <button id="btnGen" onclick="writeGen()">✍️ Escribir generador bpy</button>
+  <div id="genBox" style="display:none">
+    <label>gen_<span id="genSlug"></span>.py (editable antes de lanzar):</label>
+    <textarea id="genCode" style="min-height:200px"></textarea>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>2 · Lanzar misión (Blender z1 → render → juez VLM)</h2>
+  <label>Pregunta para el juez VLM:</label>
+  <input type="text" id="ask" value="Describe la pieza renderizada: forma, color y detalles. Una frase.">
+  <div class="row">
+    <div><label>Generador (archivo):</label><input type="text" id="genName" placeholder="gen_soporte_m8_v1.py"></div>
+  </div>
+  <button id="btnLaunch" onclick="launchMission()">🚀 Lanzar misión</button>
+  <div id="launchOut"></div>
+</div>
+
+<div class="panel">
+  <h2>3 · Estado del run</h2>
+  <div id="statusBox">— sin run activo —</div>
+  <div id="pollCtl" style="display:none"><button class="sec" onclick="stopPoll()">⏹ Dejar de vigilar</button></div>
+</div>
+
+<div class="panel">
+  <h2>4 · Artefactos (sha256 verificado)</h2>
+  <div id="artsBox">—</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let poller = null;
+
+function cfg() {
+  const url = ($('clusterUrl').value.trim() || 'http://192.168.10.140:8200').replace(/\/$/, '');
+  return { url, key: $('clusterKey').value.trim() };
+}
+function saveCfg() {
+  localStorage.setItem('nexus_cluster_url', $('clusterUrl').value.trim());
+  localStorage.setItem('nexus_cluster_key', $('clusterKey').value.trim());
+  alert('💾 Config guardada (compartida con la pestaña IA).');
+}
+async function api(path, body, method) {
+  const c = cfg();
+  if (!c.key) throw new Error('Falta Cluster API Key.');
+  const res = await fetch(c.url + path, { method: method || (body ? 'POST' : 'GET'),
+    headers: { 'X-Api-Key': c.key, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+  return data;
+}
+function slug(s) { return (s || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48); }
+
+async function writeGen() {
+  const btn = $('btnGen'); btn.disabled = true; btn.innerText = '⏳ El Coder escribe...';
+  try {
+    const name = $('runName').value.trim();
+    const s = slug(name); if (!s) throw new Error('Pon un nombre de pieza válido.');
+    $('genSlug').innerText = s; $('genName').value = 'gen_' + s + '.py';
+    const system = 'Eres un ingeniero OpenSCAD/Blender experto del cluster TXURTXIL. Escribe un generador Python para Blender headless que cumpla ESTE CONTRATO EXACTO: ' +
+      '1) diccionario P con todos los parametros en mm (1 BU = 1 mm), 2) limpiar la escena, 3) construir la pieza con primitivas bpy, 4) aplicar transforms, ' +
+      '5) guardar con bpy.ops.wm.save_as_mainfile(filepath=sys.argv[sys.argv.index("--")+1]), 6) imprimir GEN_OK al final. ' +
+      'Responde UNICAMENTE con el codigo python, sin markdown, sin explicaciones.';
+    const code = await (async () => {
+      const d = await api('/coder/ask', { system, prompt: $('prompt').value.trim(), json_mode: false });
+      return d.answer;
+    })();
+    $('genCode').value = code.replace(/```python|```/g, '').trim();
+    $('genBox').style.display = 'block';
+  } catch (e) { alert('❌ ' + e.message); }
+  btn.disabled = false; btn.innerText = '✍️ Escribir generador bpy';
+}
+
+async function launchMission() {
+  const out = $('launchOut'); out.innerHTML = '';
+  try {
+    const name = $('runName').value.trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) throw new Error('Nombre de run inválido [A-Za-z0-9_-]{1,64}');
+    const gen = $('genName').value.trim();
+    const body = { name, gen, ask: $('ask').value.trim() };
+    const genBoxVisible = $('genBox').style.display === 'block';
+    if (genBoxVisible && $('genCode').value.trim()) body.gen_code = $('genCode').value;
+    const d = await api('/mission', body);
+    out.innerHTML = '<span class="ok">🚀 Lanzada: ' + d.run_id + ' (' + d.gen + ')</span>';
+    watchRun(d.run_id);
+  } catch (e) { out.innerHTML = '<span class="bad">❌ ' + e.message + '</span>'; }
+}
+
+async function watchRun(runId) {
+  if (poller) clearInterval(poller);
+  $('pollCtl').style.display = 'block';
+  const tick = async () => {
+    try {
+      const st = await api('/mission/' + runId);
+      const sb = $('statusBox');
+      let html = '<div><span class="pill ' + st.status + '">' + st.status + '</span> <b>' + runId + '</b></div>';
+      if (st.exitcode !== undefined) html += '<div>exitcode: ' + st.exitcode + '</div>';
+      if (st.bbox) html += '<pre>' + JSON.stringify(st.bbox, null, 1).slice(0, 600) + '</pre>';
+      if (st.verificacion) html += '<pre>' + st.verificacion.slice(0, 500) + '</pre>';
+      if (st.log_tail) html += '<pre class="warn">' + st.log_tail.slice(-600) + '</pre>';
+      sb.innerHTML = html;
+      if (st.status === 'DONE' || st.status === 'FAILED') {
+        stopPoll();
+        if (st.status === 'DONE') loadArts(runId);
+      }
+    } catch (e) { $('statusBox').innerHTML = '<span class="bad">❌ ' + e.message + '</span>'; }
+  };
+  tick(); poller = setInterval(tick, 5000);
+}
+function stopPoll() { if (poller) { clearInterval(poller); poller = null; } }
+
+async function loadArts(runId) {
+  const box = $('artsBox');
+  try {
+    const d = await api('/artifacts/' + runId);
+    let html = '<table><tr><th>archivo</th><th>tamaño</th><th>sha256</th><th></th></tr>';
+    for (const a of d.artifacts) {
+      html += '<tr><td>' + a.file + '</td><td>' + a.size + '</td><td title="' + a.sha256 + '">' + a.sha256.slice(0, 12) + '…</td>' +
+              '<td><button class="sec" onclick="dl(\'' + runId + '\',\'' + a.file + '\',\'' + a.sha256 + '\')">⬇</button></td></tr>';
+    }
+    box.innerHTML = html + '</table>';
+  } catch (e) { box.innerHTML = '<span class="bad">❌ ' + e.message + '</span>'; }
+}
+
+async function dl(runId, file, expectSha) {
+  try {
+    const c = cfg();
+    const res = await fetch(c.url + '/artifacts/' + runId + '/' + file, { headers: { 'X-Api-Key': c.key } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buf = await res.arrayBuffer();
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    const sha = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+    if (sha !== expectSha) throw new Error('sha256 NO coincide: ' + sha.slice(0, 16));
+    const blob = new Blob([buf]);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = runId + '_' + file; a.click();
+    URL.revokeObjectURL(a.href);
+    alert('✅ ' + file + ' descargado, sha256 verificado');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+async function loadGens() {
+  try {
+    const gens = await api('/gens');
+    $('gensSel').innerHTML = '<option value="">— generadores existentes —</option>' +
+      gens.map(g => '<option value="' + g + '">' + g + '</option>').join('');
+    if (!gens.length) alert('No hay gen_*.py en ~/pipeline3d');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+async function refreshRuns() {
+  try {
+    const runs = await api('/missions');
+    $('artsBox').innerHTML = runs.length ? '<pre>' + runs.join('\n') + '</pre>' : '(sin runs)';
+  } catch (e) { alert('❌ ' + e.message); }
+}
+
+// init: compartir config con ia_assistant.html
+$('clusterUrl').value = localStorage.getItem('nexus_cluster_url') || '';
+$('clusterKey').value = localStorage.getItem('nexus_cluster_key') || '';
+</script>
+</body>
+</html>

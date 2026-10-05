@@ -388,6 +388,9 @@ def main(page: ft.Page):
         lbl_ia_btn = ft.Text(lang.t("ia_btn"), color="white")
         btn_ia_open = ft.ElevatedButton(content=lbl_ia_btn, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/ia_assistant.html", bgcolor="#8E24AA", height=70, width=float('inf'))
         lbl_ia_hint = ft.Text(lang.t("ia_hint"), color="#8B949E", size=12, text_align="center")
+        lbl_missions_btn = ft.Text(lang.t("missions_btn"), color="white")
+        btn_missions = ft.ElevatedButton(content=lbl_missions_btn, url=f"http://{INTERNAL_IP}:{LOCAL_PORT}/cluster_missions.html", bgcolor="#8B0000", height=70, width=float('inf'))
+        lbl_missions_hint = ft.Text(lang.t("missions_hint"), color="#8B949E", size=12, text_align="center")
 
         # Pestaña Sliders
         lbl_cat_opts = ft.Text(lang.t("cat_opts"), size=12, color="#8B949E")
@@ -653,7 +656,9 @@ def main(page: ft.Page):
             ft.Container(height=20), 
             btn_ia_open, 
             ft.Container(height=10), 
-            lbl_ia_hint
+            btn_missions,
+            ft.Container(height=4),
+            lbl_missions_hint
         ], expand=True, horizontal_alignment="center")
 
         btn_render_3d = ft.ElevatedButton(content=lbl_btn_render, on_click=lambda _: run_render(), bgcolor="#00E676", height=50, width=float('inf'))
@@ -987,7 +992,7 @@ def main(page: ft.Page):
             lbl_info.value = lang.t("btn_info"); lbl_lang.value = lang.t("btn_lang")
             
             # Studio
-            lbl_ia_title.value = lang.t("ia_title"); lbl_ia_desc.value = lang.t("ia_desc"); lbl_ia_btn.value = lang.t("ia_btn"); lbl_ia_hint.value = lang.t("ia_hint")
+            lbl_ia_title.value = lang.t("ia_title"); lbl_ia_desc.value = lang.t("ia_desc"); lbl_ia_btn.value = lang.t("ia_btn"); lbl_ia_hint.value = lang.t("ia_hint"); lbl_missions_btn.value = lang.t("missions_btn"); lbl_missions_hint.value = lang.t("missions_hint")
             lbl_cat_opts.value = lang.t("cat_opts"); lbl_cat_sketch.value = lang.t("cat_sketch"); lbl_cat_forge.value = lang.t("cat_forge"); lbl_cat_prod.value = lang.t("cat_prod")
             lbl_cat_loft.value = lang.t("cat_loft"); lbl_cat_mech.value = lang.t("cat_mech"); lbl_cat_basic.value = lang.t("cat_basic")
             lbl_param_title.value = lang.t("param_title"); sw_ensamble.label = lang.t("param_asm"); lbl_param_tex.value = lang.t("param_tex"); lbl_param_kine.value = lang.t("param_kine")

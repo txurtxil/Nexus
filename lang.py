@@ -12,6 +12,7 @@ translations = {
         
         # UI Studio
         "ia_title": "AI AGENT ACTIVE", "ia_desc": "Copilot Assistant & Agentic Builder.",
+        "missions_btn": "🦀 3D CLUSTER MISSIONS", "missions_hint": "Design by prompt with the local LLM cluster (Blender + Metrics).",
         "ia_btn": "🚀 OPEN AI ENVIRONMENT", "ia_hint": "💡 Analysis runs in background. Use tabs above to view code.",
         "cat_opts": "💡 Options:", "cat_sketch": "📐 Sketches:", "cat_forge": "⚔️ STL FORGE:",
         "cat_prod": "🏭 Production:", "cat_loft": "🌪️ Shapes:", "cat_mech": "⚙️ Mechanics:", "cat_basic": "📦 Basics:",
@@ -65,6 +66,7 @@ translations = {
         
         # UI Studio
         "ia_title": "AGENTE IA ACTIVO", "ia_desc": "Asistente Copilot y Generador Agentic.",
+        "missions_btn": "🦀 MISIONES 3D CLUSTER", "missions_hint": "Diseña por texto con el cluster local de LLMs (Blender + Métricas).",
         "ia_btn": "🚀 ABRIR ENTORNO IA", "ia_hint": "💡 El análisis ocurre en segundo plano. Usa las pestañas de arriba.",
         "cat_opts": "💡 Opciones:", "cat_sketch": "📐 Bocetos:", "cat_forge": "⚔️ STL FORGE:",
         "cat_prod": "🏭 Producción:", "cat_loft": "🌪️ Formas:", "cat_mech": "⚙️ Mecánica:", "cat_basic": "📦 Básico:",

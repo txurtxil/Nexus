@@ -41,6 +41,8 @@
     <button class="sec" onclick="refreshRuns()">🔄 Runs</button>
   </div>
   <select id="gensSel" style="margin-top:8px" onchange="if(this.value)document.getElementById('genName').value=this.value"><option value="">— generadores existentes —</option></select>
+  <label>🧩 Plantillas y ejemplos del cluster:</label>
+  <select id="tplSel" style="margin-top:4px" onchange="applyTpl()"><option value="">— elegir plantilla —</option></select>
 </div>
 
 <div class="panel">
@@ -206,9 +208,29 @@ async function refreshRuns() {
   } catch (e) { alert('❌ ' + e.message); }
 }
 
+const TEMPLATES = [
+  ["🚢 Petrolero v3 — 533 piezas (casco por estaciones, tapas abanico)", "gen_petrolero_v3.py", "petrolero_v3", "Petrolero completo v3: casco por estaciones, tapas abanico, cubierta loft"],
+  ["🖥️ Chasis BC-250", "gen_chasis.py", "chasis_bc250", "Chasis para placa BC-250"],
+  ["⚙️ Soporte angular M8 (verificado)", "gen_bracket.py", "bracket_m8_v1", "Soporte angular 40x20x3mm con agujero de 8mm"],
+  ["🗼 Torre Eiffel", "gen_eiffel.py", "eiffel_v1", "Torre Eiffel parametrica"],
+  ["🚀 Cohete estilo Falcon", "gen_cohete_estilo_falcon.py", "falcon_v1", "Cohete reutilizable estilo Falcon"],
+  ["🌀 Tapa ventilador", "gen_tapa_ventilador.py", "tapa_fan_v1", "Tapa de ventilador"],
+  ["🖼️ Moldura", "gen_moldura.py", "moldura_v1", "Moldura decorativa"]
+];
+function applyTpl() {
+  const t = TEMPLATES[$('tplSel').selectedIndex - 1];
+  if (!t) return;
+  $('genName').value = t[1];
+  $('runName').value = t[2];
+  $('prompt').value = t[3];
+  $('gensSel').value = t[1];
+}
+
 // init: compartir config con ia_assistant.html
 $('clusterUrl').value = localStorage.getItem('nexus_cluster_url') || '';
 $('clusterKey').value = localStorage.getItem('nexus_cluster_key') || '';
+$('tplSel').innerHTML = '<option value="">— elegir plantilla —</option>' +
+  TEMPLATES.map((t,i) => '<option value="' + i + '">' + t[0] + '</option>').join('');
 </script>
 </body>
 </html>

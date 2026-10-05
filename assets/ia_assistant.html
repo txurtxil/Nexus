@@ -118,7 +118,10 @@
 </div>
 
 <div class="content">
-    <div class="api-grid">
+    <div style="background:#8B0000;color:#fff;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.85rem;font-weight:bold">
+        🦀 MODO CLUSTER TXURTXIL — motor local Qwen3 (bc250 + z1). Sin nube.
+    </div>
+    <div class="api-grid" style="display:none">
         <div>
             <label>Groq API Key (Cerebro Lógico):</label>
             <input type="password" id="groqKey" placeholder="gsk_..." value="">
@@ -129,7 +132,7 @@
         </div>
     </div>
 
-    <div class="api-grid">
+    <div class="api-grid" style="display:none">
         <div>
             <label>Supabase URL:</label>
             <input type="text" id="supaUrl" value="https://kggoqfvegxkmbpskxfzw.supabase.co" placeholder="https://xxxx.supabase.co">
@@ -154,16 +157,9 @@
     <div>
         <label>Motor IA (Compilador / Creador de Código):</label>
         <select id="modelSelector" onchange="toggleManualModel()">
-            <optgroup label="Principal (Google)">
-                <option value="gemini-3.1-flash-lite-preview" selected>Gemini 3.1 Flash Lite (Estable)</option>
+            <optgroup label="🦀 Cluster TXURTXIL (único motor)">
+                <option value="cluster-qwen3-coder" selected>🦀 Qwen3-Coder-30B (bc250) + Qwen3-VL-8B (visión)</option>
             </optgroup>
-            <optgroup label="Alternativa (Groq Fallback)">
-                <option value="groq-openai/gpt-oss-120b">Groq: GPT-OSS 120B (Mejor en Código)</option>
-            </optgroup>
-            <optgroup label="🦀 Cluster TXURTXIL (LAN)">
-                <option value="cluster-qwen3-coder">🦀 Qwen3-Coder-30B (bc250) + Qwen3-VL-8B (vision)</option>
-            </optgroup>
-            <option value="manual">⚙️ Otro (Introducir manualmente)...</option>
         </select>
         <input type="text" id="manualModelInput" placeholder="Ej: gemini-experimental" style="display:none; margin-top:5px;">
     </div>
@@ -171,10 +167,9 @@
     <div class="toggle-container">
         <label style="color:#FFAB00; font-size: 11px; font-weight: bold; margin:0;">⚡ MODO:</label>
         <select id="aiMode" style="flex-grow: 1; padding: 8px; background: #0B0E14; border: 1px solid #30363D; color: #00E5FF; border-radius: 4px;">
-            <option value="architect">🧠 Doble Agente (Groq Razona -> Motor Programa)</option>
-            <option value="gemini_only">👁️ Gemini Puro (Visión -> Código sin Groq)</option>
-            <option value="copilot">🛠️ Copiloto Libre (Solo Motor Seleccionado)</option>
-            <option value="agentic">🎛️ Agentic UI (Slicer App)</option>
+            <option value="copilot" selected>🛠️ Directo (Coder escribe el código)</option>
+            <option value="architect">🧠 Arquitecto (plano JSON → Coder programa)</option>
+            <option value="gemini_only">👁️ Visión → Código (Qwen3-VL analiza tu foto)</option>
         </select>
     </div>
 
